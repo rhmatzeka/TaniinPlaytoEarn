@@ -98,6 +98,7 @@ public class MainActivity extends Activity {
         private final Rect src = new Rect();
         private final RectF dst = new RectF();
         private final List<Plot> plots = new ArrayList<>();
+        private final List<RectF> collisionRects = new ArrayList<>();
         private final List<ChainAction> pendingChainActions = new ArrayList<>();
         private final BlockchainClient blockchainClient = new BlockchainClient();
         private final SharedPreferences preferences;
@@ -169,25 +170,59 @@ public class MainActivity extends Activity {
                 tmxMap = TmxMap.load(context, "game/map.tmx");
                 worldWidthPixels = tmxMap.getWorldWidthPixels(TILE);
                 worldHeightPixels = tmxMap.getWorldHeightPixels(TILE);
-                mapStatus = "TMX map loaded";
+                collisionRects.clear();
+                tmxMap.appendCollisionRects(collisionRects, TILE);
+                mapStatus = "TMX map loaded: " + collisionRects.size() + " colliders";
             } catch (Exception exception) {
                 tmxMap = null;
+                collisionRects.clear();
+                createFallbackCollisionRects();
                 mapStatus = "TMX gagal: " + exception.getMessage();
             }
         }
 
         private void createWorld() {
-            int startX = 7;
-            int startY = 25;
-            for (int i = 0; i < 6; i++) {
-                Plot plot = new Plot((startX + i * 3) * TILE, startY * TILE, 2 * TILE, 6 * TILE);
+            int farmY = 19;
+            int[] farmColumns = {4, 6, 8, 10, 12};
+            for (int i = 0; i < farmColumns.length; i++) {
+                Plot plot = new Plot(farmColumns[i] * TILE, farmY * TILE, 2 * TILE, 4 * TILE);
                 plot.owned = i == 0;
                 plots.add(plot);
             }
-            for (int i = 0; i < 4; i++) {
-                Plot plot = new Plot((45 + i * 4) * TILE, 22 * TILE, 3 * TILE, 6 * TILE);
-                plots.add(plot);
-            }
+        }
+
+        private void createFallbackCollisionRects() {
+            addCollisionRect(0, 7 * TILE, 44 * TILE, 4 * TILE);
+            addCollisionRect(0, 0, 3 * TILE, WORLD_ROWS * TILE);
+            addCollisionRect(0, 45 * TILE, 34 * TILE, 7 * TILE);
+            addCollisionRect(52 * TILE, 0, 4 * TILE, 19 * TILE);
+
+            addFenceCollision(27 * TILE, 22 * TILE, 22 * TILE, 11 * TILE);
+            addFenceCollision(6 * TILE, 23 * TILE, 20 * TILE, 9 * TILE);
+
+            addHouseCollision(32 * TILE, 24 * TILE, 7 * TILE, 7 * TILE);
+            addHouseCollision(56 * TILE, 10 * TILE, 7 * TILE, 7 * TILE);
+            addCollisionRect(39 * TILE, 29 * TILE, 4.6f * TILE, 1.3f * TILE);
+
+            addTreeCollision(6 * TILE, 15 * TILE, 1.2f);
+            addTreeCollision(14 * TILE, 13 * TILE, 1.0f);
+            addTreeCollision(23 * TILE, 13 * TILE, 1.0f);
+            addTreeCollision(42 * TILE, 13 * TILE, 1.0f);
+            addTreeCollision(62 * TILE, 5 * TILE, 1.05f);
+            addTreeCollision(58 * TILE, 22 * TILE, 1.0f);
+            addTreeCollision(31 * TILE, 43 * TILE, 1.3f);
+            addTreeCollision(37 * TILE, 43 * TILE, 1.3f);
+            addTreeCollision(43 * TILE, 43 * TILE, 1.3f);
+            addTreeCollision(49 * TILE, 43 * TILE, 1.3f);
+
+            addCollisionRect(17 * TILE, 16 * TILE + 12, 58, 30);
+            addCollisionRect(31 * TILE, 15 * TILE + 12, 58, 30);
+            addCollisionRect(13 * TILE, 10 * TILE + 9, 24, 18);
+            addCollisionRect(54 * TILE, 32 * TILE + 9, 24, 18);
+            addCollisionRect(65 * TILE, 29 * TILE + 9, 24, 18);
+            addCollisionRect(40 * TILE, 30 * TILE, 42, 42);
+            addCollisionRect(29 * TILE, 32 * TILE, 64, 32);
+            addCollisionRect(45 * TILE, 30 * TILE, 86, 64);
         }
 
         @Override
@@ -212,8 +247,9 @@ public class MainActivity extends Activity {
             if (moving) {
                 float nx = dx / Math.max(distance, 1f);
                 float ny = dy / Math.max(distance, 1f);
-                playerX = clamp(playerX + nx * PLAYER_SPEED * dt, 2 * TILE, worldWidthPixels - 2 * TILE);
-                playerY = clamp(playerY + ny * PLAYER_SPEED * dt, 2 * TILE, worldHeightPixels - 2 * TILE);
+                movePlayer(
+                        playerX + nx * PLAYER_SPEED * dt,
+                        playerY + ny * PLAYER_SPEED * dt);
                 if (now - walkTickMs > 120L) {
                     walkFrame = (walkFrame + 1) % 6;
                     walkTickMs = now;
@@ -228,6 +264,34 @@ public class MainActivity extends Activity {
             }
         }
 
+        private void movePlayer(float targetX, float targetY) {
+            float nextX = clamp(targetX, 1.2f * TILE, worldWidthPixels - 1.2f * TILE);
+            float nextY = clamp(targetY, 1.2f * TILE, worldHeightPixels - 1.2f * TILE);
+            if (!collidesAt(nextX, playerY)) {
+                playerX = nextX;
+            }
+            if (!collidesAt(playerX, nextY)) {
+                playerY = nextY;
+            }
+        }
+
+        private boolean collidesAt(float x, float y) {
+            RectF hitbox = playerHitbox(x, y);
+            for (RectF obstacle : collisionRects) {
+                if (RectF.intersects(hitbox, obstacle)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private RectF playerHitbox(float x, float y) {
+            float halfW = TILE * 0.22f;
+            float top = y - TILE * 0.18f;
+            float bottom = y + TILE * 0.16f;
+            return new RectF(x - halfW, top, x + halfW, bottom);
+        }
+
         private void drawGame(Canvas canvas, long now) {
             int width = getWidth();
             int height = getHeight();
@@ -240,13 +304,16 @@ public class MainActivity extends Activity {
                 drawDecorations(canvas);
             }
             drawPlayer(canvas, now);
+            if (tmxMap != null) {
+                tmxMap.drawForeground(canvas, cameraX, cameraY, TILE);
+            }
             drawHud(canvas, now);
         }
 
         private void drawWorld(Canvas canvas) {
             if (tmxMap != null) {
                 canvas.drawColor(Color.rgb(113, 181, 82));
-                tmxMap.draw(canvas, cameraX, cameraY, TILE);
+                tmxMap.drawBackground(canvas, cameraX, cameraY, TILE);
                 return;
             }
 
@@ -319,11 +386,14 @@ public class MainActivity extends Activity {
                     : Math.min(2, (int) ((now - plot.plantedAtMs) / (GROW_TIME_MS / 3)));
             int cell = 16;
             src.set(stage * cell, 0, stage * cell + cell, cell);
-            for (int row = 1; row < 7; row += 2) {
-                for (int col = 0; col < 3; col++) {
-                    float x = plot.x + col * TILE + 7 - cameraX;
-                    float y = plot.y + row * TILE + 8 - cameraY;
-                    dst.set(x, y, x + 22, y + 22);
+            int cols = Math.max(1, Math.round(plot.w / TILE));
+            int rows = Math.max(1, Math.round(plot.h / TILE));
+            float cropSize = TILE * 0.42f;
+            for (int row = 0; row < rows; row++) {
+                for (int col = 0; col < cols; col++) {
+                    float x = plot.x + col * TILE + (TILE - cropSize) * 0.5f - cameraX;
+                    float y = plot.y + row * TILE + TILE * 0.34f - cameraY;
+                    dst.set(x, y, x + cropSize, y + cropSize);
                     canvas.drawBitmap(cropSheet, src, dst, pixelPaint);
                 }
             }
@@ -379,28 +449,29 @@ public class MainActivity extends Activity {
 
         private void drawPlayer(Canvas canvas, long now) {
             Bitmap sheet = moving ? walkSheet : idleSheet;
-            int frameW = 16;
+            int frameW = 32;
             int frameH = 32;
             int columns = Math.max(1, sheet.getWidth() / frameW);
             int frame = moving ? walkFrame : (int) ((now / 240L) % 6L);
             int frameIndex = frame % columns;
             src.set(frameIndex * frameW, 0, frameIndex * frameW + frameW, frameH);
 
-            float playerHeight = TILE * 1.12f;
-            float playerWidth = playerHeight * 0.56f;
-            float screenX = playerX - cameraX - playerWidth * 0.5f;
-            float screenY = playerY - cameraY - playerHeight * 0.82f;
+            float playerSize = TILE * 1.35f;
+            float screenX = playerX - cameraX - playerSize * 0.5f;
+            float screenY = playerY - cameraY - playerSize * 0.78f;
+            float footX = playerX - cameraX;
+            float footY = playerY - cameraY + TILE * 0.05f;
 
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(Color.argb(80, 0, 0, 0));
             canvas.drawOval(
-                    screenX + playerWidth * 0.20f,
-                    screenY + playerHeight * 0.78f,
-                    screenX + playerWidth * 0.80f,
-                    screenY + playerHeight * 0.94f,
+                    footX - TILE * 0.22f,
+                    footY - TILE * 0.06f,
+                    footX + TILE * 0.22f,
+                    footY + TILE * 0.07f,
                     paint);
 
-            dst.set(screenX, screenY, screenX + playerWidth, screenY + playerHeight);
+            dst.set(screenX, screenY, screenX + playerSize, screenY + playerSize);
             canvas.drawBitmap(sheet, src, dst, pixelPaint);
         }
 
@@ -1017,6 +1088,28 @@ public class MainActivity extends Activity {
 
         private void drawWorldLine(Canvas canvas, float x1, float y1, float x2, float y2) {
             canvas.drawLine(x1 - cameraX, y1 - cameraY, x2 - cameraX, y2 - cameraY, paint);
+        }
+
+        private void addFenceCollision(float x, float y, float w, float h) {
+            float rail = TILE * 0.24f;
+            addCollisionRect(x, y, w, rail);
+            addCollisionRect(x, y + h - rail, w, rail);
+            addCollisionRect(x, y, rail, h);
+            addCollisionRect(x + w - rail, y, rail, h);
+        }
+
+        private void addHouseCollision(float x, float y, float w, float h) {
+            addCollisionRect(x + TILE * 0.18f, y + TILE * 0.48f, w - TILE * 0.36f, h - TILE * 0.64f);
+            addCollisionRect(x + TILE * 0.45f, y + h - TILE * 1.02f, TILE * 0.62f, TILE * 0.72f);
+        }
+
+        private void addTreeCollision(float x, float y, float scale) {
+            float s = TILE * scale;
+            addCollisionRect(x + s * 0.16f, y + s * 0.62f, s * 0.68f, s * 0.55f);
+        }
+
+        private void addCollisionRect(float x, float y, float w, float h) {
+            collisionRects.add(new RectF(x, y, x + w, y + h));
         }
 
         private static float clamp(float value, float min, float max) {

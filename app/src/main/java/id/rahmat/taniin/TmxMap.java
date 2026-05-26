@@ -17,7 +17,10 @@ import org.w3c.dom.NodeList;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 
@@ -134,7 +137,51 @@ final class TmxMap {
         return (maxTileY - minTileY + 1) * targetTileSize;
     }
 
+    void appendCollisionRects(List<RectF> rects, int targetTileSize) {
+        Set<Long> bridgeTiles = new HashSet<>();
+        for (MapLayer layer : layers) {
+            for (Tile tile : layer.tiles) {
+                if (isBridgeTile(tile.gid)) {
+                    bridgeTiles.add(tileKey(tile.x, tile.y));
+                }
+            }
+        }
+
+        for (MapLayer layer : layers) {
+            for (Tile tile : layer.tiles) {
+                long key = tileKey(tile.x, tile.y);
+                if (bridgeTiles.contains(key) && isWaterTile(tile.gid)) {
+                    continue;
+                }
+                if (!isCollisionTile(layer.name, tile.gid)) {
+                    continue;
+                }
+                float left = (tile.x - minTileX) * targetTileSize;
+                float top = (tile.y - minTileY) * targetTileSize;
+                rects.add(new RectF(left, top, left + targetTileSize, top + targetTileSize));
+            }
+        }
+    }
+
     void draw(Canvas canvas, float cameraX, float cameraY, int targetTileSize) {
+        drawLayers(canvas, cameraX, cameraY, targetTileSize, false);
+        drawLayers(canvas, cameraX, cameraY, targetTileSize, true);
+    }
+
+    void drawBackground(Canvas canvas, float cameraX, float cameraY, int targetTileSize) {
+        drawLayers(canvas, cameraX, cameraY, targetTileSize, false);
+    }
+
+    void drawForeground(Canvas canvas, float cameraX, float cameraY, int targetTileSize) {
+        drawLayers(canvas, cameraX, cameraY, targetTileSize, true);
+    }
+
+    private void drawLayers(
+            Canvas canvas,
+            float cameraX,
+            float cameraY,
+            int targetTileSize,
+            boolean foreground) {
         float scale = targetTileSize / (float) tileWidth;
         int firstTileX = Math.max(minTileX, minTileX + (int) (cameraX / targetTileSize) - 2);
         int firstTileY = Math.max(minTileY, minTileY + (int) (cameraY / targetTileSize) - 2);
@@ -142,6 +189,9 @@ final class TmxMap {
         int lastTileY = Math.min(maxTileY, minTileY + (int) ((cameraY + canvas.getHeight()) / targetTileSize) + 3);
 
         for (MapLayer layer : layers) {
+            if (isForegroundLayer(layer.name) != foreground) {
+                continue;
+            }
             for (Tile tile : layer.tiles) {
                 if (tile.x < firstTileX || tile.x > lastTileX || tile.y < firstTileY || tile.y > lastTileY) {
                     continue;
@@ -176,6 +226,49 @@ final class TmxMap {
             }
         }
         return result;
+    }
+
+    private static boolean isCollisionTile(String layerName, int gid) {
+        if (isBridgeTile(gid)) {
+            return false;
+        }
+        if (isWaterTile(gid)) {
+            return true;
+        }
+        if ("Tile Layer 1".equals(layerName)) {
+            return false;
+        }
+        return gid >= 241 && gid < 1396;
+    }
+
+    private static boolean isWaterTile(int gid) {
+        switch (gid) {
+            case 818:
+            case 819:
+            case 821:
+            case 840:
+            case 861:
+            case 865:
+            case 883:
+            case 884:
+            case 906:
+            case 907:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static boolean isBridgeTile(int gid) {
+        return gid >= 1396 && gid <= 1410;
+    }
+
+    private static boolean isForegroundLayer(String layerName) {
+        return layerName != null && layerName.toLowerCase(Locale.US).contains("depan");
+    }
+
+    private static long tileKey(int x, int y) {
+        return ((long) x << 32) ^ (y & 0xffffffffL);
     }
 
     private static Tileset loadTileset(
