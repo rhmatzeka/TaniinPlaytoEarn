@@ -153,12 +153,9 @@ final class TmxMap {
                 if (bridgeTiles.contains(key) && isWaterTile(tile.gid)) {
                     continue;
                 }
-                if (!isCollisionTile(layer.name, tile.gid)) {
-                    continue;
-                }
                 float left = (tile.x - minTileX) * targetTileSize;
                 float top = (tile.y - minTileY) * targetTileSize;
-                rects.add(new RectF(left, top, left + targetTileSize, top + targetTileSize));
+                appendCollisionRect(rects, layer.name, tile.gid, left, top, targetTileSize);
             }
         }
     }
@@ -189,10 +186,10 @@ final class TmxMap {
         int lastTileY = Math.min(maxTileY, minTileY + (int) ((cameraY + canvas.getHeight()) / targetTileSize) + 3);
 
         for (MapLayer layer : layers) {
-            if (isForegroundLayer(layer.name) != foreground) {
-                continue;
-            }
             for (Tile tile : layer.tiles) {
+                if (isDrawnInForeground(layer.name, tile.gid) != foreground) {
+                    continue;
+                }
                 if (tile.x < firstTileX || tile.x > lastTileX || tile.y < firstTileY || tile.y > lastTileY) {
                     continue;
                 }
@@ -228,17 +225,54 @@ final class TmxMap {
         return result;
     }
 
-    private static boolean isCollisionTile(String layerName, int gid) {
+    private static void appendCollisionRect(
+            List<RectF> rects,
+            String layerName,
+            int gid,
+            float left,
+            float top,
+            int size) {
         if (isBridgeTile(gid)) {
-            return false;
+            return;
         }
         if (isWaterTile(gid)) {
-            return true;
+            rects.add(new RectF(left, top, left + size, top + size));
+            return;
         }
         if ("Tile Layer 1".equals(layerName)) {
-            return false;
+            return;
         }
-        return gid >= 241 && gid < 1396;
+        if (isHouseTile(gid) || isFenceTile(gid)) {
+            rects.add(new RectF(left, top, left + size, top + size));
+            return;
+        }
+        if (isMapleTreeFootTile(gid) || isWoodTreeFootTile(gid)) {
+            addInsetRect(rects, left, top, size, 0.18f, 0.38f, 0.82f, 0.95f);
+            return;
+        }
+        if (isLampBaseTile(gid)) {
+            addInsetRect(rects, left, top, size, 0.38f, 0.58f, 0.62f, 0.95f);
+            return;
+        }
+        if (isSmallObstacleTile(gid)) {
+            addInsetRect(rects, left, top, size, 0.26f, 0.38f, 0.74f, 0.86f);
+        }
+    }
+
+    private static void addInsetRect(
+            List<RectF> rects,
+            float left,
+            float top,
+            int size,
+            float leftInset,
+            float topInset,
+            float rightInset,
+            float bottomInset) {
+        rects.add(new RectF(
+                left + size * leftInset,
+                top + size * topInset,
+                left + size * rightInset,
+                top + size * bottomInset));
     }
 
     private static boolean isWaterTile(int gid) {
@@ -263,8 +297,67 @@ final class TmxMap {
         return gid >= 1396 && gid <= 1410;
     }
 
+    private static boolean isHouseTile(int gid) {
+        return gid >= 241 && gid < 339;
+    }
+
+    private static boolean isFenceTile(int gid) {
+        return gid >= 369 && gid < 384;
+    }
+
+    private static boolean isMapleTreeFootTile(int gid) {
+        return gid >= 363 && gid <= 368;
+    }
+
+    private static boolean isWoodTreeFootTile(int gid) {
+        switch (gid) {
+            case 781:
+            case 782:
+            case 783:
+            case 784:
+            case 847:
+            case 848:
+            case 849:
+            case 850:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static boolean isLampBaseTile(int gid) {
+        return gid == 638;
+    }
+
+    private static boolean isSmallObstacleTile(int gid) {
+        switch (gid) {
+            case 606:
+            case 607:
+            case 608:
+            case 643:
+            case 800:
+            case 801:
+            case 823:
+            case 827:
+            case 828:
+            case 866:
+            case 867:
+            case 887:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     private static boolean isForegroundLayer(String layerName) {
         return layerName != null && layerName.toLowerCase(Locale.US).contains("depan");
+    }
+
+    private static boolean isDrawnInForeground(String layerName, int gid) {
+        return isForegroundLayer(layerName)
+                && gid >= 241
+                && gid < 1396
+                && !isWaterTile(gid);
     }
 
     private static long tileKey(int x, int y) {
