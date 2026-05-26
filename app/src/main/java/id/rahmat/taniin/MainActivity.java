@@ -96,6 +96,10 @@ public class MainActivity extends Activity {
         private static final int DIR_UP = 1;
         private static final int DIR_DOWN = 2;
         private static final int DIR_LEFT = 3;
+        private static final float HORIZONTAL_FACING_BIAS = 0.70f;
+        private static final float JOYSTICK_RADIUS = 76f;
+        private static final float JOYSTICK_KNOB_RADIUS = 29f;
+        private static final float JOYSTICK_TRAVEL = 58f;
 
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint pixelPaint = new Paint();
@@ -271,9 +275,11 @@ public class MainActivity extends Activity {
         }
 
         private void updateFacingDirection(float nx, float ny) {
-            if (Math.abs(nx) > Math.abs(ny)) {
+            float absX = Math.abs(nx);
+            float absY = Math.abs(ny);
+            if (absX >= 0.30f && absX >= absY * HORIZONTAL_FACING_BIAS) {
                 facingDirection = nx < 0f ? DIR_LEFT : DIR_RIGHT;
-            } else {
+            } else if (absY >= 0.30f) {
                 facingDirection = ny < 0f ? DIR_UP : DIR_DOWN;
             }
         }
@@ -502,9 +508,9 @@ public class MainActivity extends Activity {
                 return 1;
             }
             if (facingDirection == DIR_DOWN) {
-                return 2;
+                return 0;
             }
-            return 0;
+            return 2;
         }
 
         private void drawHud(Canvas canvas, long now) {
@@ -525,23 +531,29 @@ public class MainActivity extends Activity {
         }
 
         private void drawInventory(Canvas canvas) {
+            float left = miniMapLeft() + miniMapWidth() + 18f;
+            float top = 14f;
+            float right = Math.min(left + 382f, getWidth() - 410f);
+            if (right - left < 300f) {
+                right = left + 300f;
+            }
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(Color.argb(210, 82, 49, 21));
-            canvas.drawRoundRect(18, 14, 400, 66, 12, 12, paint);
+            canvas.drawRoundRect(left, top, right, top + 52f, 10, 10, paint);
             paint.setColor(Color.rgb(255, 226, 88));
             paint.setTextSize(21f);
             paint.setFakeBoldText(true);
-            canvas.drawText("Coin " + coins, 34, 48, paint);
+            canvas.drawText("Coin " + coins, left + 16f, top + 34f, paint);
             paint.setColor(Color.WHITE);
-            canvas.drawText("Bibit " + seeds, 140, 48, paint);
-            canvas.drawText("Panen " + harvests, 238, 48, paint);
+            canvas.drawText("Bibit " + seeds, left + 122f, top + 34f, paint);
+            canvas.drawText("Panen " + harvests, left + 220f, top + 34f, paint);
             paint.setFakeBoldText(false);
         }
 
         private void drawChainBar(Canvas canvas) {
-            float left = 416;
+            float left = miniMapLeft() + miniMapWidth() + 414f;
             float top = 14;
-            float right = Math.min(getWidth() - 192f, 780f);
+            float right = Math.min(getWidth() - 192f, left + 470f);
             if (right <= left + 80) {
                 return;
             }
@@ -561,37 +573,101 @@ public class MainActivity extends Activity {
         }
 
         private void drawMiniMap(Canvas canvas) {
-            float mapW = 152;
-            float mapH = 92;
-            float left = getWidth() - mapW - 18;
-            float top = 16;
+            float mapW = miniMapWidth();
+            float mapH = miniMapHeight();
+            float left = miniMapLeft();
+            float top = miniMapTop();
+            float inset = 8f;
+            RectF inner = new RectF(left + inset, top + inset, left + mapW - inset, top + mapH - inset);
+
             paint.setStyle(Paint.Style.FILL);
-            paint.setColor(Color.argb(210, 30, 62, 36));
+            paint.setColor(Color.argb(90, 0, 0, 0));
+            canvas.drawRoundRect(left + 4f, top + 5f, left + mapW + 4f, top + mapH + 5f, 8, 8, paint);
+            paint.setColor(Color.rgb(78, 63, 30));
             canvas.drawRoundRect(left, top, left + mapW, top + mapH, 8, 8, paint);
-            paint.setColor(Color.rgb(117, 184, 82));
-            canvas.drawRect(left + 8, top + 8, left + mapW - 8, top + mapH - 8, paint);
-            paint.setColor(Color.rgb(235, 151, 73));
-            for (Plot plot : plots) {
-                float px = left + 8 + plot.x / worldWidthPixels * (mapW - 16);
-                float py = top + 8 + plot.y / worldHeightPixels * (mapH - 16);
-                canvas.drawRect(px, py, px + 5, py + 13, paint);
+            paint.setColor(Color.rgb(147, 108, 45));
+            canvas.drawRoundRect(left + 3f, top + 3f, left + mapW - 3f, top + mapH - 3f, 6, 6, paint);
+
+            canvas.save();
+            canvas.clipRect(inner);
+            if (tmxMap != null) {
+                tmxMap.drawMiniMap(canvas, inner, TILE);
+            } else {
+                paint.setColor(Color.rgb(105, 184, 78));
+                canvas.drawRect(inner, paint);
             }
-            paint.setColor(Color.rgb(41, 80, 221));
-            float x = left + 8 + playerX / worldWidthPixels * (mapW - 16);
-            float y = top + 8 + playerY / worldHeightPixels * (mapH - 16);
-            canvas.drawCircle(x, y, 4, paint);
+
+            float x = inner.left + playerX / worldWidthPixels * inner.width();
+            float y = inner.top + playerY / worldHeightPixels * inner.height();
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.WHITE);
+            canvas.drawCircle(x, y, 4.4f, paint);
+            paint.setColor(Color.rgb(225, 38, 34));
+            canvas.drawCircle(x, y, 3.2f, paint);
+            canvas.restore();
+
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(2f);
+            paint.setColor(Color.argb(170, 255, 241, 166));
+            canvas.drawRoundRect(left + 6f, top + 6f, left + mapW - 6f, top + mapH - 6f, 4, 4, paint);
+            paint.setStyle(Paint.Style.FILL);
+        }
+
+        private float miniMapLeft() {
+            return 18f;
+        }
+
+        private float miniMapTop() {
+            return 14f;
+        }
+
+        private float miniMapWidth() {
+            return clamp(getWidth() * 0.10f, 210f, 250f);
+        }
+
+        private float miniMapHeight() {
+            float mapRatio = worldHeightPixels / Math.max(1f, worldWidthPixels);
+            return miniMapWidth() * clamp(mapRatio, 0.82f, 0.92f);
+        }
+
+        private float joystickBaseX() {
+            return clamp(getWidth() * 0.12f, 250f, 310f);
+        }
+
+        private float joystickBaseY() {
+            return getHeight() - clamp(getHeight() * 0.31f, 285f, 340f);
         }
 
         private void drawJoystick(Canvas canvas) {
-            float baseX = joystickActive ? joyBaseX : 92;
-            float baseY = joystickActive ? joyBaseY : getHeight() - 92;
+            float baseX = joystickActive ? joyBaseX : joystickBaseX();
+            float baseY = joystickActive ? joyBaseY : joystickBaseY();
             float knobX = joystickActive ? joyX : baseX;
             float knobY = joystickActive ? joyY : baseY;
             paint.setStyle(Paint.Style.FILL);
-            paint.setColor(Color.argb(90, 20, 20, 20));
-            canvas.drawCircle(baseX, baseY, 64, paint);
-            paint.setColor(Color.argb(160, 255, 255, 255));
-            canvas.drawCircle(knobX, knobY, 26, paint);
+            paint.setColor(Color.argb(85, 0, 0, 0));
+            canvas.drawCircle(baseX + 5f, baseY + 6f, JOYSTICK_RADIUS, paint);
+            paint.setColor(Color.argb(150, 18, 72, 98));
+            canvas.drawCircle(baseX, baseY, JOYSTICK_RADIUS, paint);
+            paint.setColor(Color.argb(95, 96, 186, 196));
+            canvas.drawCircle(baseX, baseY, JOYSTICK_RADIUS * 0.68f, paint);
+
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(3f);
+            paint.setColor(Color.argb(115, 208, 246, 244));
+            canvas.drawCircle(baseX, baseY, JOYSTICK_RADIUS - 10f, paint);
+            if (joystickActive) {
+                paint.setStrokeWidth(5f);
+                paint.setColor(Color.argb(120, 210, 246, 239));
+                canvas.drawLine(baseX, baseY, knobX, knobY, paint);
+            }
+
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.argb(90, 0, 0, 0));
+            canvas.drawCircle(knobX + 3f, knobY + 4f, JOYSTICK_KNOB_RADIUS + 2f, paint);
+            paint.setColor(Color.rgb(222, 239, 232));
+            canvas.drawCircle(knobX, knobY, JOYSTICK_KNOB_RADIUS, paint);
+            paint.setColor(Color.rgb(183, 219, 218));
+            canvas.drawCircle(knobX - 7f, knobY - 7f, JOYSTICK_KNOB_RADIUS * 0.45f, paint);
         }
 
         private void drawActionButton(Canvas canvas) {
@@ -727,11 +803,11 @@ public class MainActivity extends Activity {
             if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
                 float x = event.getX(index);
                 float y = event.getY(index);
-                if (x < getWidth() * 0.42f && y > getHeight() * 0.45f) {
+                if (isInsideJoystickArea(x, y)) {
                     joystickActive = true;
                     joystickPointerId = pointerId;
-                    joyBaseX = x;
-                    joyBaseY = y;
+                    joyBaseX = joystickBaseX();
+                    joyBaseY = joystickBaseY();
                     updateJoystick(x, y);
                 } else if (isInsideAction(x, y)) {
                     performAction();
@@ -771,13 +847,22 @@ public class MainActivity extends Activity {
             float dx = x - joyBaseX;
             float dy = y - joyBaseY;
             float distance = (float) Math.hypot(dx, dy);
-            float radius = 58f;
+            float radius = JOYSTICK_TRAVEL;
             if (distance > radius) {
                 dx = dx / distance * radius;
                 dy = dy / distance * radius;
             }
             joyX = joyBaseX + dx;
             joyY = joyBaseY + dy;
+        }
+
+        private boolean isInsideJoystickArea(float x, float y) {
+            float baseX = joystickBaseX();
+            float baseY = joystickBaseY();
+            float wideArea = JOYSTICK_RADIUS * 2.35f;
+            return x < getWidth() * 0.42f
+                    && y > getHeight() * 0.42f
+                    && Math.hypot(x - baseX, y - baseY) <= wideArea;
         }
 
         private boolean isInsideAction(float x, float y) {

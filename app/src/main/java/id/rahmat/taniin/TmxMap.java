@@ -5,6 +5,7 @@ import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
@@ -31,6 +32,7 @@ final class TmxMap {
     private final List<Tileset> tilesets = new ArrayList<>();
     private final List<MapLayer> layers = new ArrayList<>();
     private final Paint pixelPaint = new Paint();
+    private final Paint miniPaint = new Paint();
     private final Rect src = new Rect();
     private final RectF dst = new RectF();
 
@@ -44,6 +46,8 @@ final class TmxMap {
     private TmxMap() {
         pixelPaint.setAntiAlias(false);
         pixelPaint.setFilterBitmap(false);
+        miniPaint.setAntiAlias(false);
+        miniPaint.setStyle(Paint.Style.FILL);
     }
 
     static TmxMap load(Context context, String assetPath) throws Exception {
@@ -173,6 +177,33 @@ final class TmxMap {
         drawLayers(canvas, cameraX, cameraY, targetTileSize, true);
     }
 
+    void drawMiniMap(Canvas canvas, RectF bounds, int targetTileSize) {
+        float scaleX = bounds.width() / Math.max(1, getWorldWidthPixels(targetTileSize));
+        float scaleY = bounds.height() / Math.max(1, getWorldHeightPixels(targetTileSize));
+        float tileW = Math.max(1f, targetTileSize * scaleX);
+        float tileH = Math.max(1f, targetTileSize * scaleY);
+
+        miniPaint.setColor(Color.rgb(105, 184, 78));
+        canvas.drawRect(bounds, miniPaint);
+
+        for (MapLayer layer : layers) {
+            for (Tile tile : layer.tiles) {
+                Tileset tileset = findTileset(tile.gid);
+                if (tileset == null || tileset.bitmap == null) {
+                    continue;
+                }
+                int localId = tile.gid - tileset.firstGid;
+                int sourceX = (localId % tileset.columns) * tileset.tileWidth;
+                int sourceY = (localId / tileset.columns) * tileset.tileHeight;
+                src.set(sourceX, sourceY, sourceX + tileset.tileWidth, sourceY + tileset.tileHeight);
+                float x = bounds.left + (tile.x - minTileX) * targetTileSize * scaleX;
+                float y = bounds.top + (tile.y - minTileY) * targetTileSize * scaleY;
+                dst.set(x, y, x + tileW, y + tileH);
+                canvas.drawBitmap(tileset.bitmap, src, dst, pixelPaint);
+            }
+        }
+    }
+
     private void drawLayers(
             Canvas canvas,
             float cameraX,
@@ -277,14 +308,12 @@ final class TmxMap {
 
     private static void appendLampCollision(List<RectF> rects, int gid, float left, float top, int size) {
         if (gid == 624) {
-            addInsetRect(rects, left, top, size, 0.20f, 0.08f, 0.80f, 1.0f);
             return;
         }
         if (gid == 631) {
-            addInsetRect(rects, left, top, size, 0.30f, 0.0f, 0.70f, 1.0f);
             return;
         }
-        addInsetRect(rects, left, top, size, 0.16f, 0.0f, 0.84f, 0.94f);
+        addInsetRect(rects, left, top, size, 0.40f, 0.66f, 0.60f, 0.92f);
     }
 
     private static boolean isWaterTile(int gid) {
