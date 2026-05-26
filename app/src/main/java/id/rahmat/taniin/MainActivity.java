@@ -92,6 +92,10 @@ public class MainActivity extends Activity {
         private static final int WORLD_ROWS = 52;
         private static final float PLAYER_SPEED = TILE * 3.9f;
         private static final long GROW_TIME_MS = 12_000L;
+        private static final int DIR_RIGHT = 0;
+        private static final int DIR_UP = 1;
+        private static final int DIR_DOWN = 2;
+        private static final int DIR_LEFT = 3;
 
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint pixelPaint = new Paint();
@@ -137,6 +141,7 @@ public class MainActivity extends Activity {
         private int ownedLand = 1;
         private int selectedPlot = -1;
         private boolean moving;
+        private int facingDirection = DIR_DOWN;
         private int walkFrame;
         private long walkTickMs;
         private int worldWidthPixels = WORLD_COLS * TILE;
@@ -247,6 +252,7 @@ public class MainActivity extends Activity {
             if (moving) {
                 float nx = dx / Math.max(distance, 1f);
                 float ny = dy / Math.max(distance, 1f);
+                updateFacingDirection(nx, ny);
                 movePlayer(
                         playerX + nx * PLAYER_SPEED * dt,
                         playerY + ny * PLAYER_SPEED * dt);
@@ -261,6 +267,14 @@ public class MainActivity extends Activity {
                 if (plot.state == PlotState.GROWING && now - plot.plantedAtMs >= GROW_TIME_MS) {
                     plot.state = PlotState.READY;
                 }
+            }
+        }
+
+        private void updateFacingDirection(float nx, float ny) {
+            if (Math.abs(nx) > Math.abs(ny)) {
+                facingDirection = nx < 0f ? DIR_LEFT : DIR_RIGHT;
+            } else {
+                facingDirection = ny < 0f ? DIR_UP : DIR_DOWN;
             }
         }
 
@@ -454,7 +468,8 @@ public class MainActivity extends Activity {
             int columns = Math.max(1, sheet.getWidth() / frameW);
             int frame = moving ? walkFrame : (int) ((now / 240L) % 6L);
             int frameIndex = frame % columns;
-            src.set(frameIndex * frameW, 0, frameIndex * frameW + frameW, frameH);
+            int row = spriteRowForDirection();
+            src.set(frameIndex * frameW, row * frameH, frameIndex * frameW + frameW, row * frameH + frameH);
 
             float playerSize = TILE * 1.35f;
             float screenX = playerX - cameraX - playerSize * 0.5f;
@@ -472,7 +487,24 @@ public class MainActivity extends Activity {
                     paint);
 
             dst.set(screenX, screenY, screenX + playerSize, screenY + playerSize);
-            canvas.drawBitmap(sheet, src, dst, pixelPaint);
+            if (facingDirection == DIR_LEFT) {
+                canvas.save();
+                canvas.scale(-1f, 1f, screenX + playerSize * 0.5f, screenY + playerSize * 0.5f);
+                canvas.drawBitmap(sheet, src, dst, pixelPaint);
+                canvas.restore();
+            } else {
+                canvas.drawBitmap(sheet, src, dst, pixelPaint);
+            }
+        }
+
+        private int spriteRowForDirection() {
+            if (facingDirection == DIR_UP) {
+                return 1;
+            }
+            if (facingDirection == DIR_DOWN) {
+                return 2;
+            }
+            return 0;
         }
 
         private void drawHud(Canvas canvas, long now) {

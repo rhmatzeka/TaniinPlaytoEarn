@@ -250,8 +250,8 @@ final class TmxMap {
             addInsetRect(rects, left, top, size, 0.18f, 0.38f, 0.82f, 0.95f);
             return;
         }
-        if (isLampBaseTile(gid)) {
-            addInsetRect(rects, left, top, size, 0.38f, 0.58f, 0.62f, 0.95f);
+        if (isLampTile(gid)) {
+            appendLampCollision(rects, gid, left, top, size);
             return;
         }
         if (isSmallObstacleTile(gid)) {
@@ -273,6 +273,18 @@ final class TmxMap {
                 top + size * topInset,
                 left + size * rightInset,
                 top + size * bottomInset));
+    }
+
+    private static void appendLampCollision(List<RectF> rects, int gid, float left, float top, int size) {
+        if (gid == 624) {
+            addInsetRect(rects, left, top, size, 0.20f, 0.08f, 0.80f, 1.0f);
+            return;
+        }
+        if (gid == 631) {
+            addInsetRect(rects, left, top, size, 0.30f, 0.0f, 0.70f, 1.0f);
+            return;
+        }
+        addInsetRect(rects, left, top, size, 0.16f, 0.0f, 0.84f, 0.94f);
     }
 
     private static boolean isWaterTile(int gid) {
@@ -325,8 +337,8 @@ final class TmxMap {
         }
     }
 
-    private static boolean isLampBaseTile(int gid) {
-        return gid == 638;
+    private static boolean isLampTile(int gid) {
+        return gid == 624 || gid == 631 || gid == 638;
     }
 
     private static boolean isSmallObstacleTile(int gid) {
@@ -354,10 +366,11 @@ final class TmxMap {
     }
 
     private static boolean isDrawnInForeground(String layerName, int gid) {
-        return isForegroundLayer(layerName)
+        return isLampTile(gid)
+                || (isForegroundLayer(layerName)
                 && gid >= 241
                 && gid < 1396
-                && !isWaterTile(gid);
+                && !isWaterTile(gid));
     }
 
     private static long tileKey(int x, int y) {
