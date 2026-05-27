@@ -286,7 +286,7 @@ final class TmxMap {
             return;
         }
         if (isSmallObstacleTile(gid)) {
-            addInsetRect(rects, left, top, size, 0.26f, 0.38f, 0.74f, 0.86f);
+            addInsetRect(rects, left, top, size, 0.14f, 0.18f, 0.86f, 0.94f);
         }
     }
 
@@ -350,6 +350,43 @@ final class TmxMap {
         return gid >= 363 && gid <= 368;
     }
 
+    private static boolean isMapleTreeTile(int gid) {
+        return gid >= 339 && gid < 369;
+    }
+
+    private static boolean isWoodTreeTile(int gid) {
+        if (gid >= 693 && gid <= 696) {
+            return true;
+        }
+        if (gid >= 715 && gid <= 718) {
+            return true;
+        }
+        if (gid >= 737 && gid <= 740) {
+            return true;
+        }
+        if (gid >= 759 && gid <= 762) {
+            return true;
+        }
+        if (gid >= 781 && gid <= 784) {
+            return true;
+        }
+        switch (gid) {
+            case 803:
+            case 804:
+            case 825:
+            case 826:
+            case 827:
+            case 828:
+            case 847:
+            case 848:
+            case 849:
+            case 850:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     private static boolean isWoodTreeFootTile(int gid) {
         switch (gid) {
             case 781:
@@ -396,6 +433,9 @@ final class TmxMap {
 
     private static boolean isDrawnInForeground(String layerName, int gid) {
         return isLampTile(gid)
+                || isMapleTreeTile(gid)
+                || isWoodTreeTile(gid)
+                || isSmallObstacleTile(gid)
                 || (isForegroundLayer(layerName)
                 && gid >= 241
                 && gid < 1396

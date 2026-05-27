@@ -95,7 +95,7 @@ public class MainActivity extends Activity {
     }
 
     private static final class FarmGameView extends View {
-        private static final int TILE = 120;
+        private static final int TILE = 128;
         private static final int WORLD_COLS = 72;
         private static final int WORLD_ROWS = 52;
         private static final float PLAYER_SPEED = TILE * 3.9f;
@@ -135,6 +135,7 @@ public class MainActivity extends Activity {
         private final Bitmap cropSheet;
         private final Bitmap chest;
         private final Bitmap chicken;
+        private final Bitmap babyChicken;
         private final Bitmap cow;
 
         private float playerX = 18.5f * TILE;
@@ -183,6 +184,7 @@ public class MainActivity extends Activity {
             cropSheet = decodePixelResource(R.drawable.spring_crops);
             chest = decodePixelResource(R.drawable.chest);
             chicken = decodePixelResource(R.drawable.chicken_blonde_green);
+            babyChicken = decodePixelResource(R.drawable.baby_chicken_yellow);
             cow = decodePixelResource(R.drawable.female_cow_brown);
             loadTmxMap(context);
             createWorld();
@@ -335,8 +337,8 @@ public class MainActivity extends Activity {
         private void drawGame(Canvas canvas, long now) {
             int width = getWidth();
             int height = getHeight();
-            cameraX = clamp(playerX - width * 0.5f, 0, Math.max(0, worldWidthPixels - width));
-            cameraY = clamp(playerY - height * 0.56f, 0, Math.max(0, worldHeightPixels - height));
+            cameraX = Math.round(clamp(playerX - width * 0.5f, 0, Math.max(0, worldWidthPixels - width)));
+            cameraY = Math.round(clamp(playerY - height * 0.56f, 0, Math.max(0, worldHeightPixels - height)));
 
             drawWorld(canvas);
             drawMapDecorations(canvas, false);
@@ -493,16 +495,17 @@ public class MainActivity extends Activity {
             if (tmxMap == null) {
                 return;
             }
-            if (!foreground) {
-                drawSpriteWorld(canvas, chicken, 0, 16, 16, 4, 22.25f * TILE, 17.35f * TILE, TILE * 0.46f, TILE * 0.46f);
-                drawSpriteWorld(canvas, chicken, 1, 16, 16, 4, 23.0f * TILE, 17.35f * TILE, TILE * 0.46f, TILE * 0.46f);
-                drawSpriteWorld(canvas, chicken, 2, 16, 16, 4, 24.25f * TILE, 23.05f * TILE, TILE * 0.48f, TILE * 0.48f);
-                drawSpriteWorld(canvas, cow, 0, 32, 32, 4, 22.6f * TILE, 20.0f * TILE, TILE * 0.95f, TILE * 0.95f);
-                drawSpriteWorld(canvas, chest, 0, 16, 16, 2, 23.6f * TILE, 24.25f * TILE, TILE * 0.58f, TILE * 0.58f);
+            if (foreground) {
                 return;
             }
-            drawSpriteWorld(canvas, chicken, 4, 16, 16, 4, 21.1f * TILE, 24.65f * TILE, TILE * 0.48f, TILE * 0.48f);
-            drawSpriteWorld(canvas, chicken, 5, 16, 16, 4, 21.7f * TILE, 24.65f * TILE, TILE * 0.48f, TILE * 0.48f);
+            drawSpriteWorld(canvas, chicken, 0, 16, 16, 4, 22.25f * TILE, 17.50f * TILE, TILE * 0.50f, TILE * 0.50f);
+            drawSpriteWorld(canvas, chicken, 1, 16, 16, 4, 23.00f * TILE, 17.50f * TILE, TILE * 0.50f, TILE * 0.50f);
+            drawSpriteWorld(canvas, chicken, 2, 16, 16, 4, 24.15f * TILE, 22.10f * TILE, TILE * 0.50f, TILE * 0.50f);
+            drawSpriteWorld(canvas, chicken, 4, 16, 16, 4, 20.80f * TILE, 22.55f * TILE, TILE * 0.50f, TILE * 0.50f);
+            drawSpriteWorld(canvas, babyChicken, 0, 16, 16, 4, 21.45f * TILE, 22.95f * TILE, TILE * 0.38f, TILE * 0.38f);
+            drawSpriteWorld(canvas, babyChicken, 1, 16, 16, 4, 22.85f * TILE, 21.85f * TILE, TILE * 0.38f, TILE * 0.38f);
+            drawSpriteWorld(canvas, cow, 0, 32, 32, 4, 22.60f * TILE, 20.00f * TILE, TILE, TILE);
+            drawSpriteWorld(canvas, chest, 0, 32, 16, 1, 23.80f * TILE, 23.10f * TILE, TILE * 0.75f, TILE * 0.38f);
         }
 
         private void drawPlayer(Canvas canvas, long now) {
