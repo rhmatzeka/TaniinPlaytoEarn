@@ -13,6 +13,8 @@ import android.view.WindowManager;
 
 public class MainActivity extends Activity {
     private FarmGameView gameView;
+    private LoadingScreenView loadingView;
+    private boolean resumed;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -24,8 +26,9 @@ public class MainActivity extends Activity {
                 WindowManager.LayoutParams.FLAG_FULLSCREEN,
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
         hideSystemUi();
-        gameView = new FarmGameView(this);
-        setContentView(gameView);
+        loadingView = new LoadingScreenView(this);
+        setContentView(loadingView);
+        loadingView.start(this::showGameView);
     }
 
     @Override
@@ -41,7 +44,41 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        resumed = true;
         hideSystemUi();
+        if (gameView != null) {
+            gameView.resumeAudio();
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        if (gameView != null) {
+            gameView.pauseAudio();
+        }
+        resumed = false;
+        super.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (gameView != null) {
+            gameView.releaseAudio();
+        }
+        super.onDestroy();
+    }
+
+    private void showGameView() {
+        if (isFinishing() || isDestroyed()) {
+            return;
+        }
+        gameView = new FarmGameView(this);
+        loadingView = null;
+        setContentView(gameView);
+        hideSystemUi();
+        if (resumed) {
+            gameView.resumeAudio();
+        }
     }
 
     @Override

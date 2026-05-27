@@ -5,9 +5,11 @@ Taniin is a landscape Android farming game prototype with Web3 hooks for Sepolia
 ## Current Features
 
 - Java Canvas game loop with TMX map rendering, collisions, foreground layers, minimap, joystick, and hardware key support.
+- Fullscreen loading screen using `app/src/main/res/drawable/loadingscreen.jpg` with animated 1-100 progress before entering the game.
 - Farming loop for land ownership, seed selection, quantity-based seed purchase, planting confirmation, harvest confirmation, success popups, and harvest effects.
 - Separate seed shop and crop-selling house interactions.
 - Local game state persistence for coins, seeds, harvest inventory, land ownership, and planted crops when the app is closed and reopened.
+- Background music plus click/error/walking SFX from `res/raw`, with toggles in the hamburger menu's Audio tab.
 - Wallet button that stores a public wallet address, checks Sepolia RPC, reads ETH balance, and reads ERC-20 TANI balance when the deployed coin contract address is configured.
 - Pending Web3 action queue for buy land, buy seed, plant, harvest, and sell crop actions. If `TANIIN_GAME_API_URL` is configured, actions are posted to that backend signer endpoint.
 - Solidity contracts and Hardhat deploy scaffold in `contracts/`.
@@ -93,6 +95,14 @@ TANIIN_ITEMS_CONTRACT_ADDRESS=...
 ```
 
 Copy those public addresses into the root `.env`, then rebuild the Android app.
+
+Current Sepolia deployment:
+
+```properties
+TANIIN_COIN_CONTRACT_ADDRESS=0xc3F787EF326Cec3EFD9DC50258B7b4F0639F385e
+TANIIN_LAND_CONTRACT_ADDRESS=0x5c612b1dE28Cc5bC63e51580b06b196EDB4f3f78
+TANIIN_ITEMS_CONTRACT_ADDRESS=0xE3651A399FB1818880E5e90fd5d76a80DB2d76CF
+```
 
 ## License
 

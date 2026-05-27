@@ -3,13 +3,14 @@ require("@nomicfoundation/hardhat-toolbox");
 
 const sepoliaUrl = process.env.SEPOLIA_RPC_URL || "";
 const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY || "";
-const hasDeployerKey = /^0x?[0-9a-fA-F]{64}$/.test(deployerPrivateKey)
+const hasDeployerKey = /^(0x)?[0-9a-fA-F]{64}$/.test(deployerPrivateKey)
   && !deployerPrivateKey.includes("replace_with_new");
 
 module.exports = {
   solidity: {
-    version: "0.8.24",
+    version: "0.8.26",
     settings: {
+      evmVersion: "cancun",
       optimizer: {
         enabled: true,
         runs: 200

@@ -38,7 +38,8 @@ final class FarmGameView extends CanvasGameView {
     private static final int DIR_UP = 1;
     private static final int DIR_DOWN = 2;
     private static final int DIR_LEFT = 3;
-    private static final long WALK_FRAME_MS = 72L;
+    private static final long WALK_FRAME_MS = 48L;
+    private static final long WALK_SOUND_GRACE_MS = 80L;
     private static final float HORIZONTAL_FACING_BIAS = 0.70f;
     private static final float JOYSTICK_RADIUS = 82f;
     private static final float JOYSTICK_KNOB_RADIUS = 34f;
@@ -87,6 +88,7 @@ final class FarmGameView extends CanvasGameView {
     private final List<ChainAction> pendingChainActions = new ArrayList<>();
     private final List<HarvestEffect> harvestEffects = new ArrayList<>();
     private final BlockchainClient blockchainClient = new BlockchainClient();
+    private final GameAudio gameAudio;
     private final SharedPreferences preferences;
     private TmxMap tmxMap;
 
@@ -135,12 +137,16 @@ final class FarmGameView extends CanvasGameView {
     private boolean interactionDialogOpen;
     private boolean shopCatalogOpen;
     private boolean shopPurchaseConfirmOpen;
+    private boolean audioBgmEnabled = true;
+    private boolean audioSfxEnabled = true;
     private int menuTab = MENU_TAB_INVENTORY;
     private InteractionKind activeInteractionKind = InteractionKind.NONE;
     private int shopPurchaseSeedIndex = -1;
+    private int audioTrackIndex;
     private int facingDirection = DIR_DOWN;
     private int walkFrame;
     private long walkTickMs;
+    private long lastPlayerMoveMs;
     private int worldWidthPixels = WORLD_COLS * TILE;
     private int worldHeightPixels = WORLD_ROWS * TILE;
 
@@ -151,8 +157,10 @@ final class FarmGameView extends CanvasGameView {
         requestFocus();
         pixelPaint.setAntiAlias(false);
         pixelPaint.setFilterBitmap(false);
+        gameAudio = new GameAudio(context);
         preferences = context.getSharedPreferences("taniin_chain", Context.MODE_PRIVATE);
         walletAddress = preferences.getString("wallet_address", "");
+        loadAudioSettings();
         idleSheet = decodePixelResource(R.drawable.idle);
         walkSheet = decodePixelResource(R.drawable.walk);
         cropSheet = decodePixelResource(R.drawable.spring_crops);
@@ -166,6 +174,36 @@ final class FarmGameView extends CanvasGameView {
         if (!walletAddress.isEmpty()) {
             refreshWalletState(false);
         }
+    }
+
+    void resumeAudio() {
+        gameAudio.resumeBgm();
+    }
+
+    void pauseAudio() {
+        stopWalkSound();
+        gameAudio.pauseBgm();
+    }
+
+    void releaseAudio() {
+        gameAudio.release();
+    }
+
+    private void loadAudioSettings() {
+        audioBgmEnabled = preferences.getBoolean("audio_bgm_enabled", true);
+        audioSfxEnabled = preferences.getBoolean("audio_sfx_enabled", true);
+        audioTrackIndex = clampInt(preferences.getInt("audio_track_index", 0), 0, Math.max(0, gameAudio.getBgmCount() - 1));
+        gameAudio.setBgmIndex(audioTrackIndex);
+        gameAudio.setBgmEnabled(audioBgmEnabled);
+        gameAudio.setSfxEnabled(audioSfxEnabled);
+    }
+
+    private void saveAudioSettings() {
+        preferences.edit()
+                .putBoolean("audio_bgm_enabled", audioBgmEnabled)
+                .putBoolean("audio_sfx_enabled", audioSfxEnabled)
+                .putInt("audio_track_index", audioTrackIndex)
+                .apply();
     }
 
     private Bitmap decodePixelResource(int resId) {
@@ -249,17 +287,24 @@ final class FarmGameView extends CanvasGameView {
         float dy = joyY - joyBaseY;
         float distance = (float) Math.hypot(dx, dy);
         moving = joystickActive && distance > 8f;
+        boolean playerMoved = false;
         if (moving) {
             float nx = dx / Math.max(distance, 1f);
             float ny = dy / Math.max(distance, 1f);
             updateFacingDirection(nx, ny);
-            movePlayer(
+            playerMoved = movePlayer(
                     playerX + nx * PLAYER_SPEED * dt,
                     playerY + ny * PLAYER_SPEED * dt);
+            if (playerMoved) {
+                startWalkSound(now);
+            }
             if (now - walkTickMs > WALK_FRAME_MS) {
                 walkFrame = (walkFrame + 1) % 6;
                 walkTickMs = now;
             }
+        }
+        if (!playerMoved && now - lastPlayerMoveMs > WALK_SOUND_GRACE_MS) {
+            stopWalkSound();
         }
 
         selectedPlot = findNearbyPlot();
@@ -285,7 +330,9 @@ final class FarmGameView extends CanvasGameView {
         }
     }
 
-    private void movePlayer(float targetX, float targetY) {
+    private boolean movePlayer(float targetX, float targetY) {
+        float oldX = playerX;
+        float oldY = playerY;
         float nextX = clamp(targetX, 1.2f * TILE, worldWidthPixels - 1.2f * TILE);
         float nextY = clamp(targetY, 1.2f * TILE, worldHeightPixels - 1.2f * TILE);
         if (!collidesAt(nextX, playerY)) {
@@ -294,6 +341,7 @@ final class FarmGameView extends CanvasGameView {
         if (!collidesAt(playerX, nextY)) {
             playerY = nextY;
         }
+        return Math.abs(playerX - oldX) > 0.5f || Math.abs(playerY - oldY) > 0.5f;
     }
 
     private boolean collidesAt(float x, float y) {
@@ -1006,10 +1054,13 @@ final class FarmGameView extends CanvasGameView {
         drawBackpackTitle(canvas, panel.left + 58f, panel.top + 61f);
         drawBackpackCloseButton(canvas);
 
-        RectF seedTab = new RectF(panel.left + 34f, bodyTop + 42f, panel.left + 170f, bodyTop + 188f);
-        RectF harvestTab = new RectF(panel.left + 34f, bodyTop + 218f, panel.left + 170f, bodyTop + 364f);
-        drawBackpackSideTab(canvas, seedTab, true, "SEEDS", Color.rgb(255, 207, 14));
-        drawBackpackSideTab(canvas, harvestTab, false, "HARVEST", Color.rgb(244, 151, 47));
+        drawBackpackSideTab(canvas, backpackSeedTabBounds(), menuTab == MENU_TAB_INVENTORY, "SEEDS", Color.rgb(255, 207, 14));
+        drawBackpackSideTab(canvas, backpackAudioTabBounds(), menuTab == MENU_TAB_SETTINGS, "AUDIO", Color.rgb(105, 196, 250));
+
+        if (menuTab == MENU_TAB_SETTINGS) {
+            drawAudioSettingsPanel(canvas, panel, bodyLeft, bodyTop);
+            return;
+        }
 
         float cardTop = bodyTop + 43f;
         float cardLeft = bodyLeft + 42f;
@@ -1077,6 +1128,8 @@ final class FarmGameView extends CanvasGameView {
         float iconY = tab.top + 55f;
         if ("SEEDS".equals(label)) {
             drawSeedSproutIcon(canvas, cx, iconY, active ? Color.rgb(80, 210, 83) : Color.rgb(235, 185, 70));
+        } else if ("AUDIO".equals(label)) {
+            drawSpeakerIcon(canvas, cx, iconY, active ? Color.rgb(64, 180, 240) : Color.rgb(235, 185, 70));
         } else {
             drawHarvestIcon(canvas, cx, iconY, accent);
         }
@@ -1086,6 +1139,175 @@ final class FarmGameView extends CanvasGameView {
         paint.setFakeBoldText(true);
         drawCenteredText(canvas, label, cx, tab.bottom - 31f);
         paint.setFakeBoldText(false);
+    }
+
+    private void drawAudioSettingsPanel(Canvas canvas, RectF panel, float bodyLeft, float bodyTop) {
+        float left = bodyLeft + 58f;
+        float top = bodyTop + 48f;
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(255, 235, 171));
+        paint.setTextSize(30f);
+        paint.setFakeBoldText(true);
+        canvas.drawText("Audio", left, top, paint);
+        paint.setFakeBoldText(false);
+
+        RectF chip = new RectF(left + 104f, top - 27f, left + 296f, top + 4f);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(120, 58, 22));
+        canvas.drawRoundRect(chip, 15, 15, paint);
+        paint.setColor(Color.rgb(255, 218, 93));
+        paint.setTextSize(15f);
+        paint.setFakeBoldText(true);
+        drawCenteredText(canvas, "PIXEL SOUND", chip.centerX(), chip.top + 21f);
+        paint.setFakeBoldText(false);
+
+        paint.setColor(Color.rgb(248, 224, 188));
+        paint.setTextSize(18f);
+        canvas.drawText("Backsound, efek tombol, error, dan langkah karakter.", left, top + 35f, paint);
+
+        drawAudioSettingRow(canvas, audioBgmRowBounds(), audioBgmToggleBounds(),
+                "Backsound", "Musik latar game", audioBgmEnabled, Color.rgb(255, 203, 65), 0);
+        drawAudioSettingRow(canvas, audioSfxRowBounds(), audioSfxToggleBounds(),
+                "Efek suara", "Klik, error, langkah", audioSfxEnabled, Color.rgb(93, 202, 250), 1);
+        drawAudioTrackRow(canvas, audioTrackRowBounds(), audioTrackButtonBounds());
+    }
+
+    private void drawAudioSettingRow(Canvas canvas, RectF row, RectF toggle, String label,
+            String detail, boolean enabled, int accent, int iconType) {
+        drawAudioRowBackground(canvas, row, accent);
+        drawAudioRowIcon(canvas, row.left + 46f, row.centerY(), accent, iconType);
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(255, 241, 212));
+        paint.setTextSize(21f);
+        paint.setFakeBoldText(true);
+        canvas.drawText(label, row.left + 86f, row.top + 31f, paint);
+        paint.setFakeBoldText(false);
+        paint.setColor(Color.rgb(232, 202, 164));
+        paint.setTextSize(16f);
+        canvas.drawText(detail, row.left + 86f, row.top + 56f, paint);
+
+        RectF state = new RectF(toggle.left - 76f, toggle.top + 7f, toggle.left - 16f, toggle.bottom - 7f);
+        paint.setColor(enabled ? Color.rgb(51, 129, 72) : Color.rgb(122, 55, 48));
+        canvas.drawRoundRect(state, 14, 14, paint);
+        paint.setColor(enabled ? Color.rgb(181, 246, 164) : Color.rgb(244, 171, 155));
+        paint.setTextSize(14f);
+        paint.setFakeBoldText(true);
+        drawCenteredText(canvas, enabled ? "ON" : "OFF", state.centerX(), state.top + 22f);
+        paint.setFakeBoldText(false);
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(enabled ? Color.rgb(38, 139, 78) : Color.rgb(122, 51, 45));
+        canvas.drawRoundRect(toggle, 24, 24, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(4f);
+        paint.setColor(enabled ? Color.rgb(128, 237, 143) : Color.rgb(225, 105, 91));
+        canvas.drawRoundRect(toggle, 24, 24, paint);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(249, 240, 218));
+        float knobRadius = 20f;
+        float knobX = enabled ? toggle.right - 28f : toggle.left + 28f;
+        canvas.drawCircle(knobX, toggle.centerY(), knobRadius, paint);
+    }
+
+    private void drawAudioTrackRow(Canvas canvas, RectF row, RectF button) {
+        drawAudioRowBackground(canvas, row, Color.rgb(255, 152, 71));
+        drawAudioRowIcon(canvas, row.left + 46f, row.centerY(), Color.rgb(255, 152, 71), 2);
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(255, 241, 212));
+        paint.setTextSize(21f);
+        paint.setFakeBoldText(true);
+        canvas.drawText("Track backsound", row.left + 86f, row.top + 31f, paint);
+        paint.setFakeBoldText(false);
+        paint.setColor(Color.rgb(232, 202, 164));
+        paint.setTextSize(16f);
+        canvas.drawText("Track " + (audioTrackIndex + 1) + " / " + gameAudio.getBgmCount(), row.left + 86f, row.top + 56f, paint);
+
+        drawMenuActionButton(canvas, button, "Ganti");
+    }
+
+    private void drawAudioRowBackground(Canvas canvas, RectF row, int accent) {
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.argb(68, 0, 0, 0));
+        canvas.drawRoundRect(row.left + 4f, row.top + 5f, row.right + 4f, row.bottom + 5f, 16, 16, paint);
+        paint.setColor(Color.rgb(104, 47, 15));
+        canvas.drawRoundRect(row, 16, 16, paint);
+        paint.setColor(Color.rgb(124, 58, 21));
+        canvas.drawRoundRect(row.left + 8f, row.top + 8f, row.right - 8f, row.top + 27f, 9, 9, paint);
+        paint.setColor(accent);
+        canvas.drawRoundRect(row.left, row.top, row.left + 10f, row.bottom, 8, 8, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(3f);
+        paint.setColor(Color.rgb(164, 85, 31));
+        canvas.drawRoundRect(row, 12, 12, paint);
+    }
+
+    private void drawAudioRowIcon(Canvas canvas, float cx, float cy, int accent, int type) {
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(64, 31, 13));
+        canvas.drawCircle(cx, cy, 27f, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(3f);
+        paint.setColor(accent);
+        canvas.drawCircle(cx, cy, 23f, paint);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(accent);
+        if (type == 0) {
+            canvas.drawRect(cx - 8f, cy - 16f, cx - 3f, cy + 12f, paint);
+            canvas.drawRect(cx + 8f, cy - 19f, cx + 13f, cy + 9f, paint);
+            canvas.drawOval(cx - 22f, cy + 8f, cx - 2f, cy + 22f, paint);
+            canvas.drawOval(cx + 0f, cy + 5f, cx + 20f, cy + 19f, paint);
+            paint.setStrokeWidth(4f);
+            canvas.drawLine(cx - 5f, cy - 16f, cx + 13f, cy - 20f, paint);
+        } else if (type == 1) {
+            canvas.drawRoundRect(cx - 18f, cy - 9f, cx - 4f, cy + 9f, 4, 4, paint);
+            float[] points = {cx - 4f, cy - 14f, cx + 11f, cy - 23f, cx + 11f, cy + 23f, cx - 4f, cy + 14f};
+            android.graphics.Path path = new android.graphics.Path();
+            path.moveTo(points[0], points[1]);
+            path.lineTo(points[2], points[3]);
+            path.lineTo(points[4], points[5]);
+            path.lineTo(points[6], points[7]);
+            path.close();
+            canvas.drawPath(path, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(4f);
+            paint.setColor(Color.rgb(255, 238, 190));
+            canvas.drawArc(cx + 9f, cy - 17f, cx + 31f, cy + 17f, -35, 70, false, paint);
+            paint.setStyle(Paint.Style.FILL);
+        } else {
+            canvas.drawRoundRect(cx - 17f, cy - 15f, cx + 7f, cy + 3f, 6, 6, paint);
+            canvas.drawRoundRect(cx - 3f, cy + 4f, cx + 19f, cy + 20f, 6, 6, paint);
+            paint.setColor(Color.rgb(255, 226, 129));
+            canvas.drawCircle(cx - 7f, cy - 6f, 3f, paint);
+            canvas.drawCircle(cx + 8f, cy + 12f, 3f, paint);
+        }
+    }
+
+    private void drawSpeakerIcon(Canvas canvas, float cx, float cy, int accent) {
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(accent);
+        canvas.drawRoundRect(cx - 34f, cy - 13f, cx - 17f, cy + 13f, 5, 5, paint);
+        float[] points = {
+                cx - 16f, cy - 18f,
+                cx + 5f, cy - 30f,
+                cx + 5f, cy + 30f,
+                cx - 16f, cy + 18f
+        };
+        android.graphics.Path path = new android.graphics.Path();
+        path.moveTo(points[0], points[1]);
+        path.lineTo(points[2], points[3]);
+        path.lineTo(points[4], points[5]);
+        path.lineTo(points[6], points[7]);
+        path.close();
+        canvas.drawPath(path, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(5f);
+        paint.setColor(Color.rgb(255, 236, 190));
+        canvas.drawArc(cx + 8f, cy - 23f, cx + 40f, cy + 23f, -38, 76, false, paint);
+        canvas.drawArc(cx + 19f, cy - 36f, cx + 60f, cy + 36f, -38, 76, false, paint);
+        paint.setStyle(Paint.Style.FILL);
     }
 
     private void drawInventoryItemCard(
@@ -1312,6 +1534,50 @@ final class FarmGameView extends CanvasGameView {
     private RectF inventoryCloseButtonBounds() {
         RectF panel = inventoryPanelBounds();
         return new RectF(panel.right - 92f, panel.top + 38f, panel.right - 42f, panel.top + 88f);
+    }
+
+    private RectF backpackSeedTabBounds() {
+        RectF panel = inventoryPanelBounds();
+        float bodyTop = panel.top + 118f;
+        return new RectF(panel.left + 34f, bodyTop + 42f, panel.left + 170f, bodyTop + 188f);
+    }
+
+    private RectF backpackAudioTabBounds() {
+        RectF panel = inventoryPanelBounds();
+        float bodyTop = panel.top + 118f;
+        return new RectF(panel.left + 34f, bodyTop + 218f, panel.left + 170f, bodyTop + 364f);
+    }
+
+    private RectF audioBgmRowBounds() {
+        RectF panel = inventoryPanelBounds();
+        float bodyTop = panel.top + 118f;
+        float bodyLeft = panel.left + 220f;
+        return new RectF(bodyLeft + 58f, bodyTop + 94f, panel.right - 58f, bodyTop + 166f);
+    }
+
+    private RectF audioSfxRowBounds() {
+        RectF bgm = audioBgmRowBounds();
+        return new RectF(bgm.left, bgm.top + 86f, bgm.right, bgm.bottom + 86f);
+    }
+
+    private RectF audioTrackRowBounds() {
+        RectF sfx = audioSfxRowBounds();
+        return new RectF(sfx.left, sfx.top + 86f, sfx.right, sfx.bottom + 86f);
+    }
+
+    private RectF audioBgmToggleBounds() {
+        RectF row = audioBgmRowBounds();
+        return new RectF(row.right - 112f, row.top + 15f, row.right - 24f, row.bottom - 15f);
+    }
+
+    private RectF audioSfxToggleBounds() {
+        RectF row = audioSfxRowBounds();
+        return new RectF(row.right - 112f, row.top + 15f, row.right - 24f, row.bottom - 15f);
+    }
+
+    private RectF audioTrackButtonBounds() {
+        RectF row = audioTrackRowBounds();
+        return new RectF(row.right - 128f, row.top + 14f, row.right - 22f, row.bottom - 14f);
     }
 
     private RectF settingsRpcButtonBounds() {
@@ -1940,6 +2206,7 @@ final class FarmGameView extends CanvasGameView {
                 return handleInteractionDialogTouch(x, y);
             }
             if (topMenuButtonBounds().contains(x, y)) {
+                playClickSound();
                 menuOpen = !menuOpen;
                 if (menuOpen) {
                     menuTab = MENU_TAB_INVENTORY;
@@ -1950,20 +2217,24 @@ final class FarmGameView extends CanvasGameView {
                 if (handleMenuTouch(x, y)) {
                     return true;
                 }
+                playClickSound();
                 menuOpen = false;
                 return true;
             }
             int tappedPlot = findTappedPlotSign(x, y);
             if (tappedPlot >= 0) {
+                playClickSound();
                 selectedPlot = tappedPlot;
                 openInteractionDialog(plotInteractionKind(plots.get(tappedPlot), System.currentTimeMillis()));
                 return true;
             }
             if (isNearShop() && shopSignTapBounds().contains(x, y)) {
+                playClickSound();
                 openInteractionDialog(InteractionKind.SHOP);
                 return true;
             }
             if (isNearSellHouse() && sellSignTapBounds().contains(x, y)) {
+                playClickSound();
                 openInteractionDialog(InteractionKind.SELL_HARVEST);
                 return true;
             }
@@ -1974,8 +2245,10 @@ final class FarmGameView extends CanvasGameView {
                 joyBaseY = joystickBaseY();
                 updateJoystick(x, y);
             } else if (isInsideAction(x, y)) {
+                playClickSound();
                 performAction();
             } else if (isInsideWallet(x, y)) {
+                playClickSound();
                 performWallet();
             }
             return true;
@@ -1999,6 +2272,7 @@ final class FarmGameView extends CanvasGameView {
                 joystickPointerId = -1;
                 joyX = joyBaseX;
                 joyY = joyBaseY;
+                stopWalkSound();
             }
             return true;
         }
@@ -2021,6 +2295,7 @@ final class FarmGameView extends CanvasGameView {
             return handleInteractionDialogKey(keyCode);
         }
         if (isPrimaryKey(keyCode)) {
+            playClickSound();
             performAction();
             return true;
         }
@@ -2029,6 +2304,7 @@ final class FarmGameView extends CanvasGameView {
         }
         if (keyCode == KeyEvent.KEYCODE_S || keyCode == KeyEvent.KEYCODE_BUTTON_X) {
             if (isNearShop()) {
+                playClickSound();
                 openInteractionDialog(InteractionKind.SHOP);
                 return true;
             }
@@ -2052,26 +2328,32 @@ final class FarmGameView extends CanvasGameView {
         }
 
         updateFacingDirection(dx, dy);
-        movePlayer(playerX + dx * TILE * 0.42f, playerY + dy * TILE * 0.42f);
+        if (movePlayer(playerX + dx * TILE * 0.42f, playerY + dy * TILE * 0.42f)) {
+            startWalkSound(System.currentTimeMillis());
+        }
         return true;
     }
 
     private boolean handleInteractionDialogKey(int keyCode) {
         if (activeInteractionKind == InteractionKind.PLANT) {
             if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                playClickSound();
                 selectNextSeed(1);
                 return true;
             }
             if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                playClickSound();
                 selectNextSeed(-1);
                 return true;
             }
         }
         if (isPrimaryKey(keyCode)) {
+            playClickSound();
             activateInteractionPrimary();
             return true;
         }
         if (isBackKey(keyCode)) {
+            playClickSound();
             interactionDialogOpen = false;
             return true;
         }
@@ -2080,11 +2362,13 @@ final class FarmGameView extends CanvasGameView {
 
     private boolean handleShopCatalogKey(int keyCode) {
         if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+            playClickSound();
             selectedSeedIndex = (selectedSeedIndex + 1) % SEED_NAMES.length;
             showMessage("Benih dipilih: " + SEED_NAMES[selectedSeedIndex]);
             return true;
         }
         if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+            playClickSound();
             selectedSeedIndex = (selectedSeedIndex + SEED_NAMES.length - 1) % SEED_NAMES.length;
             showMessage("Benih dipilih: " + SEED_NAMES[selectedSeedIndex]);
             return true;
@@ -2093,20 +2377,24 @@ final class FarmGameView extends CanvasGameView {
                 || keyCode == KeyEvent.KEYCODE_PLUS
                 || keyCode == KeyEvent.KEYCODE_EQUALS
                 || keyCode == KeyEvent.KEYCODE_NUMPAD_ADD) {
+            playClickSound();
             adjustShopBundleQuantity(1);
             return true;
         }
         if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN
                 || keyCode == KeyEvent.KEYCODE_MINUS
                 || keyCode == KeyEvent.KEYCODE_NUMPAD_SUBTRACT) {
+            playClickSound();
             adjustShopBundleQuantity(-1);
             return true;
         }
         if (isPrimaryKey(keyCode)) {
+            playClickSound();
             openShopPurchaseConfirm(selectedSeedIndex);
             return true;
         }
         if (isBackKey(keyCode)) {
+            playClickSound();
             shopCatalogOpen = false;
             shopPurchaseConfirmOpen = false;
             return true;
@@ -2116,10 +2404,12 @@ final class FarmGameView extends CanvasGameView {
 
     private boolean handleShopPurchaseConfirmKey(int keyCode) {
         if (isPrimaryKey(keyCode)) {
+            playClickSound();
             confirmShopPurchase();
             return true;
         }
         if (isBackKey(keyCode)) {
+            playClickSound();
             shopPurchaseConfirmOpen = false;
             return true;
         }
@@ -2145,8 +2435,51 @@ final class FarmGameView extends CanvasGameView {
             return false;
         }
         if (inventoryCloseButtonBounds().contains(x, y)) {
+            playClickSound();
             menuOpen = false;
             return true;
+        }
+        if (backpackSeedTabBounds().contains(x, y)) {
+            playClickSound();
+            menuTab = MENU_TAB_INVENTORY;
+            return true;
+        }
+        if (backpackAudioTabBounds().contains(x, y)) {
+            playClickSound();
+            menuTab = MENU_TAB_SETTINGS;
+            return true;
+        }
+        if (menuTab == MENU_TAB_SETTINGS) {
+            if (audioBgmRowBounds().contains(x, y) || audioBgmToggleBounds().contains(x, y)) {
+                audioBgmEnabled = !audioBgmEnabled;
+                gameAudio.setBgmEnabled(audioBgmEnabled);
+                playClickSound();
+                saveAudioSettings();
+                showMessage(audioBgmEnabled ? "Backsound dinyalakan." : "Backsound dimatikan.");
+                return true;
+            }
+            if (audioSfxRowBounds().contains(x, y) || audioSfxToggleBounds().contains(x, y)) {
+                boolean nextEnabled = !audioSfxEnabled;
+                if (audioSfxEnabled) {
+                    playClickSound();
+                }
+                audioSfxEnabled = nextEnabled;
+                gameAudio.setSfxEnabled(audioSfxEnabled);
+                if (audioSfxEnabled) {
+                    playClickSound();
+                }
+                saveAudioSettings();
+                showMessage(audioSfxEnabled ? "Efek suara dinyalakan." : "Efek suara dimatikan.");
+                return true;
+            }
+            if (audioTrackRowBounds().contains(x, y) || audioTrackButtonBounds().contains(x, y)) {
+                gameAudio.nextBgm();
+                audioTrackIndex = gameAudio.getBgmIndex();
+                playClickSound();
+                saveAudioSettings();
+                showMessage("Backsound track " + (audioTrackIndex + 1) + " dipilih.");
+                return true;
+            }
         }
         return true;
     }
@@ -2155,6 +2488,7 @@ final class FarmGameView extends CanvasGameView {
         if (activeInteractionKind == InteractionKind.PLANT) {
             for (int i = 0; i < SEED_NAMES.length; i++) {
                 if (plantSeedOptionBounds(i).contains(x, y)) {
+                    playClickSound();
                     selectedSeedIndex = i;
                     showMessage("Benih dipilih: " + SEED_NAMES[selectedSeedIndex]);
                     return true;
@@ -2162,10 +2496,12 @@ final class FarmGameView extends CanvasGameView {
             }
         }
         if (interactionPrimaryButtonBounds().contains(x, y)) {
+            playClickSound();
             activateInteractionPrimary();
             return true;
         }
         if (interactionSecondaryButtonBounds().contains(x, y)) {
+            playClickSound();
             interactionDialogOpen = false;
             return true;
         }
@@ -2203,24 +2539,29 @@ final class FarmGameView extends CanvasGameView {
 
     private boolean handleShopCatalogTouch(float x, float y) {
         if (shopCloseButtonBounds().contains(x, y)) {
+            playClickSound();
             shopCatalogOpen = false;
             shopPurchaseConfirmOpen = false;
             return true;
         }
         if (shopQuantityMinusBounds().contains(x, y)) {
+            playClickSound();
             adjustShopBundleQuantity(-1);
             return true;
         }
         if (shopQuantityPlusBounds().contains(x, y)) {
+            playClickSound();
             adjustShopBundleQuantity(1);
             return true;
         }
         for (int i = 0; i < SEED_NAMES.length; i++) {
             if (shopBuyButtonBounds(i).contains(x, y)) {
+                playClickSound();
                 openShopPurchaseConfirm(i);
                 return true;
             }
             if (shopCardBounds(i).contains(x, y)) {
+                playClickSound();
                 selectedSeedIndex = i;
                 showMessage("Benih dipilih: " + SEED_NAMES[selectedSeedIndex]);
                 return true;
@@ -2231,10 +2572,12 @@ final class FarmGameView extends CanvasGameView {
 
     private boolean handleShopPurchaseConfirmTouch(float x, float y) {
         if (shopPurchaseConfirmPrimaryBounds().contains(x, y)) {
+            playClickSound();
             confirmShopPurchase();
             return true;
         }
         if (shopPurchaseConfirmSecondaryBounds().contains(x, y)) {
+            playClickSound();
             shopPurchaseConfirmOpen = false;
             return true;
         }
@@ -2520,19 +2863,19 @@ final class FarmGameView extends CanvasGameView {
             openInteractionDialog(InteractionKind.SELL_HARVEST);
             return;
         }
-        showMessage("Dekati lahan, shop, atau rumah jual panen dulu.");
+        showErrorMessage("Dekati lahan, shop, atau rumah jual panen dulu.");
     }
 
     private void performPlotAction(int plotIndex) {
         long now = System.currentTimeMillis();
         if (plotIndex < 0 || plotIndex >= plots.size()) {
-            showMessage("Dekati lahan dulu.");
+            showErrorMessage("Dekati lahan dulu.");
             return;
         }
         Plot plot = plots.get(plotIndex);
         if (!plot.owned) {
             if (coins < 250) {
-                showMessage("Coin belum cukup untuk beli tanah.");
+                showErrorMessage("Coin belum cukup untuk beli tanah.");
                 return;
             }
             coins -= 250;
@@ -2545,7 +2888,7 @@ final class FarmGameView extends CanvasGameView {
         }
         if (plot.state == PlotState.EMPTY) {
             if (seedCounts[selectedSeedIndex] <= 0) {
-                showMessage("Benih " + SEED_NAMES[selectedSeedIndex] + " habis. Pilih benih lain di toko.");
+                showErrorMessage("Benih " + SEED_NAMES[selectedSeedIndex] + " habis. Pilih benih lain di toko.");
                 return;
             }
             seedCounts[selectedSeedIndex]--;
@@ -2558,7 +2901,7 @@ final class FarmGameView extends CanvasGameView {
             return;
         }
         if (plot.state == PlotState.GROWING) {
-            showMessage("Tanaman belum siap panen.");
+            showErrorMessage("Tanaman belum siap panen.");
             return;
         }
         int harvestedSeedIndex = plot.seedIndex;
@@ -2581,19 +2924,19 @@ final class FarmGameView extends CanvasGameView {
         selectedSeedIndex = seedIndex;
         if (blockchainClient.hasCoinContract()) {
             if (walletAddress.isEmpty()) {
-                showMessage("Connect wallet dulu supaya coin shop pakai wallet.");
+                showErrorMessage("Connect wallet dulu supaya coin shop pakai wallet.");
                 performWallet();
                 return;
             }
             if (!coinBalanceOnChain && !checkingChain) {
                 refreshWalletState(true);
-                showMessage("Sync saldo wallet dulu.");
+                showErrorMessage("Sync saldo wallet dulu.");
                 return;
             }
         }
         int price = totalPriceForSeed(seedIndex);
         if (coins < price) {
-            showMessage("Coin belum cukup untuk beli " + shopBundleQuantity + " paket " + SEED_NAMES[seedIndex] + ".");
+            showErrorMessage("Coin belum cukup untuk beli " + shopBundleQuantity + " paket " + SEED_NAMES[seedIndex] + ".");
             return;
         }
         coins -= price;
@@ -2606,12 +2949,12 @@ final class FarmGameView extends CanvasGameView {
 
     private void sellHarvestToWallet() {
         if (walletAddress.isEmpty()) {
-            showMessage("Connect wallet dulu sebelum jual panen.");
+            showErrorMessage("Connect wallet dulu sebelum jual panen.");
             performWallet();
             return;
         }
         if (harvests <= 0) {
-            showMessage("Belum ada hasil panen untuk dijual.");
+            showErrorMessage("Belum ada hasil panen untuk dijual.");
             return;
         }
         int soldHarvests = harvests;
@@ -2717,7 +3060,7 @@ final class FarmGameView extends CanvasGameView {
         save.setOnClickListener(v -> {
             String address = input.getText().toString().trim();
             if (!isValidAddress(address)) {
-                showMessage("Wallet address tidak valid.");
+                showErrorMessage("Wallet address tidak valid.");
                 return;
             }
             walletAddress = address;
@@ -2787,6 +3130,9 @@ final class FarmGameView extends CanvasGameView {
         blockchainClient.checkSepolia(result -> {
             checkingChain = false;
             chainStatus = result.message + " " + blockchainClient.contractSummary();
+            if (!result.success) {
+                playErrorSound();
+            }
             if (revealPanel) {
                 chainPanelUntilMs = System.currentTimeMillis() + 4500L;
             }
@@ -2811,6 +3157,9 @@ final class FarmGameView extends CanvasGameView {
             checkingChain = false;
             chainStatus = state.message;
             walletNativeBalance = state.nativeEth;
+            if (!state.success) {
+                playErrorSound();
+            }
             if (state.success && state.coinBalanceAvailable) {
                 coins = state.coinBalance;
                 coinBalanceOnChain = true;
@@ -2942,11 +3291,33 @@ final class FarmGameView extends CanvasGameView {
         }
     }
 
+    private void showErrorMessage(String text) {
+        playErrorSound();
+        showMessage(text);
+    }
+
     private void showSuccessPopup(String text) {
         showMessage(text);
         statusPopupTitle = "BERHASIL";
         statusPopupMessage = text;
         statusPopupUntilMs = System.currentTimeMillis() + 2400L;
+    }
+
+    private void playClickSound() {
+        gameAudio.playClick();
+    }
+
+    private void playErrorSound() {
+        gameAudio.playError();
+    }
+
+    private void startWalkSound(long now) {
+        lastPlayerMoveMs = now;
+        gameAudio.startWalk();
+    }
+
+    private void stopWalkSound() {
+        gameAudio.stopWalk();
     }
 
     private int findNearbyPlot() {
