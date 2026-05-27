@@ -498,14 +498,14 @@ public class MainActivity extends Activity {
             if (foreground) {
                 return;
             }
-            drawSpriteWorld(canvas, chicken, 0, 16, 16, 4, 22.25f * TILE, 17.50f * TILE, TILE * 0.50f, TILE * 0.50f);
-            drawSpriteWorld(canvas, chicken, 1, 16, 16, 4, 23.00f * TILE, 17.50f * TILE, TILE * 0.50f, TILE * 0.50f);
-            drawSpriteWorld(canvas, chicken, 2, 16, 16, 4, 24.15f * TILE, 22.10f * TILE, TILE * 0.50f, TILE * 0.50f);
-            drawSpriteWorld(canvas, chicken, 4, 16, 16, 4, 20.80f * TILE, 22.55f * TILE, TILE * 0.50f, TILE * 0.50f);
-            drawSpriteWorld(canvas, babyChicken, 0, 16, 16, 4, 21.45f * TILE, 22.95f * TILE, TILE * 0.38f, TILE * 0.38f);
-            drawSpriteWorld(canvas, babyChicken, 1, 16, 16, 4, 22.85f * TILE, 21.85f * TILE, TILE * 0.38f, TILE * 0.38f);
-            drawSpriteWorld(canvas, cow, 0, 32, 32, 4, 22.60f * TILE, 20.00f * TILE, TILE, TILE);
-            drawSpriteWorld(canvas, chest, 0, 32, 16, 1, 23.80f * TILE, 23.10f * TILE, TILE * 0.75f, TILE * 0.38f);
+            drawSpriteWithShadowWorld(canvas, chicken, 0, 16, 16, 4, 22.35f * TILE, 17.45f * TILE, TILE * 0.50f, TILE * 0.50f);
+            drawSpriteWithShadowWorld(canvas, chicken, 1, 16, 16, 4, 23.35f * TILE, 18.20f * TILE, TILE * 0.50f, TILE * 0.50f);
+            drawSpriteWithShadowWorld(canvas, cow, 0, 32, 32, 4, 22.85f * TILE, 20.00f * TILE, TILE, TILE);
+            drawSpriteWithShadowWorld(canvas, chicken, 2, 16, 16, 4, 24.20f * TILE, 21.80f * TILE, TILE * 0.50f, TILE * 0.50f);
+            drawSpriteWithShadowWorld(canvas, babyChicken, 1, 16, 16, 4, 22.45f * TILE, 22.00f * TILE, TILE * 0.38f, TILE * 0.38f);
+            drawSpriteWithShadowWorld(canvas, chicken, 4, 16, 16, 4, 22.95f * TILE, 22.75f * TILE, TILE * 0.50f, TILE * 0.50f);
+            drawSpriteWithShadowWorld(canvas, babyChicken, 0, 16, 16, 4, 23.80f * TILE, 22.55f * TILE, TILE * 0.38f, TILE * 0.38f);
+            drawSpriteWithShadowWorld(canvas, chest, 0, 32, 16, 1, 23.85f * TILE, 23.15f * TILE, TILE * 0.75f, TILE * 0.38f);
         }
 
         private void drawPlayer(Canvas canvas, long now) {
@@ -1838,6 +1838,36 @@ public class MainActivity extends Activity {
             src.set(sourceX, sourceY, sourceX + frameW, sourceY + frameH);
             dst.set(worldX - cameraX, worldY - cameraY, worldX - cameraX + w, worldY - cameraY + h);
             canvas.drawBitmap(bitmap, src, dst, pixelPaint);
+        }
+
+        private void drawSpriteWithShadowWorld(
+                Canvas canvas,
+                Bitmap bitmap,
+                int frame,
+                int frameW,
+                int frameH,
+                int columns,
+                float worldX,
+                float worldY,
+                float w,
+                float h) {
+            drawSpriteShadowWorld(canvas, worldX, worldY, w, h);
+            drawSpriteWorld(canvas, bitmap, frame, frameW, frameH, columns, worldX, worldY, w, h);
+        }
+
+        private void drawSpriteShadowWorld(Canvas canvas, float worldX, float worldY, float w, float h) {
+            float shadowW = w * 0.72f;
+            float shadowH = Math.max(5f, h * 0.16f);
+            float centerX = worldX + w * 0.5f - cameraX;
+            float centerY = worldY + h * 0.87f - cameraY;
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.argb(62, 0, 0, 0));
+            canvas.drawOval(
+                    centerX - shadowW * 0.5f,
+                    centerY - shadowH * 0.5f,
+                    centerX + shadowW * 0.5f,
+                    centerY + shadowH * 0.5f,
+                    paint);
         }
 
         private void drawWorldRect(Canvas canvas, float x, float y, float w, float h) {
