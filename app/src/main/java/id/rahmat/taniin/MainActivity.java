@@ -1,7 +1,7 @@
 package id.rahmat.taniin;
 
 import android.app.Activity;
-import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
@@ -12,14 +12,22 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
+import android.text.InputType;
+import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -87,7 +95,7 @@ public class MainActivity extends Activity {
     }
 
     private static final class FarmGameView extends View {
-        private static final int TILE = 96;
+        private static final int TILE = 120;
         private static final int WORLD_COLS = 72;
         private static final int WORLD_ROWS = 52;
         private static final float PLAYER_SPEED = TILE * 3.9f;
@@ -97,9 +105,19 @@ public class MainActivity extends Activity {
         private static final int DIR_DOWN = 2;
         private static final int DIR_LEFT = 3;
         private static final float HORIZONTAL_FACING_BIAS = 0.70f;
-        private static final float JOYSTICK_RADIUS = 76f;
-        private static final float JOYSTICK_KNOB_RADIUS = 29f;
-        private static final float JOYSTICK_TRAVEL = 58f;
+        private static final float JOYSTICK_RADIUS = 82f;
+        private static final float JOYSTICK_KNOB_RADIUS = 34f;
+        private static final float JOYSTICK_TRAVEL = 76f;
+        private static final float SHOP_LEFT_TILE = 13.8f;
+        private static final float SHOP_RIGHT_TILE = 26.4f;
+        private static final float SHOP_TOP_TILE = 16.6f;
+        private static final float SHOP_BOTTOM_TILE = 31.2f;
+        private static final float SHOP_ALT_LEFT_TILE = 27.8f;
+        private static final float SHOP_ALT_RIGHT_TILE = 35.6f;
+        private static final float SHOP_ALT_TOP_TILE = 8.2f;
+        private static final float SHOP_ALT_BOTTOM_TILE = 18.2f;
+        private static final int MENU_TAB_INVENTORY = 0;
+        private static final int MENU_TAB_SETTINGS = 1;
 
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint pixelPaint = new Paint();
@@ -145,6 +163,8 @@ public class MainActivity extends Activity {
         private int ownedLand = 1;
         private int selectedPlot = -1;
         private boolean moving;
+        private boolean menuOpen;
+        private int menuTab = MENU_TAB_INVENTORY;
         private int facingDirection = DIR_DOWN;
         private int walkFrame;
         private long walkTickMs;
@@ -319,6 +339,7 @@ public class MainActivity extends Activity {
             cameraY = clamp(playerY - height * 0.56f, 0, Math.max(0, worldHeightPixels - height));
 
             drawWorld(canvas);
+            drawMapDecorations(canvas, false);
             drawPlots(canvas, now);
             if (tmxMap == null) {
                 drawDecorations(canvas);
@@ -327,6 +348,7 @@ public class MainActivity extends Activity {
             if (tmxMap != null) {
                 tmxMap.drawForeground(canvas, cameraX, cameraY, TILE);
             }
+            drawMapDecorations(canvas, true);
             drawHud(canvas, now);
         }
 
@@ -467,6 +489,22 @@ public class MainActivity extends Activity {
             drawBitmapWorld(canvas, cow, 45 * TILE, 30 * TILE, 86, 64);
         }
 
+        private void drawMapDecorations(Canvas canvas, boolean foreground) {
+            if (tmxMap == null) {
+                return;
+            }
+            if (!foreground) {
+                drawSpriteWorld(canvas, chicken, 0, 16, 16, 4, 22.25f * TILE, 17.35f * TILE, TILE * 0.46f, TILE * 0.46f);
+                drawSpriteWorld(canvas, chicken, 1, 16, 16, 4, 23.0f * TILE, 17.35f * TILE, TILE * 0.46f, TILE * 0.46f);
+                drawSpriteWorld(canvas, chicken, 2, 16, 16, 4, 24.25f * TILE, 23.05f * TILE, TILE * 0.48f, TILE * 0.48f);
+                drawSpriteWorld(canvas, cow, 0, 32, 32, 4, 22.6f * TILE, 20.0f * TILE, TILE * 0.95f, TILE * 0.95f);
+                drawSpriteWorld(canvas, chest, 0, 16, 16, 2, 23.6f * TILE, 24.25f * TILE, TILE * 0.58f, TILE * 0.58f);
+                return;
+            }
+            drawSpriteWorld(canvas, chicken, 4, 16, 16, 4, 21.1f * TILE, 24.65f * TILE, TILE * 0.48f, TILE * 0.48f);
+            drawSpriteWorld(canvas, chicken, 5, 16, 16, 4, 21.7f * TILE, 24.65f * TILE, TILE * 0.48f, TILE * 0.48f);
+        }
+
         private void drawPlayer(Canvas canvas, long now) {
             Bitmap sheet = moving ? walkSheet : idleSheet;
             int frameW = 32;
@@ -514,9 +552,8 @@ public class MainActivity extends Activity {
         }
 
         private void drawHud(Canvas canvas, long now) {
-            drawInventory(canvas);
-            drawChainBar(canvas);
             drawMiniMap(canvas);
+            drawTopMenu(canvas);
             drawJoystick(canvas);
             drawActionButton(canvas);
             drawShopButton(canvas);
@@ -527,6 +564,9 @@ public class MainActivity extends Activity {
             }
             if (chainPanelUntilMs > now) {
                 drawChainPanel(canvas);
+            }
+            if (menuOpen) {
+                drawMenuPanel(canvas);
             }
         }
 
@@ -613,16 +653,380 @@ public class MainActivity extends Activity {
             paint.setStyle(Paint.Style.FILL);
         }
 
+        private void drawTopMenu(Canvas canvas) {
+            float top = topMenuTop();
+            float buttonSize = topMenuButtonSize();
+            float buttonRight = getWidth() - 20f;
+            float buttonLeft = buttonRight - buttonSize;
+            float barRight = buttonLeft - 14f;
+            float barLeft = barRight - topMenuBarWidth();
+            float bottom = top + buttonSize;
+
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.argb(90, 0, 0, 0));
+            canvas.drawRoundRect(barLeft + 4f, top + 5f, barRight + 4f, bottom + 5f, 12, 12, paint);
+            paint.setColor(Color.rgb(112, 65, 16));
+            canvas.drawRoundRect(barLeft, top, barRight, bottom, 12, 12, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(4f);
+            paint.setColor(Color.rgb(86, 48, 12));
+            canvas.drawRoundRect(barLeft, top, barRight, bottom, 12, 12, paint);
+
+            paint.setStyle(Paint.Style.FILL);
+            drawCoinHudIcon(canvas, barLeft + 36f, top + buttonSize * 0.5f);
+            paint.setColor(Color.rgb(240, 222, 179));
+            paint.setTextSize(26f);
+            paint.setFakeBoldText(true);
+            canvas.drawText(String.valueOf(coins), barLeft + 76f, top + 48f, paint);
+
+            paint.setColor(Color.rgb(76, 42, 12));
+            canvas.drawRect(barLeft + topMenuBarWidth() * 0.52f, top + 13f, barLeft + topMenuBarWidth() * 0.52f + 4f, bottom - 13f, paint);
+
+            drawHarvestHudIcon(canvas, barLeft + topMenuBarWidth() * 0.67f, top + buttonSize * 0.5f);
+            paint.setColor(Color.rgb(240, 222, 179));
+            canvas.drawText(String.valueOf(harvests), barLeft + topMenuBarWidth() * 0.67f + 39f, top + 48f, paint);
+            paint.setFakeBoldText(false);
+
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.argb(90, 0, 0, 0));
+            canvas.drawRoundRect(buttonLeft + 4f, top + 5f, buttonRight + 4f, bottom + 5f, 10, 10, paint);
+            paint.setColor(menuOpen ? Color.rgb(141, 82, 24) : Color.rgb(122, 72, 24));
+            canvas.drawRoundRect(buttonLeft, top, buttonRight, bottom, 10, 10, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(4f);
+            paint.setColor(Color.rgb(91, 53, 16));
+            canvas.drawRoundRect(buttonLeft, top, buttonRight, bottom, 10, 10, paint);
+            paint.setStrokeWidth(5f);
+            paint.setColor(Color.rgb(245, 231, 203));
+            float cx = (buttonLeft + buttonRight) * 0.5f;
+            for (int i = -1; i <= 1; i++) {
+                float y = top + buttonSize * 0.5f + i * 15f;
+                canvas.drawLine(cx - 21f, y, cx + 21f, y, paint);
+            }
+            paint.setStyle(Paint.Style.FILL);
+        }
+
+        private void drawCoinHudIcon(Canvas canvas, float cx, float cy) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.rgb(248, 242, 215));
+            canvas.drawCircle(cx, cy, 23f, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(4f);
+            paint.setColor(Color.rgb(54, 42, 18));
+            canvas.drawCircle(cx, cy, 19f, paint);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.rgb(238, 197, 48));
+            canvas.drawCircle(cx, cy, 10f, paint);
+        }
+
+        private void drawHarvestHudIcon(Canvas canvas, float cx, float cy) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.rgb(36, 116, 216));
+            canvas.drawCircle(cx, cy, 23f, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(4f);
+            paint.setColor(Color.rgb(209, 238, 255));
+            canvas.drawCircle(cx, cy, 17f, paint);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.WHITE);
+            paint.setTextSize(25f);
+            paint.setFakeBoldText(true);
+            canvas.drawText("X", cx - 9f, cy + 9f, paint);
+            paint.setFakeBoldText(false);
+        }
+
+        private void drawMenuPanel(Canvas canvas) {
+            drawBackpackPanel(canvas);
+        }
+
+        private void drawBackpackPanel(Canvas canvas) {
+            canvas.drawColor(Color.argb(155, 0, 0, 0));
+
+            RectF panel = inventoryPanelBounds();
+            float headerH = 118f;
+            float sidebarW = 220f;
+            float bodyTop = panel.top + headerH;
+            float bodyLeft = panel.left + sidebarW;
+
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.argb(120, 0, 0, 0));
+            canvas.drawRoundRect(panel.left + 8f, panel.top + 10f, panel.right + 8f, panel.bottom + 10f, 26, 26, paint);
+            paint.setColor(Color.rgb(134, 70, 25));
+            canvas.drawRoundRect(panel, 26, 26, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(6f);
+            paint.setColor(Color.rgb(83, 43, 18));
+            canvas.drawRoundRect(panel, 26, 26, paint);
+
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.rgb(128, 61, 23));
+            canvas.drawRoundRect(panel.left + 4f, panel.top + 4f, panel.right - 4f, bodyTop, 24, 24, paint);
+            paint.setColor(Color.rgb(95, 43, 16));
+            canvas.drawRect(panel.left + 4f, bodyTop - 4f, panel.right - 4f, bodyTop + 2f, paint);
+            paint.setColor(Color.rgb(161, 81, 33));
+            canvas.drawRect(bodyLeft, bodyTop, panel.right - 4f, panel.bottom - 4f, paint);
+            paint.setColor(Color.rgb(112, 52, 20));
+            canvas.drawRect(panel.left + 4f, bodyTop, bodyLeft, panel.bottom - 4f, paint);
+
+            drawBackpackTitle(canvas, panel.left + 58f, panel.top + 61f);
+            drawBackpackCloseButton(canvas);
+
+            RectF seedTab = new RectF(panel.left + 34f, bodyTop + 42f, panel.left + 170f, bodyTop + 188f);
+            RectF harvestTab = new RectF(panel.left + 34f, bodyTop + 218f, panel.left + 170f, bodyTop + 364f);
+            drawBackpackSideTab(canvas, seedTab, true, "SEEDS", Color.rgb(255, 207, 14));
+            drawBackpackSideTab(canvas, harvestTab, false, "HARVEST", Color.rgb(244, 151, 47));
+
+            float cardTop = bodyTop + 43f;
+            float cardLeft = bodyLeft + 42f;
+            float cardW = 116f;
+            float cardH = 118f;
+            float gap = 34f;
+            drawInventoryItemCard(canvas, cardLeft, cardTop, cardW, cardH,
+                    Color.rgb(169, 75, 31), Color.rgb(174, 97, 222), "Benih", "Kentang", seeds);
+            drawInventoryItemCard(canvas, cardLeft + (cardW + gap), cardTop, cardW, cardH,
+                    Color.rgb(74, 113, 159), Color.rgb(122, 205, 126), "Benih Daun", "Bawang", 0);
+            drawInventoryItemCard(canvas, cardLeft + 2f * (cardW + gap), cardTop, cardW, cardH,
+                    Color.rgb(170, 60, 36), Color.rgb(236, 70, 103), "Benih", "Stroberi", 0);
+            drawInventoryItemCard(canvas, cardLeft + 3f * (cardW + gap), cardTop, cardW, cardH,
+                    Color.rgb(169, 77, 27), Color.rgb(247, 156, 88), "Benih", "Bit", 0);
+        }
+
+        private void drawBackpackTitle(Canvas canvas, float left, float centerY) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.rgb(255, 84, 122));
+            canvas.drawRoundRect(left, centerY - 18f, left + 25f, centerY + 18f, 8, 8, paint);
+            paint.setColor(Color.rgb(255, 181, 78));
+            canvas.drawRect(left + 5f, centerY - 9f, left + 20f, centerY - 3f, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(4f);
+            paint.setColor(Color.rgb(255, 138, 170));
+            canvas.drawArc(left + 5f, centerY - 25f, left + 20f, centerY - 6f, 200, 140, false, paint);
+
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.rgb(255, 222, 35));
+            paint.setTextSize(35f);
+            paint.setFakeBoldText(false);
+            canvas.drawText("BACKPACK", left + 48f, centerY + 13f, paint);
+        }
+
+        private void drawBackpackCloseButton(Canvas canvas) {
+            RectF close = inventoryCloseButtonBounds();
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.rgb(148, 75, 25));
+            canvas.drawRoundRect(close, 10, 10, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(4f);
+            paint.setColor(Color.rgb(183, 100, 35));
+            canvas.drawRoundRect(close, 10, 10, paint);
+            paint.setStrokeWidth(5f);
+            paint.setColor(Color.rgb(255, 236, 190));
+            canvas.drawLine(close.left + 16f, close.top + 16f, close.right - 16f, close.bottom - 16f, paint);
+            canvas.drawLine(close.right - 16f, close.top + 16f, close.left + 16f, close.bottom - 16f, paint);
+            paint.setStyle(Paint.Style.FILL);
+        }
+
+        private void drawBackpackSideTab(Canvas canvas, RectF tab, boolean active, String label, int accent) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(active ? Color.rgb(255, 200, 15) : Color.rgb(106, 48, 13));
+            canvas.drawRoundRect(tab, 12, 12, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(active ? 4f : 3f);
+            paint.setColor(active ? Color.rgb(255, 226, 34) : Color.rgb(166, 85, 26));
+            canvas.drawRoundRect(tab, 12, 12, paint);
+
+            float cx = (tab.left + tab.right) * 0.5f;
+            float iconY = tab.top + 55f;
+            if ("SEEDS".equals(label)) {
+                drawSeedSproutIcon(canvas, cx, iconY, active ? Color.rgb(80, 210, 83) : Color.rgb(235, 185, 70));
+            } else {
+                drawHarvestIcon(canvas, cx, iconY, accent);
+            }
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(active ? Color.rgb(48, 29, 11) : Color.rgb(242, 228, 198));
+            paint.setTextSize(19f);
+            paint.setFakeBoldText(true);
+            drawCenteredText(canvas, label, cx, tab.bottom - 31f);
+            paint.setFakeBoldText(false);
+        }
+
+        private void drawInventoryItemCard(
+                Canvas canvas,
+                float left,
+                float top,
+                float width,
+                float height,
+                int cardColor,
+                int iconColor,
+                String labelTop,
+                String labelBottom,
+                int count) {
+            RectF card = new RectF(left, top, left + width, top + height);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.argb(85, 0, 0, 0));
+            canvas.drawRoundRect(card.left + 4f, card.top + 5f, card.right + 4f, card.bottom + 5f, 9, 9, paint);
+            paint.setColor(cardColor);
+            canvas.drawRoundRect(card, 9, 9, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(3f);
+            paint.setColor(Color.rgb(120, 55, 18));
+            canvas.drawRoundRect(card, 9, 9, paint);
+
+            drawSeedPacketIcon(canvas, left + width * 0.5f, top + 34f, iconColor);
+
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.rgb(255, 238, 205));
+            paint.setTextSize(14f);
+            paint.setFakeBoldText(true);
+            drawCenteredText(canvas, labelTop, left + width * 0.5f, top + 72f);
+            drawCenteredText(canvas, labelBottom, left + width * 0.5f, top + 88f);
+            paint.setColor(Color.rgb(255, 220, 28));
+            paint.setTextSize(15f);
+            drawCenteredText(canvas, "x" + count, left + width * 0.5f, top + 106f);
+            paint.setFakeBoldText(false);
+        }
+
+        private void drawSeedPacketIcon(Canvas canvas, float cx, float cy, int accent) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.rgb(255, 246, 216));
+            canvas.drawRoundRect(cx - 16f, cy - 19f, cx + 16f, cy + 17f, 4, 4, paint);
+            paint.setColor(accent);
+            canvas.drawRect(cx - 12f, cy - 12f, cx + 12f, cy + 7f, paint);
+            paint.setColor(Color.rgb(71, 44, 31));
+            canvas.drawRoundRect(cx - 8f, cy + 3f, cx + 8f, cy + 14f, 3, 3, paint);
+            paint.setColor(Color.rgb(96, 210, 92));
+            canvas.drawOval(cx - 10f, cy - 4f, cx + 2f, cy + 5f, paint);
+            canvas.drawOval(cx, cy - 7f, cx + 11f, cy + 3f, paint);
+        }
+
+        private void drawSeedSproutIcon(Canvas canvas, float cx, float cy, int leafColor) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.rgb(124, 72, 37));
+            canvas.drawRect(cx - 5f, cy + 2f, cx + 5f, cy + 27f, paint);
+            paint.setColor(leafColor);
+            canvas.drawOval(cx - 26f, cy - 16f, cx - 2f, cy + 1f, paint);
+            canvas.drawOval(cx + 2f, cy - 20f, cx + 27f, cy - 2f, paint);
+            paint.setColor(Color.rgb(236, 171, 61));
+            canvas.drawOval(cx - 15f, cy + 21f, cx + 15f, cy + 32f, paint);
+        }
+
+        private void drawHarvestIcon(Canvas canvas, float cx, float cy, int accent) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(accent);
+            canvas.drawRect(cx - 5f, cy - 24f, cx + 5f, cy + 28f, paint);
+            paint.setColor(Color.rgb(243, 200, 70));
+            canvas.drawOval(cx - 25f, cy - 18f, cx - 2f, cy + 0f, paint);
+            canvas.drawOval(cx + 2f, cy - 5f, cx + 25f, cy + 14f, paint);
+            paint.setColor(Color.rgb(81, 156, 95));
+            canvas.drawRect(cx - 18f, cy + 16f, cx - 11f, cy + 33f, paint);
+            canvas.drawRect(cx + 11f, cy + 16f, cx + 18f, cy + 33f, paint);
+        }
+
+        private void drawCenteredText(Canvas canvas, String text, float centerX, float baselineY) {
+            canvas.drawText(text, centerX - paint.measureText(text) * 0.5f, baselineY, paint);
+        }
+
+        private void drawMenuTab(Canvas canvas, float left, float top, float width, String label, boolean active) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(active ? Color.rgb(134, 83, 29) : Color.rgb(74, 54, 31));
+            canvas.drawRoundRect(left, top, left + width, top + 42f, 8, 8, paint);
+            paint.setColor(active ? Color.rgb(255, 231, 166) : Color.rgb(203, 185, 151));
+            paint.setTextSize(18f);
+            paint.setFakeBoldText(true);
+            float textW = paint.measureText(label);
+            canvas.drawText(label, left + (width - textW) * 0.5f, top + 28f, paint);
+            paint.setFakeBoldText(false);
+        }
+
+        private void drawInventoryMenu(Canvas canvas, RectF panel) {
+            float x = panel.left + 24f;
+            float y = panel.top + 88f;
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.rgb(255, 232, 170));
+            paint.setTextSize(22f);
+            paint.setFakeBoldText(true);
+            canvas.drawText("Inventory Aset", x, y, paint);
+            paint.setFakeBoldText(false);
+
+            int growing = 0;
+            int ready = 0;
+            for (Plot plot : plots) {
+                if (plot.state == PlotState.GROWING) {
+                    growing++;
+                } else if (plot.state == PlotState.READY) {
+                    ready++;
+                }
+            }
+
+            drawInventoryRow(canvas, x, y + 45f, Color.rgb(255, 209, 84), "Coin", coins);
+            drawInventoryRow(canvas, x, y + 90f, Color.rgb(116, 209, 85), "Bibit tanaman", seeds);
+            drawInventoryRow(canvas, x, y + 135f, Color.rgb(235, 150, 63), "Hasil panen", harvests);
+            drawInventoryRow(canvas, x, y + 180f, Color.rgb(123, 188, 91), "Lahan dimiliki", ownedLand);
+            drawInventoryRow(canvas, x, y + 225f, Color.rgb(96, 176, 220), "Tanaman tumbuh", growing);
+            drawInventoryRow(canvas, x, y + 270f, Color.rgb(255, 230, 92), "Siap panen", ready);
+        }
+
+        private void drawInventoryRow(Canvas canvas, float x, float y, int iconColor, String label, int value) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.rgb(66, 52, 34));
+            canvas.drawRoundRect(x, y - 28f, x + menuPanelBounds().width() - 48f, y + 8f, 8, 8, paint);
+            paint.setColor(iconColor);
+            canvas.drawCircle(x + 19f, y - 10f, 11f, paint);
+            paint.setColor(Color.rgb(239, 226, 201));
+            paint.setTextSize(18f);
+            canvas.drawText(label, x + 44f, y - 3f, paint);
+            paint.setFakeBoldText(true);
+            String text = String.valueOf(value);
+            canvas.drawText(text, x + menuPanelBounds().width() - 76f - paint.measureText(text), y - 3f, paint);
+            paint.setFakeBoldText(false);
+        }
+
+        private void drawSettingsMenu(Canvas canvas, RectF panel) {
+            float x = panel.left + 24f;
+            float y = panel.top + 88f;
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.rgb(255, 232, 170));
+            paint.setTextSize(22f);
+            paint.setFakeBoldText(true);
+            canvas.drawText("Setting", x, y, paint);
+            paint.setFakeBoldText(false);
+
+            paint.setColor(Color.rgb(226, 213, 187));
+            paint.setTextSize(18f);
+            canvas.drawText("Kontrol: Analog default", x, y + 40f, paint);
+            canvas.drawText("Wallet: " + (walletAddress.isEmpty() ? "belum connect" : shortAddress(walletAddress)), x, y + 74f, paint);
+            canvas.drawText(chainStatus, x, y + 108f, paint);
+            drawMenuActionButton(canvas, settingsRpcButtonBounds(), "Cek RPC");
+            drawMenuActionButton(canvas, settingsWalletButtonBounds(), "Wallet");
+            drawMenuActionButton(canvas, settingsCloseButtonBounds(), "Tutup");
+        }
+
+        private void drawMenuActionButton(Canvas canvas, RectF bounds, String label) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.rgb(119, 72, 28));
+            canvas.drawRoundRect(bounds, 8, 8, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(2f);
+            paint.setColor(Color.rgb(162, 105, 41));
+            canvas.drawRoundRect(bounds, 8, 8, paint);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.WHITE);
+            paint.setTextSize(18f);
+            paint.setFakeBoldText(true);
+            float textW = paint.measureText(label);
+            canvas.drawText(label, bounds.left + (bounds.width() - textW) * 0.5f, bounds.top + 28f, paint);
+            paint.setFakeBoldText(false);
+        }
+
         private float miniMapLeft() {
-            return 18f;
+            return 32f;
         }
 
         private float miniMapTop() {
-            return 14f;
+            return 26f;
         }
 
         private float miniMapWidth() {
-            return clamp(getWidth() * 0.10f, 210f, 250f);
+            return clamp(getWidth() * 0.112f, 236f, 286f);
         }
 
         private float miniMapHeight() {
@@ -630,12 +1034,67 @@ public class MainActivity extends Activity {
             return miniMapWidth() * clamp(mapRatio, 0.82f, 0.92f);
         }
 
+        private float topMenuTop() {
+            return 10f;
+        }
+
+        private float topMenuButtonSize() {
+            return 76f;
+        }
+
+        private float topMenuBarWidth() {
+            return 305f;
+        }
+
+        private RectF topMenuButtonBounds() {
+            float right = getWidth() - 20f;
+            float top = topMenuTop();
+            float size = topMenuButtonSize();
+            return new RectF(right - size, top, right, top + size);
+        }
+
+        private RectF menuPanelBounds() {
+            float w = clamp(getWidth() * 0.28f, 430f, 540f);
+            float h = 410f;
+            float right = getWidth() - 20f;
+            float top = topMenuTop() + topMenuButtonSize() + 14f;
+            return new RectF(right - w, top, right, top + h);
+        }
+
+        private RectF inventoryPanelBounds() {
+            float w = clamp(getWidth() * 0.58f, 980f, 1320f);
+            float h = clamp(getHeight() * 0.58f, 520f, 640f);
+            float left = (getWidth() - w) * 0.5f;
+            float top = (getHeight() - h) * 0.5f;
+            return new RectF(left, top, left + w, top + h);
+        }
+
+        private RectF inventoryCloseButtonBounds() {
+            RectF panel = inventoryPanelBounds();
+            return new RectF(panel.right - 92f, panel.top + 38f, panel.right - 42f, panel.top + 88f);
+        }
+
+        private RectF settingsRpcButtonBounds() {
+            RectF panel = menuPanelBounds();
+            return new RectF(panel.left + 24f, panel.bottom - 126f, panel.left + 154f, panel.bottom - 84f);
+        }
+
+        private RectF settingsWalletButtonBounds() {
+            RectF panel = menuPanelBounds();
+            return new RectF(panel.left + 168f, panel.bottom - 126f, panel.left + 298f, panel.bottom - 84f);
+        }
+
+        private RectF settingsCloseButtonBounds() {
+            RectF panel = menuPanelBounds();
+            return new RectF(panel.right - 150f, panel.bottom - 62f, panel.right - 24f, panel.bottom - 20f);
+        }
+
         private float joystickBaseX() {
-            return clamp(getWidth() * 0.12f, 250f, 310f);
+            return clamp(getWidth() * 0.145f, 320f, 390f);
         }
 
         private float joystickBaseY() {
-            return getHeight() - clamp(getHeight() * 0.31f, 285f, 340f);
+            return getHeight() - clamp(getHeight() * 0.31f, 300f, 350f);
         }
 
         private void drawJoystick(Canvas canvas) {
@@ -644,30 +1103,10 @@ public class MainActivity extends Activity {
             float knobX = joystickActive ? joyX : baseX;
             float knobY = joystickActive ? joyY : baseY;
             paint.setStyle(Paint.Style.FILL);
-            paint.setColor(Color.argb(85, 0, 0, 0));
-            canvas.drawCircle(baseX + 5f, baseY + 6f, JOYSTICK_RADIUS, paint);
-            paint.setColor(Color.argb(150, 18, 72, 98));
+            paint.setColor(Color.argb(90, 20, 20, 20));
             canvas.drawCircle(baseX, baseY, JOYSTICK_RADIUS, paint);
-            paint.setColor(Color.argb(95, 96, 186, 196));
-            canvas.drawCircle(baseX, baseY, JOYSTICK_RADIUS * 0.68f, paint);
-
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(3f);
-            paint.setColor(Color.argb(115, 208, 246, 244));
-            canvas.drawCircle(baseX, baseY, JOYSTICK_RADIUS - 10f, paint);
-            if (joystickActive) {
-                paint.setStrokeWidth(5f);
-                paint.setColor(Color.argb(120, 210, 246, 239));
-                canvas.drawLine(baseX, baseY, knobX, knobY, paint);
-            }
-
-            paint.setStyle(Paint.Style.FILL);
-            paint.setColor(Color.argb(90, 0, 0, 0));
-            canvas.drawCircle(knobX + 3f, knobY + 4f, JOYSTICK_KNOB_RADIUS + 2f, paint);
-            paint.setColor(Color.rgb(222, 239, 232));
+            paint.setColor(Color.argb(160, 255, 255, 255));
             canvas.drawCircle(knobX, knobY, JOYSTICK_KNOB_RADIUS, paint);
-            paint.setColor(Color.rgb(183, 219, 218));
-            canvas.drawCircle(knobX - 7f, knobY - 7f, JOYSTICK_KNOB_RADIUS * 0.45f, paint);
         }
 
         private void drawActionButton(Canvas canvas) {
@@ -697,16 +1136,42 @@ public class MainActivity extends Activity {
         }
 
         private void drawWalletButton(Canvas canvas) {
-            float right = getWidth() - 18;
-            float top = 122;
+            RectF bounds = walletButtonBounds();
+            boolean connected = !walletAddress.isEmpty();
+
             paint.setStyle(Paint.Style.FILL);
-            paint.setColor(Color.rgb(44, 85, 64));
-            canvas.drawRoundRect(right - 152, top, right, top + 48, 10, 10, paint);
-            paint.setColor(Color.WHITE);
-            paint.setTextSize(18f);
+            paint.setColor(Color.argb(95, 0, 0, 0));
+            canvas.drawRoundRect(bounds.left + 4f, bounds.top + 5f, bounds.right + 4f, bounds.bottom + 5f, 12, 12, paint);
+            paint.setColor(connected ? Color.rgb(36, 102, 68) : Color.rgb(42, 87, 62));
+            canvas.drawRoundRect(bounds, 12, 12, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(3f);
+            paint.setColor(connected ? Color.rgb(105, 196, 135) : Color.rgb(91, 143, 104));
+            canvas.drawRoundRect(bounds, 12, 12, paint);
+
+            float iconCx = bounds.left + 30f;
+            float iconCy = (bounds.top + bounds.bottom) * 0.5f;
+            drawWalletHudIcon(canvas, iconCx, iconCy, connected);
+
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.rgb(236, 248, 226));
+            paint.setTextSize(16f);
             paint.setFakeBoldText(true);
-            canvas.drawText("WALLET", right - 124, top + 31, paint);
+            String label = connected ? shortAddress(walletAddress) : "CONNECT WALLET";
+            canvas.drawText(label, bounds.left + 58f, bounds.top + 31f, paint);
             paint.setFakeBoldText(false);
+        }
+
+        private void drawWalletHudIcon(Canvas canvas, float cx, float cy, boolean connected) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(connected ? Color.rgb(112, 224, 132) : Color.rgb(244, 208, 87));
+            canvas.drawCircle(cx, cy, 17f, paint);
+            paint.setColor(Color.rgb(33, 47, 32));
+            canvas.drawRoundRect(cx - 11f, cy - 8f, cx + 12f, cy + 9f, 4, 4, paint);
+            paint.setColor(Color.rgb(240, 246, 228));
+            canvas.drawRect(cx - 7f, cy - 3f, cx + 8f, cy + 0f, paint);
+            paint.setColor(connected ? Color.rgb(69, 170, 83) : Color.rgb(193, 138, 36));
+            canvas.drawCircle(cx + 11f, cy - 11f, 5f, paint);
         }
 
         private void drawContextMessage(Canvas canvas, long now) {
@@ -791,7 +1256,7 @@ public class MainActivity extends Activity {
                     : "Next: " + pendingChainActions.get(0).label();
             canvas.drawText(nextAction, x + 22, y + 164, paint);
             paint.setColor(Color.rgb(210, 225, 216));
-            canvas.drawText("Tap WALLET untuk input address & cek RPC.", x + 22, y + 190, paint);
+            canvas.drawText("Tap CONNECT WALLET untuk input address & cek RPC.", x + 22, y + 190, paint);
         }
 
         @Override
@@ -803,6 +1268,20 @@ public class MainActivity extends Activity {
             if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
                 float x = event.getX(index);
                 float y = event.getY(index);
+                if (topMenuButtonBounds().contains(x, y)) {
+                    menuOpen = !menuOpen;
+                    if (menuOpen) {
+                        menuTab = MENU_TAB_INVENTORY;
+                    }
+                    return true;
+                }
+                if (menuOpen) {
+                    if (handleMenuTouch(x, y)) {
+                        return true;
+                    }
+                    menuOpen = false;
+                    return true;
+                }
                 if (isInsideJoystickArea(x, y)) {
                     joystickActive = true;
                     joystickPointerId = pointerId;
@@ -843,6 +1322,18 @@ public class MainActivity extends Activity {
             return true;
         }
 
+        private boolean handleMenuTouch(float x, float y) {
+            RectF panel = inventoryPanelBounds();
+            if (!panel.contains(x, y)) {
+                return false;
+            }
+            if (inventoryCloseButtonBounds().contains(x, y)) {
+                menuOpen = false;
+                return true;
+            }
+            return true;
+        }
+
         private void updateJoystick(float x, float y) {
             float dx = x - joyBaseX;
             float dy = y - joyBaseY;
@@ -878,9 +1369,14 @@ public class MainActivity extends Activity {
         }
 
         private boolean isInsideWallet(float x, float y) {
-            float right = getWidth() - 18;
-            float top = 122;
-            return x >= right - 152 && x <= right && y >= top && y <= top + 48;
+            return walletButtonBounds().contains(x, y);
+        }
+
+        private RectF walletButtonBounds() {
+            float right = getWidth() - 20f;
+            float top = topMenuTop() + topMenuButtonSize() + 14f;
+            float width = clamp(getWidth() * 0.23f, 190f, 236f);
+            return new RectF(right - width, top, right, top + 52f);
         }
 
         private void performAction() {
@@ -952,35 +1448,153 @@ public class MainActivity extends Activity {
         }
 
         private void performWallet() {
-            chainPanelUntilMs = System.currentTimeMillis() + 4000L;
-            checkSepolia();
+            checkSepolia(false);
             Context context = getContext();
             if (!(context instanceof Activity)) {
                 return;
             }
-            final android.widget.EditText input = new android.widget.EditText(context);
+
+            Dialog dialog = new Dialog(context);
+            dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+
+            LinearLayout root = new LinearLayout(context);
+            root.setOrientation(LinearLayout.VERTICAL);
+            root.setPadding(dp(context, 30), dp(context, 28), dp(context, 30), dp(context, 24));
+            root.setBackground(roundedStrokeDrawable(
+                    Color.rgb(55, 37, 24),
+                    dp(context, 18),
+                    Color.rgb(173, 91, 31),
+                    dp(context, 3)));
+
+            LinearLayout header = new LinearLayout(context);
+            header.setOrientation(LinearLayout.HORIZONTAL);
+            header.setGravity(Gravity.CENTER_VERTICAL);
+            TextView icon = new TextView(context);
+            icon.setText("W");
+            icon.setTextColor(Color.rgb(52, 42, 23));
+            icon.setTextSize(18f);
+            icon.setGravity(Gravity.CENTER);
+            icon.setTypeface(null, android.graphics.Typeface.BOLD);
+            icon.setBackground(roundedDrawable(Color.rgb(244, 204, 72), dp(context, 11)));
+            LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(context, 38), dp(context, 38));
+            header.addView(icon, iconParams);
+
+            LinearLayout titleBlock = new LinearLayout(context);
+            titleBlock.setOrientation(LinearLayout.VERTICAL);
+            titleBlock.setPadding(dp(context, 14), 0, 0, 0);
+            TextView title = new TextView(context);
+            title.setText("Connect Wallet");
+            title.setTextColor(Color.rgb(255, 230, 158));
+            title.setTextSize(26f);
+            title.setTypeface(null, android.graphics.Typeface.BOLD);
+            TextView network = new TextView(context);
+            network.setText("Sepolia network");
+            network.setTextColor(Color.rgb(155, 220, 164));
+            network.setTextSize(15f);
+            titleBlock.addView(title);
+            titleBlock.addView(network);
+            header.addView(titleBlock, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            root.addView(header);
+
+            TextView body = new TextView(context);
+            body.setText("Masukkan public wallet address untuk menyimpan profil wallet. Jangan masukkan private key.");
+            body.setTextColor(Color.rgb(237, 223, 200));
+            body.setTextSize(17f);
+            body.setPadding(0, dp(context, 20), 0, dp(context, 18));
+            root.addView(body);
+
+            final EditText input = new EditText(context);
             input.setSingleLine(true);
+            input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
             input.setHint("0x wallet address Sepolia");
             input.setText(walletAddress);
-            new AlertDialog.Builder(context)
-                    .setTitle("Wallet Sepolia")
-                    .setMessage("Masukkan public wallet address. Jangan masukkan private key.")
-                    .setView(input)
-                    .setPositiveButton("Simpan", (dialog, which) -> {
-                        String address = input.getText().toString().trim();
-                        if (!isValidAddress(address)) {
-                            showMessage("Wallet address tidak valid.");
-                            return;
-                        }
-                        walletAddress = address;
-                        preferences.edit().putString("wallet_address", walletAddress).apply();
-                        showMessage("Wallet tersimpan: " + shortAddress(walletAddress));
-                    })
-                    .setNegativeButton("Tutup", null)
-                    .show();
+            input.setTextColor(Color.WHITE);
+            input.setHintTextColor(Color.rgb(185, 164, 138));
+            input.setTextSize(18f);
+            input.setPadding(dp(context, 16), 0, dp(context, 16), 0);
+            input.setBackground(roundedStrokeDrawable(
+                    Color.rgb(38, 30, 24),
+                    dp(context, 10),
+                    Color.rgb(130, 85, 43),
+                    dp(context, 2)));
+            root.addView(input, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(context, 54)));
+
+            LinearLayout actions = new LinearLayout(context);
+            actions.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+            actions.setPadding(0, dp(context, 24), 0, 0);
+            Button close = walletDialogButton(context, "Tutup", Color.rgb(91, 64, 40), Color.rgb(239, 220, 191));
+            Button save = walletDialogButton(context, "Simpan", Color.rgb(214, 129, 39), Color.WHITE);
+            LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(dp(context, 118), dp(context, 48));
+            buttonParams.leftMargin = dp(context, 14);
+            actions.addView(close, buttonParams);
+            LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(dp(context, 126), dp(context, 48));
+            saveParams.leftMargin = dp(context, 14);
+            actions.addView(save, saveParams);
+            root.addView(actions);
+
+            close.setOnClickListener(v -> dialog.dismiss());
+            save.setOnClickListener(v -> {
+                String address = input.getText().toString().trim();
+                if (!isValidAddress(address)) {
+                    showMessage("Wallet address tidak valid.");
+                    return;
+                }
+                walletAddress = address;
+                preferences.edit().putString("wallet_address", walletAddress).apply();
+                showMessage("Wallet tersimpan: " + shortAddress(walletAddress));
+                dialog.dismiss();
+            });
+
+            dialog.setContentView(root);
+            dialog.show();
+            Window dialogWindow = dialog.getWindow();
+            if (dialogWindow != null) {
+                dialogWindow.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+                WindowManager.LayoutParams params = dialogWindow.getAttributes();
+                params.dimAmount = 0.62f;
+                dialogWindow.setAttributes(params);
+                dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+                dialogWindow.setLayout(
+                        (int) clamp(getWidth() * 0.42f, 650f, 880f),
+                        WindowManager.LayoutParams.WRAP_CONTENT);
+            }
+        }
+
+        private static Button walletDialogButton(Context context, String label, int background, int textColor) {
+            Button button = new Button(context);
+            button.setText(label);
+            button.setAllCaps(false);
+            button.setTextSize(15f);
+            button.setTypeface(null, android.graphics.Typeface.BOLD);
+            button.setTextColor(textColor);
+            button.setBackground(roundedStrokeDrawable(background, dp(context, 10), Color.rgb(235, 164, 74), dp(context, 2)));
+            return button;
+        }
+
+        private static GradientDrawable roundedDrawable(int color, float radius) {
+            GradientDrawable drawable = new GradientDrawable();
+            drawable.setColor(color);
+            drawable.setCornerRadius(radius);
+            return drawable;
+        }
+
+        private static GradientDrawable roundedStrokeDrawable(int color, float radius, int strokeColor, int strokeWidth) {
+            GradientDrawable drawable = roundedDrawable(color, radius);
+            drawable.setStroke(strokeWidth, strokeColor);
+            return drawable;
+        }
+
+        private static int dp(Context context, float value) {
+            return Math.round(value * context.getResources().getDisplayMetrics().density);
         }
 
         private void checkSepolia() {
+            checkSepolia(true);
+        }
+
+        private void checkSepolia(boolean revealPanel) {
             if (checkingChain) {
                 return;
             }
@@ -989,7 +1603,9 @@ public class MainActivity extends Activity {
             blockchainClient.checkSepolia(result -> {
                 checkingChain = false;
                 chainStatus = result.message;
-                chainPanelUntilMs = System.currentTimeMillis() + 4500L;
+                if (revealPanel) {
+                    chainPanelUntilMs = System.currentTimeMillis() + 4500L;
+                }
                 invalidate();
             });
         }
@@ -1016,7 +1632,15 @@ public class MainActivity extends Activity {
         }
 
         private boolean isNearShop() {
-            return playerX > 37 * TILE && playerX < 43 * TILE && playerY > 28 * TILE && playerY < 34 * TILE;
+            boolean nearMainHouse = playerX > SHOP_LEFT_TILE * TILE
+                    && playerX < SHOP_RIGHT_TILE * TILE
+                    && playerY > SHOP_TOP_TILE * TILE
+                    && playerY < SHOP_BOTTOM_TILE * TILE;
+            boolean nearUpperHouse = playerX > SHOP_ALT_LEFT_TILE * TILE
+                    && playerX < SHOP_ALT_RIGHT_TILE * TILE
+                    && playerY > SHOP_ALT_TOP_TILE * TILE
+                    && playerY < SHOP_ALT_BOTTOM_TILE * TILE;
+            return nearMainHouse || nearUpperHouse;
         }
 
         private void drawGrassTexture(Canvas canvas) {
@@ -1193,6 +1817,24 @@ public class MainActivity extends Activity {
         private void drawBitmapWorld(Canvas canvas, Bitmap bitmap, float worldX, float worldY, float w, float h) {
             dst.set(worldX - cameraX, worldY - cameraY, worldX - cameraX + w, worldY - cameraY + h);
             canvas.drawBitmap(bitmap, null, dst, pixelPaint);
+        }
+
+        private void drawSpriteWorld(
+                Canvas canvas,
+                Bitmap bitmap,
+                int frame,
+                int frameW,
+                int frameH,
+                int columns,
+                float worldX,
+                float worldY,
+                float w,
+                float h) {
+            int sourceX = (frame % columns) * frameW;
+            int sourceY = (frame / columns) * frameH;
+            src.set(sourceX, sourceY, sourceX + frameW, sourceY + frameH);
+            dst.set(worldX - cameraX, worldY - cameraY, worldX - cameraX + w, worldY - cameraY + h);
+            canvas.drawBitmap(bitmap, src, dst, pixelPaint);
         }
 
         private void drawWorldRect(Canvas canvas, float x, float y, float w, float h) {
