@@ -1,5 +1,22 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
+}
+
+val localEnv = Properties().apply {
+    val envFile = rootProject.file(".env")
+    if (envFile.exists()) {
+        envFile.inputStream().use { load(it) }
+    }
+}
+
+fun envValue(name: String, fallback: String = ""): String {
+    return (System.getenv(name) ?: localEnv.getProperty(name) ?: fallback).trim()
+}
+
+fun escapedBuildConfig(value: String): String {
+    return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 }
 
 android {
@@ -14,6 +31,15 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "SEPOLIA_RPC_URL", escapedBuildConfig(envValue("SEPOLIA_RPC_URL", "https://ethereum-sepolia-rpc.publicnode.com")))
+        buildConfigField("String", "TANIIN_COIN_CONTRACT_ADDRESS", escapedBuildConfig(envValue("TANIIN_COIN_CONTRACT_ADDRESS")))
+        buildConfigField("String", "TANIIN_ITEMS_CONTRACT_ADDRESS", escapedBuildConfig(envValue("TANIIN_ITEMS_CONTRACT_ADDRESS")))
+        buildConfigField("String", "TANIIN_LAND_CONTRACT_ADDRESS", escapedBuildConfig(envValue("TANIIN_LAND_CONTRACT_ADDRESS")))
+        buildConfigField("String", "TANIIN_GAME_API_URL", escapedBuildConfig(envValue("TANIIN_GAME_API_URL")))
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {

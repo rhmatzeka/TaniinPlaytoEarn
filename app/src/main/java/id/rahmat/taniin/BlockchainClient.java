@@ -3,11 +3,17 @@ package id.rahmat.taniin;
 import android.os.Handler;
 import android.os.Looper;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.math.RoundingMode;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -18,20 +24,46 @@ import java.util.concurrent.Executors;
 final class BlockchainClient {
     static final String SEPOLIA_CHAIN_ID_HEX = "0xaa36a7";
     static final String SEPOLIA_CHAIN_ID_LABEL = "11155111";
-    static final String RPC_URL = "https://ethereum-sepolia-rpc.publicnode.com";
+    private static final String DEFAULT_RPC_URL = "https://ethereum-sepolia-rpc.publicnode.com";
+    private static final BigInteger WEI_PER_ETH = new BigInteger("1000000000000000000");
+    private static final BigInteger ERC20_DECIMALS = WEI_PER_ETH;
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final String rpcUrl;
+    private final String coinContractAddress;
+    private final String itemsContractAddress;
+    private final String landContractAddress;
+    private final String gameApiUrl;
+
+    BlockchainClient() {
+        rpcUrl = nonEmpty(BuildConfig.SEPOLIA_RPC_URL, DEFAULT_RPC_URL);
+        coinContractAddress = cleanAddress(BuildConfig.TANIIN_COIN_CONTRACT_ADDRESS);
+        itemsContractAddress = cleanAddress(BuildConfig.TANIIN_ITEMS_CONTRACT_ADDRESS);
+        landContractAddress = cleanAddress(BuildConfig.TANIIN_LAND_CONTRACT_ADDRESS);
+        gameApiUrl = trimTrailingSlash(BuildConfig.TANIIN_GAME_API_URL);
+    }
+
+    boolean hasCoinContract() {
+        return !coinContractAddress.isEmpty();
+    }
+
+    boolean hasGameApi() {
+        return !gameApiUrl.isEmpty();
+    }
+
+    String contractSummary() {
+        String coin = hasCoinContract() ? shortAddress(coinContractAddress) : "TANI belum diset";
+        String items = itemsContractAddress.isEmpty() ? "Items belum diset" : shortAddress(itemsContractAddress);
+        String land = landContractAddress.isEmpty() ? "Land belum diset" : shortAddress(landContractAddress);
+        return "Coin " + coin + " | Items " + items + " | Land " + land;
+    }
 
     void checkSepolia(Callback callback) {
         executor.execute(() -> {
             Result result;
             try {
-                String response = postRpc("{\"jsonrpc\":\"2.0\",\"method\":\"eth_chainId\",\"params\":[],\"id\":1}");
-                boolean sepolia = response.toLowerCase(Locale.US).contains(SEPOLIA_CHAIN_ID_HEX);
-                result = sepolia
-                        ? Result.ok("Sepolia RPC online. Chain ID " + SEPOLIA_CHAIN_ID_LABEL + ".")
-                        : Result.error("RPC online, tapi chain ID bukan Sepolia.");
+                result = checkSepoliaSync();
             } catch (IOException exception) {
                 result = Result.error("Gagal cek Sepolia: " + exception.getMessage());
             }
@@ -40,8 +72,116 @@ final class BlockchainClient {
         });
     }
 
+    void loadWalletState(String walletAddress, WalletCallback callback) {
+        executor.execute(() -> {
+            WalletState state;
+            try {
+                if (!isValidAddress(walletAddress)) {
+                    state = WalletState.error("Wallet address tidak valid.");
+                } else {
+                    Result network = checkSepoliaSync();
+                    BigInteger nativeWei = ethGetBalance(walletAddress);
+                    String nativeEth = formatEth(nativeWei);
+
+                    if (hasCoinContract()) {
+                        BigInteger rawCoin = erc20BalanceOf(coinContractAddress, walletAddress);
+                        int wholeCoin = clampToGameCoin(rawCoin.divide(ERC20_DECIMALS));
+                        state = WalletState.ok(
+                                network.message + " TANI " + wholeCoin + " | ETH " + nativeEth,
+                                wholeCoin,
+                                true,
+                                nativeEth);
+                    } else {
+                        state = WalletState.ok(
+                                network.message + " ETH " + nativeEth + ". Contract TANI belum diset, coin masih lokal.",
+                                0,
+                                false,
+                                nativeEth);
+                    }
+                }
+            } catch (IOException exception) {
+                state = WalletState.error("Gagal sync wallet: " + exception.getMessage());
+            }
+            WalletState finalState = state;
+            mainHandler.post(() -> callback.onWalletState(finalState));
+        });
+    }
+
+    void submitGameAction(String walletAddress, ChainAction action, Callback callback) {
+        executor.execute(() -> {
+            Result result;
+            try {
+                if (!hasGameApi()) {
+                    result = Result.error("TANIIN_GAME_API_URL belum diset; aksi disimpan sebagai pending lokal.");
+                } else if (!isValidAddress(walletAddress)) {
+                    result = Result.error("Wallet belum valid; aksi disimpan sebagai pending lokal.");
+                } else {
+                    JSONObject body = new JSONObject();
+                    body.put("wallet", walletAddress);
+                    body.put("type", action.type);
+                    body.put("plotId", action.plotId);
+                    body.put("amount", action.amount);
+                    body.put("createdAtMs", action.createdAtMs);
+                    postJson(gameApiUrl + "/game-actions", body.toString());
+                    result = Result.ok("Aksi dikirim ke signer backend.");
+                }
+            } catch (IOException | JSONException exception) {
+                result = Result.error("Gagal kirim aksi chain: " + exception.getMessage());
+            }
+            Result finalResult = result;
+            mainHandler.post(() -> callback.onResult(finalResult));
+        });
+    }
+
+    private Result checkSepoliaSync() throws IOException {
+        String chainId = rpcResult("{\"jsonrpc\":\"2.0\",\"method\":\"eth_chainId\",\"params\":[],\"id\":1}");
+        boolean sepolia = SEPOLIA_CHAIN_ID_HEX.equals(chainId.toLowerCase(Locale.US));
+        return sepolia
+                ? Result.ok("Sepolia RPC online. Chain ID " + SEPOLIA_CHAIN_ID_LABEL + ".")
+                : Result.error("RPC online, tapi chain ID bukan Sepolia.");
+    }
+
+    private BigInteger ethGetBalance(String walletAddress) throws IOException {
+        String payload = String.format(Locale.US,
+                "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBalance\",\"params\":[\"%s\",\"latest\"],\"id\":2}",
+                walletAddress);
+        return hexToBigInteger(rpcResult(payload));
+    }
+
+    private BigInteger erc20BalanceOf(String contractAddress, String walletAddress) throws IOException {
+        JSONObject call = new JSONObject();
+        try {
+            call.put("to", contractAddress);
+            call.put("data", erc20BalanceOfData(walletAddress));
+        } catch (JSONException exception) {
+            throw new IOException(exception.getMessage(), exception);
+        }
+        String payload = String.format(Locale.US,
+                "{\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[%s,\"latest\"],\"id\":3}",
+                call);
+        return hexToBigInteger(rpcResult(payload));
+    }
+
+    private String rpcResult(String payload) throws IOException {
+        String response = postRpc(payload);
+        try {
+            JSONObject object = new JSONObject(response);
+            if (object.has("error")) {
+                JSONObject error = object.getJSONObject("error");
+                throw new IOException(error.optString("message", error.toString()));
+            }
+            return object.optString("result", "");
+        } catch (JSONException exception) {
+            throw new IOException("Response RPC tidak valid.", exception);
+        }
+    }
+
     private String postRpc(String payload) throws IOException {
-        HttpURLConnection connection = (HttpURLConnection) new URL(RPC_URL).openConnection();
+        return postJson(rpcUrl, payload);
+    }
+
+    private static String postJson(String urlString, String payload) throws IOException {
+        HttpURLConnection connection = (HttpURLConnection) new URL(urlString).openConnection();
         connection.setConnectTimeout(9000);
         connection.setReadTimeout(9000);
         connection.setRequestMethod("POST");
@@ -72,8 +212,76 @@ final class BlockchainClient {
         return response.toString();
     }
 
+    private static String erc20BalanceOfData(String walletAddress) {
+        return "0x70a08231" + leftPad64(walletAddress.substring(2).toLowerCase(Locale.US));
+    }
+
+    private static String leftPad64(String value) {
+        StringBuilder padded = new StringBuilder();
+        for (int i = value.length(); i < 64; i++) {
+            padded.append('0');
+        }
+        padded.append(value);
+        return padded.toString();
+    }
+
+    private static BigInteger hexToBigInteger(String value) {
+        if (value == null || value.length() <= 2) {
+            return BigInteger.ZERO;
+        }
+        return new BigInteger(value.substring(2), 16);
+    }
+
+    private static String formatEth(BigInteger wei) {
+        BigDecimal value = new BigDecimal(wei).divide(new BigDecimal(WEI_PER_ETH), 6, RoundingMode.DOWN);
+        return value.stripTrailingZeros().toPlainString();
+    }
+
+    private static int clampToGameCoin(BigInteger value) {
+        if (value.compareTo(BigInteger.ZERO) < 0) {
+            return 0;
+        }
+        if (value.compareTo(BigInteger.valueOf(Integer.MAX_VALUE)) > 0) {
+            return Integer.MAX_VALUE;
+        }
+        return value.intValue();
+    }
+
+    private static String nonEmpty(String value, String fallback) {
+        String cleaned = value == null ? "" : value.trim();
+        return cleaned.isEmpty() ? fallback : cleaned;
+    }
+
+    private static String cleanAddress(String value) {
+        String cleaned = value == null ? "" : value.trim();
+        return isValidAddress(cleaned) ? cleaned : "";
+    }
+
+    private static String trimTrailingSlash(String value) {
+        String cleaned = value == null ? "" : value.trim();
+        while (cleaned.endsWith("/")) {
+            cleaned = cleaned.substring(0, cleaned.length() - 1);
+        }
+        return cleaned;
+    }
+
+    static boolean isValidAddress(String address) {
+        return address != null && address.matches("^0x[0-9a-fA-F]{40}$");
+    }
+
+    static String shortAddress(String address) {
+        if (address == null || address.length() < 12) {
+            return "";
+        }
+        return address.substring(0, 6) + "..." + address.substring(address.length() - 4);
+    }
+
     interface Callback {
         void onResult(Result result);
+    }
+
+    interface WalletCallback {
+        void onWalletState(WalletState state);
     }
 
     static final class Result {
@@ -91,6 +299,30 @@ final class BlockchainClient {
 
         static Result error(String message) {
             return new Result(false, message);
+        }
+    }
+
+    static final class WalletState {
+        final boolean success;
+        final String message;
+        final int coinBalance;
+        final boolean coinBalanceAvailable;
+        final String nativeEth;
+
+        private WalletState(boolean success, String message, int coinBalance, boolean coinBalanceAvailable, String nativeEth) {
+            this.success = success;
+            this.message = message;
+            this.coinBalance = coinBalance;
+            this.coinBalanceAvailable = coinBalanceAvailable;
+            this.nativeEth = nativeEth;
+        }
+
+        static WalletState ok(String message, int coinBalance, boolean coinBalanceAvailable, String nativeEth) {
+            return new WalletState(true, message, coinBalance, coinBalanceAvailable, nativeEth);
+        }
+
+        static WalletState error(String message) {
+            return new WalletState(false, message, 0, false, "");
         }
     }
 }

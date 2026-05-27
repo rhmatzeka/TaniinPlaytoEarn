@@ -1,38 +1,32 @@
 # Taniin Sepolia Contracts
 
-This folder contains the first contract shape for the Android prototype:
+This folder contains the Solidity contracts and a small Hardhat deploy scaffold for the Android prototype.
 
-- `TaniinLand`: ERC-721 land ownership. Players buy/mint land, plant, and harvest.
-- `TaniinItems`: ERC-1155 inventory items for seed and crop balances.
-- `TaniinCoin`: ERC-20 reward token for later marketplace/reward logic.
+- `TaniinCoin`: ERC-20 reward token displayed by the Android wallet/coin UI.
+- `TaniinLand`: ERC-721 land ownership prototype.
+- `TaniinItems`: ERC-1155 seed/crop inventory prototype.
 
-Do not commit private keys. The key shared in chat should be treated as compromised and replaced.
+## Setup
 
-## Suggested Deploy Flow
-
-Use a separate Hardhat or Foundry project, install OpenZeppelin, then copy `TaniinGame.sol`.
-
-Hardhat example:
+The Hardhat config reads the root `.env` file. Use a fresh deployer wallet and never commit a real key.
 
 ```bash
-npm init -y
-npm install --save-dev hardhat @nomicfoundation/hardhat-toolbox dotenv
-npm install @openzeppelin/contracts
-npx hardhat init
+cd contracts
+npm install
+npm run compile
+npm run deploy:sepolia
 ```
 
-Use a local `.env` file:
+The deploy script prints the public contract addresses that the Android build expects:
 
-```bash
-SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
-DEPLOYER_PRIVATE_KEY=replace_with_new_wallet_private_key
+```properties
+TANIIN_COIN_CONTRACT_ADDRESS=...
+TANIIN_LAND_CONTRACT_ADDRESS=...
+TANIIN_ITEMS_CONTRACT_ADDRESS=...
 ```
 
-After deploy, put the deployed contract addresses into the Android app config. The current app already records pending actions from gameplay, but transaction signing should be done through a wallet flow, not a hardcoded private key.
+## Security Notes
 
-## Contract Calls To Wire Next
+Do not put `DEPLOYER_PRIVATE_KEY` in Android code, app assets, Gradle committed files, screenshots, or GitHub. If a key was shared in chat, consider it compromised and replace the wallet before deploying or funding it.
 
-- Buy land: `TaniinLand.buyLand(tokenUri)` with `0.001 ether`.
-- Plant: `TaniinLand.plant(landId)`.
-- Harvest: `TaniinLand.harvest(landId)`.
-- Mint/burn seed and crop items through a server/admin wallet or a contract-controlled game economy.
+The Android app can read wallet balances through Sepolia JSON-RPC. Actual game transaction signing should be handled by WalletConnect or a backend signer endpoint configured through `TANIIN_GAME_API_URL`.

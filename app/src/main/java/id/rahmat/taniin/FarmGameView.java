@@ -48,8 +48,15 @@ final class FarmGameView extends CanvasGameView {
     private static final float SHOP_BOTTOM_TILE = 31.2f;
     private static final float SHOP_SIGN_X_TILE = 18.5f;
     private static final float SHOP_SIGN_Y_TILE = 22.35f;
+    private static final float SELL_HOUSE_LEFT_TILE = 27.0f;
+    private static final float SELL_HOUSE_RIGHT_TILE = 35.4f;
+    private static final float SELL_HOUSE_TOP_TILE = 8.7f;
+    private static final float SELL_HOUSE_BOTTOM_TILE = 17.1f;
+    private static final float SELL_SIGN_X_TILE = 31.0f;
+    private static final float SELL_SIGN_Y_TILE = 13.35f;
     private static final int SEED_BUNDLE_AMOUNT = 3;
     private static final int MAX_SHOP_BUNDLE_QUANTITY = 9;
+    private static final long HARVEST_EFFECT_MS = 1450L;
     private static final String[] SEED_NAMES = {"Kentang", "Bawang", "Stroberi", "Bit"};
     private static final String[] SEED_SHOP_NAMES = {"Potato Seed", "Leek Seed", "Strawberry Seed", "Beetroot Seed"};
     private static final int[] SEED_PRICES = {60, 75, 110, 90};
@@ -77,6 +84,7 @@ final class FarmGameView extends CanvasGameView {
     private final List<Plot> plots = new ArrayList<>();
     private final List<RectF> collisionRects = new ArrayList<>();
     private final List<ChainAction> pendingChainActions = new ArrayList<>();
+    private final List<HarvestEffect> harvestEffects = new ArrayList<>();
     private final BlockchainClient blockchainClient = new BlockchainClient();
     private final SharedPreferences preferences;
     private TmxMap tmxMap;
@@ -108,6 +116,8 @@ final class FarmGameView extends CanvasGameView {
     private String statusPopupMessage = "";
     private String walletAddress = "";
     private String chainStatus = "Sepolia belum dicek.";
+    private String walletNativeBalance = "";
+    private boolean coinBalanceOnChain;
     private boolean checkingChain;
     private String mapStatus = "";
 
@@ -151,6 +161,9 @@ final class FarmGameView extends CanvasGameView {
         cow = decodePixelResource(R.drawable.female_cow_brown);
         loadTmxMap(context);
         createWorld();
+        if (!walletAddress.isEmpty()) {
+            refreshWalletState(false);
+        }
     }
 
     private Bitmap decodePixelResource(int resId) {
@@ -253,6 +266,11 @@ final class FarmGameView extends CanvasGameView {
                 plot.state = PlotState.READY;
             }
         }
+        for (int i = harvestEffects.size() - 1; i >= 0; i--) {
+            if (now - harvestEffects.get(i).startedAtMs > HARVEST_EFFECT_MS) {
+                harvestEffects.remove(i);
+            }
+        }
     }
 
     private void updateFacingDirection(float nx, float ny) {
@@ -302,6 +320,7 @@ final class FarmGameView extends CanvasGameView {
         drawWorld(canvas);
         drawMapDecorations(canvas, false);
         drawPlots(canvas, now);
+        drawHarvestEffects(canvas, now);
         if (tmxMap == null) {
             drawDecorations(canvas);
         }
@@ -404,6 +423,45 @@ final class FarmGameView extends CanvasGameView {
         }
     }
 
+    private void drawHarvestEffects(Canvas canvas, long now) {
+        for (HarvestEffect effect : harvestEffects) {
+            float progress = clamp((now - effect.startedAtMs) / (float) HARVEST_EFFECT_MS, 0f, 1f);
+            int alpha = (int) (255f * (1f - progress));
+            float lift = TILE * 0.82f * progress;
+            int cell = 16;
+            int cropRow = SEED_CROP_ROWS[effect.seedIndex];
+            src.set(3 * cell, cropRow * cell, 3 * cell + cell, cropRow * cell + cell);
+
+            for (int i = 0; i < 8; i++) {
+                float angle = (float) (i * Math.PI * 0.25f + effect.phase);
+                float radius = TILE * (0.16f + progress * 0.42f);
+                float x = effect.centerX + (float) Math.cos(angle) * radius - cameraX;
+                float y = effect.centerY + (float) Math.sin(angle) * radius * 0.45f - lift - cameraY;
+
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(Color.argb(alpha, 255, 223, 77));
+                canvas.drawCircle(x, y, 8f + 7f * (1f - progress), paint);
+            }
+
+            pixelPaint.setAlpha(alpha);
+            for (int i = 0; i < 5; i++) {
+                float x = effect.centerX - TILE * 0.58f + i * TILE * 0.29f - cameraX;
+                float y = effect.centerY - TILE * 0.12f - lift - (i % 2) * TILE * 0.16f - cameraY;
+                float size = TILE * (0.34f - progress * 0.07f);
+                dst.set(x, y, x + size, y + size);
+                canvas.drawBitmap(cropSheet, src, dst, pixelPaint);
+            }
+            pixelPaint.setAlpha(255);
+
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.argb(alpha, 255, 247, 204));
+            paint.setTextSize(28f + progress * 10f);
+            paint.setFakeBoldText(true);
+            drawCenteredText(canvas, "+" + effect.amount, effect.centerX - cameraX, effect.centerY - TILE * 0.75f - lift - cameraY);
+            paint.setFakeBoldText(false);
+        }
+    }
+
     private void drawLock(Canvas canvas, Plot plot) {
         float cx = plot.x + plot.w / 2f - cameraX;
         float cy = plot.y + plot.h / 2f - cameraY;
@@ -458,6 +516,7 @@ final class FarmGameView extends CanvasGameView {
         }
         if (foreground) {
             drawShopHouseSign(canvas);
+            drawSellHouseSign(canvas);
             return;
         }
         drawSpriteWithShadowWorld(canvas, chicken, 0, 16, 16, 4, 22.35f * TILE, 17.45f * TILE, TILE * 0.50f, TILE * 0.50f);
@@ -477,6 +536,15 @@ final class FarmGameView extends CanvasGameView {
         }
 
         drawWoodSignBoard(canvas, sign, "SHOP", 36f, true);
+    }
+
+    private void drawSellHouseSign(Canvas canvas) {
+        RectF sign = sellSignBounds();
+        if (isOffscreen(sign)) {
+            return;
+        }
+
+        drawWoodSignBoard(canvas, sign, "JUAL PANEN", 28f, true);
     }
 
     private void drawPlotActionSigns(Canvas canvas, long now) {
@@ -578,9 +646,27 @@ final class FarmGameView extends CanvasGameView {
                 centerY + height * 0.5f);
     }
 
+    private RectF sellSignBounds() {
+        float centerX = SELL_SIGN_X_TILE * TILE - cameraX;
+        float centerY = SELL_SIGN_Y_TILE * TILE - cameraY;
+        float width = 230f;
+        float height = 64f;
+        return new RectF(
+                centerX - width * 0.5f,
+                centerY - height * 0.5f,
+                centerX + width * 0.5f,
+                centerY + height * 0.5f);
+    }
+
     private RectF shopSignTapBounds() {
         RectF bounds = new RectF(shopSignBounds());
         bounds.inset(-24f, -22f);
+        return bounds;
+    }
+
+    private RectF sellSignTapBounds() {
+        RectF bounds = new RectF(sellSignBounds());
+        bounds.inset(-26f, -24f);
         return bounds;
     }
 
@@ -721,7 +807,8 @@ final class FarmGameView extends CanvasGameView {
         paint.setColor(Color.rgb(255, 226, 88));
         paint.setTextSize(21f);
         paint.setFakeBoldText(true);
-        canvas.drawText("Coin " + coins, left + 16f, top + 34f, paint);
+        String coinLabel = coinBalanceOnChain ? "Wallet Coin " : "Coin ";
+        canvas.drawText(coinLabel + coins, left + 16f, top + 34f, paint);
         paint.setColor(Color.WHITE);
         canvas.drawText("Bibit " + totalSeeds(), left + 122f, top + 34f, paint);
         canvas.drawText("Panen " + harvests, left + 220f, top + 34f, paint);
@@ -741,10 +828,10 @@ final class FarmGameView extends CanvasGameView {
         paint.setTextSize(18f);
         paint.setFakeBoldText(true);
         paint.setColor(Color.rgb(152, 239, 176));
-        canvas.drawText("Sepolia", left + 16, 47, paint);
+        canvas.drawText(coinBalanceOnChain ? "Sepolia TANI" : "Sepolia", left + 16, 47, paint);
         paint.setColor(Color.WHITE);
         String wallet = walletAddress.isEmpty() ? "wallet belum connect" : shortAddress(walletAddress);
-        canvas.drawText(wallet, left + 98, 47, paint);
+        canvas.drawText(wallet, left + 132, 47, paint);
         paint.setColor(pendingChainActions.isEmpty() ? Color.rgb(190, 214, 190) : Color.rgb(255, 219, 95));
         canvas.drawText("pending " + pendingChainActions.size(), right - 112, 47, paint);
         paint.setFakeBoldText(false);
@@ -1099,7 +1186,7 @@ final class FarmGameView extends CanvasGameView {
             }
         }
 
-        drawInventoryRow(canvas, x, y + 45f, Color.rgb(255, 209, 84), "Coin", coins);
+        drawInventoryRow(canvas, x, y + 45f, Color.rgb(255, 209, 84), coinBalanceOnChain ? "Wallet coin" : "Coin lokal", coins);
         drawInventoryRow(canvas, x, y + 90f, Color.rgb(116, 209, 85), "Bibit tanaman", totalSeeds());
         drawInventoryRow(canvas, x, y + 135f, Color.rgb(235, 150, 63), "Hasil panen", harvests);
         drawInventoryRow(canvas, x, y + 180f, Color.rgb(123, 188, 91), "Lahan dimiliki", ownedLand);
@@ -1136,7 +1223,8 @@ final class FarmGameView extends CanvasGameView {
         paint.setTextSize(18f);
         canvas.drawText("Kontrol: Analog default", x, y + 40f, paint);
         canvas.drawText("Wallet: " + (walletAddress.isEmpty() ? "belum connect" : shortAddress(walletAddress)), x, y + 74f, paint);
-        canvas.drawText(chainStatus, x, y + 108f, paint);
+        String balance = walletNativeBalance.isEmpty() ? chainStatus : "ETH " + walletNativeBalance + " | " + chainStatus;
+        canvas.drawText(balance, x, y + 108f, paint);
         drawMenuActionButton(canvas, settingsRpcButtonBounds(), "Cek RPC");
         drawMenuActionButton(canvas, settingsWalletButtonBounds(), "Wallet");
         drawMenuActionButton(canvas, settingsCloseButtonBounds(), "Tutup");
@@ -1270,37 +1358,37 @@ final class FarmGameView extends CanvasGameView {
 
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.argb(95, 0, 0, 0));
-        canvas.drawRoundRect(bounds.left + 4f, bounds.top + 5f, bounds.right + 4f, bounds.bottom + 5f, 12, 12, paint);
+        canvas.drawRoundRect(bounds.left + 5f, bounds.top + 6f, bounds.right + 5f, bounds.bottom + 6f, 14, 14, paint);
         paint.setColor(connected ? Color.rgb(36, 102, 68) : Color.rgb(42, 87, 62));
-        canvas.drawRoundRect(bounds, 12, 12, paint);
+        canvas.drawRoundRect(bounds, 14, 14, paint);
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(3f);
+        paint.setStrokeWidth(4f);
         paint.setColor(connected ? Color.rgb(105, 196, 135) : Color.rgb(91, 143, 104));
-        canvas.drawRoundRect(bounds, 12, 12, paint);
+        canvas.drawRoundRect(bounds, 14, 14, paint);
 
-        float iconCx = bounds.left + 30f;
+        float iconCx = bounds.left + 40f;
         float iconCy = (bounds.top + bounds.bottom) * 0.5f;
         drawWalletHudIcon(canvas, iconCx, iconCy, connected);
 
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(236, 248, 226));
-        paint.setTextSize(16f);
+        paint.setTextSize(21f);
         paint.setFakeBoldText(true);
         String label = connected ? shortAddress(walletAddress) : "CONNECT WALLET";
-        canvas.drawText(label, bounds.left + 58f, bounds.top + 31f, paint);
+        canvas.drawText(label, bounds.left + 76f, bounds.top + 42f, paint);
         paint.setFakeBoldText(false);
     }
 
     private void drawWalletHudIcon(Canvas canvas, float cx, float cy, boolean connected) {
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(connected ? Color.rgb(112, 224, 132) : Color.rgb(244, 208, 87));
-        canvas.drawCircle(cx, cy, 17f, paint);
+        canvas.drawCircle(cx, cy, 23f, paint);
         paint.setColor(Color.rgb(33, 47, 32));
-        canvas.drawRoundRect(cx - 11f, cy - 8f, cx + 12f, cy + 9f, 4, 4, paint);
+        canvas.drawRoundRect(cx - 15f, cy - 11f, cx + 16f, cy + 12f, 5, 5, paint);
         paint.setColor(Color.rgb(240, 246, 228));
-        canvas.drawRect(cx - 7f, cy - 3f, cx + 8f, cy + 0f, paint);
+        canvas.drawRect(cx - 10f, cy - 4f, cx + 11f, cy + 0f, paint);
         paint.setColor(connected ? Color.rgb(69, 170, 83) : Color.rgb(193, 138, 36));
-        canvas.drawCircle(cx + 11f, cy - 11f, 5f, paint);
+        canvas.drawCircle(cx + 15f, cy - 15f, 6f, paint);
     }
 
     private void drawContextMessage(Canvas canvas, long now) {
@@ -1323,7 +1411,9 @@ final class FarmGameView extends CanvasGameView {
         InteractionKind kind = currentInteractionKind(now);
         switch (kind) {
             case SHOP:
-                return harvests > 0 ? "A: jual panen. Tap papan untuk beli." : "SHOP: tap papan atau A untuk beli benih.";
+                return "SHOP: tap papan atau A untuk beli benih.";
+            case SELL_HARVEST:
+                return harvests > 0 ? "A: jual hasil panen ke wallet." : "Rumah jual panen: belum ada hasil panen.";
             case BUY_LAND:
                 return "A: beli lahan 250 coin.";
             case PLANT:
@@ -1343,6 +1433,9 @@ final class FarmGameView extends CanvasGameView {
         }
         if (isNearShop()) {
             return InteractionKind.SHOP;
+        }
+        if (isNearSellHouse()) {
+            return InteractionKind.SELL_HARVEST;
         }
         return InteractionKind.NONE;
     }
@@ -1378,14 +1471,14 @@ final class FarmGameView extends CanvasGameView {
         paint.setFakeBoldText(false);
         paint.setColor(Color.WHITE);
         paint.setTextSize(19f);
-        canvas.drawText("SHOP: pilih benih, beli paket isi 3", x + 22, y + 78, paint);
+        canvas.drawText("SHOP: pilih benih, bayar pakai coin wallet", x + 22, y + 78, paint);
         canvas.drawText("Dekati lahan terkunci lalu A: beli tanah", x + 22, y + 108, paint);
-        canvas.drawText("Dekati toko lalu A: jual panen = 35 coin", x + 22, y + 138, paint);
+        canvas.drawText("Rumah Jual Panen: tukar panen = 35 coin", x + 22, y + 138, paint);
     }
 
     private void drawChainPanel(Canvas canvas) {
-        float w = 470;
-        float h = 205;
+        float w = 620;
+        float h = 232;
         float x = (getWidth() - w) / 2f;
         float y = 78;
         paint.setStyle(Paint.Style.FILL);
@@ -1398,17 +1491,23 @@ final class FarmGameView extends CanvasGameView {
         paint.setFakeBoldText(false);
         paint.setColor(Color.WHITE);
         paint.setTextSize(18f);
+        paint.setTextSize(fitTextSize(chainStatus, 18f, w - 44f));
         canvas.drawText(chainStatus, x + 22, y + 72, paint);
+        paint.setTextSize(18f);
         canvas.drawText("Wallet: " + (walletAddress.isEmpty() ? "belum diset" : shortAddress(walletAddress)), x + 22, y + 102, paint);
-        canvas.drawText("Contract: isi address setelah deploy.", x + 22, y + 132, paint);
+        String balanceLine = "TANI " + coins + (walletNativeBalance.isEmpty() ? "" : " | ETH " + walletNativeBalance);
+        canvas.drawText(balanceLine, x + 22, y + 132, paint);
+        paint.setTextSize(fitTextSize(blockchainClient.contractSummary(), 17f, w - 44f));
+        canvas.drawText(blockchainClient.contractSummary(), x + 22, y + 162, paint);
 
         paint.setColor(Color.rgb(255, 219, 95));
         String nextAction = pendingChainActions.isEmpty()
                 ? "Tidak ada aksi on-chain pending."
                 : "Next: " + pendingChainActions.get(0).label();
-        canvas.drawText(nextAction, x + 22, y + 164, paint);
+        paint.setTextSize(18f);
+        canvas.drawText(nextAction, x + 22, y + 194, paint);
         paint.setColor(Color.rgb(210, 225, 216));
-        canvas.drawText("Tap CONNECT WALLET untuk input address & cek RPC.", x + 22, y + 190, paint);
+        canvas.drawText("Tap CONNECT WALLET untuk sync saldo wallet.", x + 22, y + 220, paint);
     }
 
     private void drawInteractionDialog(Canvas canvas, long now) {
@@ -1550,9 +1649,10 @@ final class FarmGameView extends CanvasGameView {
                 shopBundleQuantity,
                 SEED_NAMES[seedIndex]);
         String line2 = String.format(Locale.US,
-                "Total %d benih - %d Coin. Coin kamu %d.",
+                "Total %d benih - %d Coin. %s kamu %d.",
                 selectedSeedTotalAmount(),
                 selectedSeedTotalPrice(),
+                coinBalanceOnChain ? "Wallet coin" : "Coin",
                 coins);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(255, 240, 212));
@@ -1608,7 +1708,8 @@ final class FarmGameView extends CanvasGameView {
 
         String selected = SEED_NAMES[selectedSeedIndex];
         String summary = String.format(Locale.US,
-                "Coin: %d | %s | Paket x%d = %d benih | Total %d Coin",
+                "%s: %d | %s | Paket x%d = %d benih | Total %d Coin",
+                coinBalanceOnChain ? "Wallet Coin" : "Coin",
                 coins,
                 selected,
                 shopBundleQuantity,
@@ -1824,6 +1925,10 @@ final class FarmGameView extends CanvasGameView {
             }
             if (isNearShop() && shopSignTapBounds().contains(x, y)) {
                 openInteractionDialog(InteractionKind.SHOP);
+                return true;
+            }
+            if (isNearSellHouse() && sellSignTapBounds().contains(x, y)) {
+                openInteractionDialog(InteractionKind.SELL_HARVEST);
                 return true;
             }
             if (isInsideJoystickArea(x, y)) {
@@ -2042,6 +2147,11 @@ final class FarmGameView extends CanvasGameView {
             shopCatalogOpen = true;
             return;
         }
+        if (activeInteractionKind == InteractionKind.SELL_HARVEST) {
+            interactionDialogOpen = false;
+            sellHarvestToWallet();
+            return;
+        }
         if (activeInteractionKind == InteractionKind.WAIT_CROP) {
             interactionDialogOpen = false;
             return;
@@ -2163,6 +2273,8 @@ final class FarmGameView extends CanvasGameView {
         switch (activeInteractionKind) {
             case SHOP:
                 return "Ucup";
+            case SELL_HARVEST:
+                return "Jual Panen";
             case BUY_LAND:
                 return "Lahan";
             case PLANT:
@@ -2179,7 +2291,14 @@ final class FarmGameView extends CanvasGameView {
     private String interactionBody(long now) {
         switch (activeInteractionKind) {
             case SHOP:
-                return "Halo! Selamat datang, ada yang bisa dibantu?";
+                return "Pilih benih yang mau dibeli memakai coin wallet.";
+            case SELL_HARVEST:
+                if (walletAddress.isEmpty()) {
+                    return "Connect wallet dulu sebelum jual hasil panen.";
+                }
+                return harvests > 0
+                        ? "Jual " + harvests + " hasil panen? Coin akan masuk ke wallet."
+                        : "Belum ada hasil panen untuk dijual.";
             case BUY_LAND:
                 return "Lahan ini bisa dibeli seharga 250 coin.";
             case PLANT:
@@ -2199,6 +2318,11 @@ final class FarmGameView extends CanvasGameView {
         switch (activeInteractionKind) {
             case SHOP:
                 return "Buka toko";
+            case SELL_HARVEST:
+                if (walletAddress.isEmpty()) {
+                    return "Connect wallet";
+                }
+                return harvests > 0 ? "Ya, jual panen" : "Oke";
             case BUY_LAND:
                 return "Ya, beli lahan";
             case PLANT:
@@ -2217,6 +2341,7 @@ final class FarmGameView extends CanvasGameView {
             case BUY_LAND:
             case PLANT:
             case HARVEST:
+            case SELL_HARVEST:
                 return "Batal";
             default:
                 return "Tidak apa-apa";
@@ -2234,8 +2359,8 @@ final class FarmGameView extends CanvasGameView {
     private RectF walletButtonBounds() {
         float right = getWidth() - 20f;
         float top = topMenuTop() + topMenuButtonSize() + 14f;
-        float width = clamp(getWidth() * 0.23f, 190f, 236f);
-        return new RectF(right - width, top, right, top + 52f);
+        float width = clamp(getWidth() * 0.28f, 292f, 360f);
+        return new RectF(right - width, top, right, top + 72f);
     }
 
     private RectF interactionDialogPanelBounds() {
@@ -2352,17 +2477,14 @@ final class FarmGameView extends CanvasGameView {
             return;
         }
         if (isNearShop()) {
-            if (harvests <= 0) {
-                openInteractionDialog(InteractionKind.SHOP);
-                return;
-            }
-            queueChainAction(new ChainAction("SELL_CROP", 0, harvests));
-            coins += harvests * 35;
-            showSuccessPopup(String.format(Locale.US, "Terjual %d panen. Coin +%d.", harvests, harvests * 35));
-            harvests = 0;
+            openInteractionDialog(InteractionKind.SHOP);
             return;
         }
-        showMessage("Dekati lahan atau toko dulu.");
+        if (isNearSellHouse()) {
+            openInteractionDialog(InteractionKind.SELL_HARVEST);
+            return;
+        }
+        showMessage("Dekati lahan, shop, atau rumah jual panen dulu.");
     }
 
     private void performPlotAction(int plotIndex) {
@@ -2401,15 +2523,35 @@ final class FarmGameView extends CanvasGameView {
             showMessage("Tanaman belum siap panen.");
             return;
         }
-        int harvestAmount = SEED_HARVEST_YIELDS[plot.seedIndex];
+        int harvestedSeedIndex = plot.seedIndex;
+        int harvestAmount = SEED_HARVEST_YIELDS[harvestedSeedIndex];
+        startHarvestEffect(plot, harvestedSeedIndex, harvestAmount, now);
         plot.state = PlotState.EMPTY;
         harvests += harvestAmount;
         queueChainAction(new ChainAction("HARVEST", plotIndex + 1, harvestAmount));
-        showSuccessPopup("Panen " + SEED_NAMES[plot.seedIndex] + " +" + harvestAmount + " masuk inventory.");
+        showSuccessPopup("Panen " + SEED_NAMES[harvestedSeedIndex] + " +" + harvestAmount + " masuk inventory.");
+    }
+
+    private void startHarvestEffect(Plot plot, int seedIndex, int amount, long now) {
+        float centerX = plot.x + plot.w * 0.5f;
+        float centerY = plot.y + plot.h * 0.52f;
+        harvestEffects.add(new HarvestEffect(centerX, centerY, seedIndex, amount, now));
     }
 
     private void buySeedsFromShop(int seedIndex) {
         selectedSeedIndex = seedIndex;
+        if (blockchainClient.hasCoinContract()) {
+            if (walletAddress.isEmpty()) {
+                showMessage("Connect wallet dulu supaya coin shop pakai wallet.");
+                performWallet();
+                return;
+            }
+            if (!coinBalanceOnChain && !checkingChain) {
+                refreshWalletState(true);
+                showMessage("Sync saldo wallet dulu.");
+                return;
+            }
+        }
         int price = totalPriceForSeed(seedIndex);
         if (coins < price) {
             showMessage("Coin belum cukup untuk beli " + shopBundleQuantity + " paket " + SEED_NAMES[seedIndex] + ".");
@@ -2420,6 +2562,27 @@ final class FarmGameView extends CanvasGameView {
         seedCounts[seedIndex] += totalSeeds;
         queueChainAction(new ChainAction("BUY_SEED", seedIndex + 1, totalSeeds));
         showSuccessPopup("Berhasil membeli " + totalSeeds + " benih " + SEED_NAMES[seedIndex] + ".");
+    }
+
+    private void sellHarvestToWallet() {
+        if (walletAddress.isEmpty()) {
+            showMessage("Connect wallet dulu sebelum jual panen.");
+            performWallet();
+            return;
+        }
+        if (harvests <= 0) {
+            showMessage("Belum ada hasil panen untuk dijual.");
+            return;
+        }
+        int soldHarvests = harvests;
+        int earnedCoins = soldHarvests * 35;
+        harvests = 0;
+        coins += earnedCoins;
+        queueChainAction(new ChainAction("SELL_CROP", 0, soldHarvests));
+        showSuccessPopup(String.format(Locale.US,
+                "Terjual %d panen. Coin wallet +%d.",
+                soldHarvests,
+                earnedCoins));
     }
 
     private void performWallet() {
@@ -2472,7 +2635,7 @@ final class FarmGameView extends CanvasGameView {
         root.addView(header);
 
         TextView body = new TextView(context);
-        body.setText("Masukkan public wallet address untuk menyimpan profil wallet. Jangan masukkan private key.");
+        body.setText("Masukkan public wallet address untuk sync saldo Sepolia dan coin TANI. Jangan masukkan private key.");
         body.setTextColor(Color.rgb(237, 223, 200));
         body.setTextSize(17f);
         body.setPadding(0, dp(context, 20), 0, dp(context, 18));
@@ -2520,6 +2683,7 @@ final class FarmGameView extends CanvasGameView {
             preferences.edit().putString("wallet_address", walletAddress).apply();
             showMessage("Wallet tersimpan: " + shortAddress(walletAddress));
             dialog.dismiss();
+            refreshWalletState(true);
         });
 
         dialog.setContentView(root);
@@ -2573,13 +2737,47 @@ final class FarmGameView extends CanvasGameView {
         if (checkingChain) {
             return;
         }
+        if (!walletAddress.isEmpty()) {
+            refreshWalletState(revealPanel);
+            return;
+        }
         checkingChain = true;
         chainStatus = "Cek Sepolia RPC...";
         blockchainClient.checkSepolia(result -> {
             checkingChain = false;
-            chainStatus = result.message;
+            chainStatus = result.message + " " + blockchainClient.contractSummary();
             if (revealPanel) {
                 chainPanelUntilMs = System.currentTimeMillis() + 4500L;
+            }
+            invalidate();
+        });
+    }
+
+    private void refreshWalletState(boolean revealPanel) {
+        if (checkingChain) {
+            return;
+        }
+        if (walletAddress.isEmpty()) {
+            chainStatus = "Connect wallet dulu untuk sync saldo.";
+            if (revealPanel) {
+                chainPanelUntilMs = System.currentTimeMillis() + 3600L;
+            }
+            return;
+        }
+        checkingChain = true;
+        chainStatus = "Sync wallet Sepolia...";
+        blockchainClient.loadWalletState(walletAddress, state -> {
+            checkingChain = false;
+            chainStatus = state.message;
+            walletNativeBalance = state.nativeEth;
+            if (state.success && state.coinBalanceAvailable) {
+                coins = state.coinBalance;
+                coinBalanceOnChain = true;
+            } else if (state.success) {
+                coinBalanceOnChain = false;
+            }
+            if (revealPanel) {
+                chainPanelUntilMs = System.currentTimeMillis() + 5200L;
             }
             invalidate();
         });
@@ -2588,6 +2786,20 @@ final class FarmGameView extends CanvasGameView {
     private void queueChainAction(ChainAction action) {
         pendingChainActions.add(action);
         chainPanelUntilMs = System.currentTimeMillis() + 2200L;
+        if (!walletAddress.isEmpty() && blockchainClient.hasGameApi()) {
+            blockchainClient.submitGameAction(walletAddress, action, result -> {
+                chainStatus = result.message;
+                if (result.success) {
+                    pendingChainActions.remove(action);
+                }
+                chainPanelUntilMs = System.currentTimeMillis() + 3600L;
+                invalidate();
+            });
+        } else if (blockchainClient.hasCoinContract() || blockchainClient.hasGameApi()) {
+            chainStatus = walletAddress.isEmpty()
+                    ? "Wallet belum connect; aksi chain masih pending lokal."
+                    : "Signer backend belum diset; aksi chain masih pending lokal.";
+        }
     }
 
     private int totalSeeds() {
@@ -2663,6 +2875,13 @@ final class FarmGameView extends CanvasGameView {
                 && playerX < SHOP_RIGHT_TILE * TILE
                 && playerY > SHOP_TOP_TILE * TILE
                 && playerY < SHOP_BOTTOM_TILE * TILE;
+    }
+
+    private boolean isNearSellHouse() {
+        return playerX > SELL_HOUSE_LEFT_TILE * TILE
+                && playerX < SELL_HOUSE_RIGHT_TILE * TILE
+                && playerY > SELL_HOUSE_TOP_TILE * TILE
+                && playerY < SELL_HOUSE_BOTTOM_TILE * TILE;
     }
 
     private void drawGrassTexture(Canvas canvas) {
@@ -2928,14 +3147,11 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private static boolean isValidAddress(String address) {
-        return address != null && address.matches("^0x[0-9a-fA-F]{40}$");
+        return BlockchainClient.isValidAddress(address);
     }
 
     private static String shortAddress(String address) {
-        if (address == null || address.length() < 12) {
-            return "";
-        }
-        return address.substring(0, 6) + "..." + address.substring(address.length() - 4);
+        return BlockchainClient.shortAddress(address);
     }
 }
 enum PlotState {
@@ -2947,10 +3163,29 @@ enum PlotState {
 enum InteractionKind {
     NONE,
     SHOP,
+    SELL_HARVEST,
     BUY_LAND,
     PLANT,
     WAIT_CROP,
     HARVEST
+}
+
+final class HarvestEffect {
+    final float centerX;
+    final float centerY;
+    final int seedIndex;
+    final int amount;
+    final long startedAtMs;
+    final float phase;
+
+    HarvestEffect(float centerX, float centerY, int seedIndex, int amount, long startedAtMs) {
+        this.centerX = centerX;
+        this.centerY = centerY;
+        this.seedIndex = seedIndex;
+        this.amount = amount;
+        this.startedAtMs = startedAtMs;
+        this.phase = (centerX * 0.017f + centerY * 0.011f) % 6.28f;
+    }
 }
 
 final class Plot {

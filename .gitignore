@@ -14,5 +14,15 @@
 .externalNativeBuild
 .cxx
 local.properties
+.env
+.env.*
+!.env.example
+contracts/.env
+contracts/.env.*
+!contracts/.env.example
+contracts/node_modules/
+contracts/artifacts/
+contracts/cache/
+contracts/typechain-types/
 /idle_scaled.png
 /taniin_*.png

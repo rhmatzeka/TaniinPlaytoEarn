@@ -1,22 +1,23 @@
 # Taniin
 
-Taniin is an Android farming game prototype with early play-to-earn hooks. The app renders a pixel farm map, lets the player move with an on-screen joystick, buy and plant land, harvest crops, and queue game actions that can later be wired to Sepolia smart contracts.
+Taniin is a landscape Android farming game prototype with Web3 hooks for Sepolia. The app renders a pixel farm map, lets the player buy seeds, plant, harvest, sell crops, and sync the in-game coin display with a connected wallet.
 
 ## Current Features
 
-- Landscape fullscreen Android game view built with Java Canvas.
-- TMX map loading from `app/src/main/assets/game/map.tmx`, including tile rendering, collisions, foreground layers, and a minimap.
-- Local farming loop for coins, seeds, crop growth, harvests, shop actions, inventory, and settings.
-- Sepolia RPC health check and wallet address storage for the blockchain panel.
-- Solidity prototype contracts for land, items, and token rewards in `contracts/`.
+- Java Canvas game loop with TMX map rendering, collisions, foreground layers, minimap, joystick, and hardware key support.
+- Farming loop for land ownership, seed selection, quantity-based seed purchase, planting confirmation, harvest confirmation, success popups, and harvest effects.
+- Separate seed shop and crop-selling house interactions.
+- Wallet button that stores a public wallet address, checks Sepolia RPC, reads ETH balance, and reads ERC-20 TANI balance when the deployed coin contract address is configured.
+- Pending Web3 action queue for buy land, buy seed, plant, harvest, and sell crop actions. If `TANIIN_GAME_API_URL` is configured, actions are posted to that backend signer endpoint.
+- Solidity contracts and Hardhat deploy scaffold in `contracts/`.
 
 ## Project Structure
 
-- `app/src/main/java/id/rahmat/taniin/` - Android gameplay, TMX parser, and Sepolia RPC client.
+- `app/src/main/java/id/rahmat/taniin/` - Android gameplay, TMX parser, wallet/RPC client, and blockchain action queue.
 - `app/src/main/assets/game/` - Tiled map files and tileset source images used by the runtime map renderer.
 - `app/src/main/res/drawable/` - Sprite sheets loaded directly through `R.drawable`.
-- `contracts/` - Smart contract prototypes and deploy notes for a separate Hardhat or Foundry workspace.
-- `gradle/` and `*.gradle.kts` - Android Gradle project configuration.
+- `contracts/` - Solidity contracts and Hardhat deploy helper.
+- `.env.example` - Local configuration template. Real `.env` files are ignored by git.
 
 ## Requirements
 
@@ -24,6 +25,22 @@ Taniin is an Android farming game prototype with early play-to-earn hooks. The a
 - JDK 17 or newer.
 - Android SDK platform 36.
 - A device or emulator running Android 8.0/API 26 or newer.
+- Optional for contracts: Node.js 20 or newer.
+
+## Environment
+
+Create a local `.env` from `.env.example`. Do not commit the real file.
+
+```properties
+SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
+TANIIN_COIN_CONTRACT_ADDRESS=
+TANIIN_ITEMS_CONTRACT_ADDRESS=
+TANIIN_LAND_CONTRACT_ADDRESS=
+TANIIN_GAME_API_URL=
+DEPLOYER_PRIVATE_KEY=replace_with_new_private_key_do_not_commit
+```
+
+The Android build reads these values into `BuildConfig`. Only public values should be shipped in the APK. Never put a real private key in Android source, Gradle config, screenshots, commits, or APK assets. If a private key has been pasted into chat or git, treat it as compromised and move funds/assets to a new wallet.
 
 ## Build And Run
 
@@ -39,14 +56,42 @@ Install to a connected device or emulator:
 ./gradlew :app:installDebug
 ```
 
-You can also open this directory in Android Studio and run the `app` configuration.
+On Windows from this WSL workspace, this command is known to work:
 
-## Blockchain Notes
+```bash
+cmd.exe /c gradlew.bat :app:assembleDebug --console=plain
+```
 
-The Android app currently checks the public Sepolia RPC endpoint and stores a wallet address locally. Gameplay actions are queued in-app as pending chain actions, but transaction signing is not implemented yet.
+## Web3 Flow
 
-Contract prototypes live in `contracts/TaniinGame.sol`. Use a separate Hardhat or Foundry project for deployment, and never commit private keys or wallet secrets.
+1. Deploy the contracts from `contracts/`.
+2. Put the deployed public addresses into the root `.env`.
+3. Rebuild the Android app so Gradle writes the addresses into `BuildConfig`.
+4. In the app, tap `CONNECT WALLET` and enter the public wallet address.
+5. The shop coin display uses the ERC-20 TANI balance when `TANIIN_COIN_CONTRACT_ADDRESS` is set. Otherwise it falls back to local prototype coins.
+6. Gameplay actions are queued locally. When `TANIIN_GAME_API_URL` is set, the app posts each action to `/game-actions` for a backend signer to process.
 
-## Generated Files
+The Android app does not sign transactions with a private key. A production setup should use WalletConnect or a backend signer with strict server-side validation.
 
-Root-level verification screenshots such as `taniin_*.png` and temporary scaled images are ignored. Runtime build outputs, Android Studio local state, and `local.properties` should stay out of git.
+## Deploy Contracts
+
+```bash
+cd contracts
+npm install
+npm run compile
+npm run deploy:sepolia
+```
+
+The deploy script prints:
+
+```properties
+TANIIN_COIN_CONTRACT_ADDRESS=...
+TANIIN_LAND_CONTRACT_ADDRESS=...
+TANIIN_ITEMS_CONTRACT_ADDRESS=...
+```
+
+Copy those public addresses into the root `.env`, then rebuild the Android app.
+
+## License
+
+This project is licensed under the MIT License. See `LICENSE` for details.
