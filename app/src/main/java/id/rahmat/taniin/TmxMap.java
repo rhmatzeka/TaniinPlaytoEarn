@@ -474,6 +474,9 @@ final class TmxMap {
     }
 
     private static boolean isDrawnInForeground(String layerName, int gid) {
+        if (isBridgeTile(gid)) {
+            return false;
+        }
         return isLampTile(gid)
                 || isMapleTreeTile(gid)
                 || isWoodTreeTile(gid)
