@@ -43,6 +43,7 @@ final class FarmGameView extends CanvasGameView {
     private static final float PLAYER_SPEED = TILE * 3.9f;
     private static final long GROW_TIME_MS = 12_000L;
     private static final int CROP_READY_STAGE_COLUMN = 5;
+    private static final int CROP_FIRST_VISIBLE_STAGE_COLUMN = 2;
     private static final int DIR_RIGHT = 0;
     private static final int DIR_UP = 1;
     private static final int DIR_DOWN = 2;
@@ -80,7 +81,7 @@ final class FarmGameView extends CanvasGameView {
     private static final String[] SEED_SHOP_NAMES = {"Potato Seed", "Leek Seed", "Strawberry Seed", "Beetroot Seed"};
     private static final int[] SEED_PRICES = {60, 75, 110, 90};
     private static final int[] SEED_HARVEST_YIELDS = {3, 4, 5, 4};
-    private static final int[] SEED_CROP_ROWS = {4, 2, 0, 6};
+    private static final int[] SEED_CROP_ROWS = {5, 3, 1, 7};
     private static final int[] SEED_CARD_COLORS = {
             Color.rgb(169, 75, 31),
             Color.rgb(74, 113, 159),
@@ -536,7 +537,7 @@ final class FarmGameView extends CanvasGameView {
         int cropRow = SEED_CROP_ROWS[plot.seedIndex];
         int cols = Math.max(1, Math.round(plot.w / TILE));
         int rows = Math.max(1, Math.round(plot.h / TILE));
-        float cropSize = TILE * 0.58f;
+        float cropSize = TILE * 0.74f;
         float progress = cropGrowthProgress(plot, now);
         for (int row = 0; row < rows; row++) {
             for (int col = 0; col < cols; col++) {
@@ -562,19 +563,33 @@ final class FarmGameView extends CanvasGameView {
     private void drawGrowingCropSprite(Canvas canvas, int cropRow, float progress, float centerX,
             float baseY, float baseSize, long now, int row, int col) {
         float eased = smoothStep(progress);
-        float stageFloat = eased * CROP_READY_STAGE_COLUMN;
+        float stageFloat = CROP_FIRST_VISIBLE_STAGE_COLUMN
+                + eased * (CROP_READY_STAGE_COLUMN - CROP_FIRST_VISIBLE_STAGE_COLUMN);
         int stage = Math.min(CROP_READY_STAGE_COLUMN, (int) stageFloat);
         int nextStage = Math.min(CROP_READY_STAGE_COLUMN, stage + 1);
         float blend = clamp(stageFloat - stage, 0f, 1f);
-        float scale = 0.42f + 0.58f * eased;
-        float sway = progress >= 1f ? 0f : (float) Math.sin(now / 420.0 + row * 0.9 + col * 1.3) * TILE * 0.018f * progress;
+        float pulse = progress >= 1f ? 0f : (float) Math.sin(now / 360.0 + row * 0.9 + col * 1.3) * 0.025f;
+        float scale = 0.72f + 0.28f * eased + pulse;
+        float sway = progress >= 1f ? 0f : (float) Math.sin(now / 420.0 + row * 0.9 + col * 1.3) * TILE * 0.018f * (0.35f + progress * 0.65f);
         float size = baseSize * scale;
 
+        drawCropGroundShadow(canvas, centerX + sway, baseY, size);
         drawCropFrame(canvas, cropRow, stage, centerX + sway, baseY, size, (int) (255f * (1f - blend * 0.55f)));
         if (nextStage != stage && blend > 0.03f) {
             float nextSize = baseSize * (scale + 0.08f * smoothStep(blend));
             drawCropFrame(canvas, cropRow, nextStage, centerX + sway, baseY, nextSize, (int) (255f * smoothStep(blend)));
         }
+    }
+
+    private void drawCropGroundShadow(Canvas canvas, float centerX, float baseY, float size) {
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.argb(38, 74, 44, 20));
+        canvas.drawOval(
+                centerX - size * 0.36f,
+                baseY - size * 0.16f,
+                centerX + size * 0.36f,
+                baseY - size * 0.03f,
+                paint);
     }
 
     private void drawCropFrame(Canvas canvas, int cropRow, int stage, float centerX, float baseY, float size, int alpha) {
@@ -2430,6 +2445,7 @@ final class FarmGameView extends CanvasGameView {
     private void drawChainHistoryButton(Canvas canvas) {
         RectF bounds = chainHistoryButtonBounds();
         boolean hasHash = !chainHistory.isEmpty() && BlockchainClient.isValidTransactionHash(chainHistory.get(0).txHash);
+        boolean needsSync = hasUnsyncedChainHistory();
 
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.argb(90, 0, 0, 0));
@@ -2438,7 +2454,8 @@ final class FarmGameView extends CanvasGameView {
         canvas.drawRoundRect(bounds, 14, 14, paint);
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(4f);
-        paint.setColor(hasHash ? Color.rgb(105, 207, 123) : Color.rgb(92, 151, 105));
+        paint.setColor(hasHash ? Color.rgb(105, 207, 123)
+                : needsSync ? Color.rgb(230, 180, 85) : Color.rgb(92, 151, 105));
         canvas.drawRoundRect(bounds, 14, 14, paint);
 
         drawChainHistoryListIcon(canvas, bounds.centerX(), bounds.centerY(), hasHash);
@@ -2473,7 +2490,9 @@ final class FarmGameView extends CanvasGameView {
         canvas.drawText("Riwayat transaksi", panel.left + 34f, panel.top + 52f, paint);
         paint.setFakeBoldText(false);
         paint.setColor(Color.rgb(202, 223, 207));
-        String mode = blockchainClient.hasGameApi() ? "Signer backend aktif" : "Belum on-chain: signer backend kosong";
+        String mode = blockchainClient.hasGameApi()
+                ? "Gameplay lokal + sync signer"
+                : "Gameplay lokal: signer belum diset";
         float modeMaxWidth = chainHistory.isEmpty()
                 ? panel.width() - 138f
                 : chainHistoryDialogClearAllBounds().left - panel.left - 46f;
@@ -2536,9 +2555,9 @@ final class FarmGameView extends CanvasGameView {
         drawChainHistoryTrashIcon(canvas, bounds.left + 28f, bounds.centerY(), 0.82f, Color.rgb(255, 225, 200));
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(255, 238, 218));
-        paint.setTextSize(fitTextSize("Hapus all", 18f, bounds.width() - 58f));
+        paint.setTextSize(fitTextSize("Hapus semua", 18f, bounds.width() - 58f));
         paint.setFakeBoldText(true);
-        canvas.drawText("Hapus all", bounds.left + 52f, bounds.centerY() + 7f, paint);
+        canvas.drawText("Hapus semua", bounds.left + 52f, bounds.centerY() + 7f, paint);
         paint.setFakeBoldText(false);
     }
 
@@ -2557,15 +2576,21 @@ final class FarmGameView extends CanvasGameView {
 
     private void drawChainHistoryRow(Canvas canvas, RectF row, ChainHistoryEntry entry) {
         boolean hasHash = BlockchainClient.isValidTransactionHash(entry.txHash);
+        boolean sending = chainStatusContains(entry.status, "mengirim");
+        boolean waitingSync = chainStatusContains(entry.status, "belum sync")
+                || chainStatusContains(entry.status, "butuh wallet");
+        boolean localSaved = chainStatusContains(entry.status, "lokal")
+                || chainStatusContains(entry.status, "tersimpan");
+        boolean failed = chainStatusContains(entry.status, "gagal");
         RectF delete = chainHistoryRowDeleteBounds(row);
         float textRight = hasHash ? delete.left - 52f : delete.left - 14f;
         float textWidth = Math.max(120f, textRight - (row.left + 50f));
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(hasHash ? Color.rgb(33, 78, 58) : Color.rgb(44, 63, 53));
+        paint.setColor(chainHistoryRowFillColor(hasHash, sending, waitingSync, localSaved, failed));
         canvas.drawRoundRect(row, 10, 10, paint);
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(3f);
-        paint.setColor(hasHash ? Color.rgb(102, 207, 123) : Color.rgb(83, 116, 92));
+        paint.setColor(chainHistoryRowStrokeColor(hasHash, sending, waitingSync, localSaved, failed));
         canvas.drawRoundRect(row, 10, 10, paint);
 
         drawChainHistoryStateDot(canvas, row.left + 24f, row.top + 25f, hasHash, entry.status);
@@ -2617,20 +2642,74 @@ final class FarmGameView extends CanvasGameView {
         paint.setStyle(Paint.Style.FILL);
     }
 
+    private int chainHistoryRowFillColor(boolean hasHash, boolean sending, boolean waitingSync, boolean localSaved, boolean failed) {
+        if (hasHash) {
+            return Color.rgb(33, 78, 58);
+        }
+        if (failed) {
+            return Color.rgb(74, 49, 45);
+        }
+        if (sending) {
+            return Color.rgb(61, 66, 42);
+        }
+        if (waitingSync) {
+            return Color.rgb(67, 58, 39);
+        }
+        if (localSaved) {
+            return Color.rgb(39, 70, 61);
+        }
+        return Color.rgb(44, 63, 53);
+    }
+
+    private int chainHistoryRowStrokeColor(boolean hasHash, boolean sending, boolean waitingSync, boolean localSaved, boolean failed) {
+        if (hasHash) {
+            return Color.rgb(102, 207, 123);
+        }
+        if (failed) {
+            return Color.rgb(218, 119, 101);
+        }
+        if (sending) {
+            return Color.rgb(235, 201, 93);
+        }
+        if (waitingSync) {
+            return Color.rgb(219, 167, 81);
+        }
+        if (localSaved) {
+            return Color.rgb(104, 183, 156);
+        }
+        return Color.rgb(83, 116, 92);
+    }
+
     private void drawChainHistoryStateDot(Canvas canvas, float cx, float cy, boolean hasHash, String status) {
         paint.setStyle(Paint.Style.FILL);
         if (hasHash) {
             paint.setColor(Color.rgb(105, 224, 129));
-        } else if (status != null && status.toLowerCase(Locale.US).contains("gagal")) {
+        } else if (chainStatusContains(status, "gagal")) {
             paint.setColor(Color.rgb(232, 105, 88));
-        } else if (status != null && status.toLowerCase(Locale.US).contains("mengirim")) {
+        } else if (chainStatusContains(status, "mengirim")) {
             paint.setColor(Color.rgb(255, 216, 89));
-        } else if (status != null && status.toLowerCase(Locale.US).contains("belum")) {
+        } else if (chainStatusContains(status, "belum") || chainStatusContains(status, "butuh")) {
             paint.setColor(Color.rgb(245, 166, 72));
+        } else if (chainStatusContains(status, "lokal") || chainStatusContains(status, "tersimpan")) {
+            paint.setColor(Color.rgb(104, 216, 181));
         } else {
             paint.setColor(Color.rgb(157, 184, 165));
         }
         canvas.drawCircle(cx, cy, 6f, paint);
+    }
+
+    private boolean hasUnsyncedChainHistory() {
+        for (ChainHistoryEntry entry : chainHistory) {
+            if (!BlockchainClient.isValidTransactionHash(entry.txHash)
+                    && !chainStatusContains(entry.status, "on-chain")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean chainStatusContains(String status, String needle) {
+        return status != null && status.toLowerCase(Locale.US).contains(needle);
     }
 
     private RectF chainHistoryButtonBounds() {
@@ -2826,19 +2905,21 @@ final class FarmGameView extends CanvasGameView {
         canvas.drawText(chainStatus, x + 22, y + 72, paint);
         paint.setTextSize(18f);
         canvas.drawText("Wallet: " + (walletAddress.isEmpty() ? "belum diset" : shortAddress(walletAddress)), x + 22, y + 102, paint);
-        String balanceLine = "TANI on-chain " + coins + (walletNativeBalance.isEmpty() ? "" : " | Sepolia ETH " + compactEth(walletNativeBalance));
+        String balanceLine = (coinBalanceOnChain ? "TANI on-chain " : "Coin lokal ")
+                + coins
+                + (walletNativeBalance.isEmpty() ? "" : " | Sepolia ETH " + compactEth(walletNativeBalance));
         canvas.drawText(balanceLine, x + 22, y + 132, paint);
         paint.setTextSize(fitTextSize(chainModeText(), 17f, w - 44f));
         canvas.drawText(chainModeText(), x + 22, y + 162, paint);
 
         paint.setColor(Color.rgb(255, 219, 95));
         String nextAction = pendingChainActions.isEmpty()
-                ? "Tidak ada aksi on-chain pending."
-                : "Next: " + pendingChainActions.get(0).label();
+                ? "Tidak ada sync chain berjalan."
+                : "Sync berikutnya: " + pendingChainActions.get(0).label();
         paint.setTextSize(18f);
         canvas.drawText(nextAction, x + 22, y + 194, paint);
         paint.setColor(Color.rgb(210, 225, 216));
-        canvas.drawText("Tap wallet di kanan atas untuk sync saldo.", x + 22, y + 220, paint);
+        canvas.drawText("Gameplay tetap tersimpan lokal saat signer tidak reachable.", x + 22, y + 220, paint);
     }
 
     private RectF chainPanelBounds(long now) {
@@ -2856,13 +2937,13 @@ final class FarmGameView extends CanvasGameView {
 
     private String chainModeText() {
         if (blockchainClient.hasCoinContract() && blockchainClient.hasGameApi()) {
-            return "Mode on-chain: saldo TANI dibaca dari contract, aksi dikirim ke signer.";
+            return "Mode sinkron: game tersimpan lokal, signer mencoba kirim on-chain.";
         }
         if (blockchainClient.hasCoinContract()) {
-            return "Saldo TANI on-chain aktif; transaksi gameplay butuh signer backend.";
+            return "Saldo TANI on-chain aktif; aksi game tersimpan lokal sampai signer diset.";
         }
         if (blockchainClient.hasGameApi()) {
-            return "Signer backend aktif; contract TANI belum diset.";
+            return "Signer diset; contract TANI belum diset, coin masih lokal.";
         }
         return "Mode lokal: contract/API belum diisi di .env, aksi belum on-chain.";
     }
@@ -4532,13 +4613,14 @@ final class FarmGameView extends CanvasGameView {
         if (!walletAddress.isEmpty() && blockchainClient.hasGameApi()) {
             pendingChainActions.add(action);
             blockchainClient.submitGameAction(walletAddress, action, result -> {
-                chainStatus = result.message;
                 pendingChainActions.remove(action);
                 if (result.success) {
                     String status = BlockchainClient.isValidTransactionHash(result.txHash) ? "on-chain" : "dikirim";
                     updateChainHistory(historyEntry, status, result.txHash);
+                    chainStatus = result.message;
                 } else {
-                    updateChainHistory(historyEntry, "gagal kirim", "");
+                    updateChainHistory(historyEntry, "belum sync", "");
+                    chainStatus = syncedLocalChainStatus(action, result.message);
                 }
                 chainPanelUntilMs = System.currentTimeMillis() + 3600L;
                 invalidate();
@@ -4560,17 +4642,35 @@ final class FarmGameView extends CanvasGameView {
         if (blockchainClient.hasCoinContract()) {
             return "belum on-chain";
         }
-        return "lokal";
+        return "lokal tersimpan";
     }
 
     private String localChainStatus(ChainAction action) {
         if (walletAddress.isEmpty()) {
-            return "Wallet belum connect; " + action.label() + " belum dikirim ke chain.";
+            return action.label() + " tersimpan lokal. Connect wallet untuk sync chain.";
         }
         if (!blockchainClient.hasGameApi()) {
             return "Signer backend belum diset; " + action.label() + " baru tersimpan lokal.";
         }
         return action.label() + " tersimpan lokal.";
+    }
+
+    private String syncedLocalChainStatus(ChainAction action, String reason) {
+        String detail = conciseChainError(reason);
+        return action.label() + " tersimpan lokal. Sync chain belum terkirim"
+                + (detail.isEmpty() ? "." : ": " + detail);
+    }
+
+    private String conciseChainError(String message) {
+        if (message == null) {
+            return "";
+        }
+        String cleaned = message.trim();
+        String prefix = "Gagal kirim aksi chain:";
+        if (cleaned.toLowerCase(Locale.US).startsWith(prefix.toLowerCase(Locale.US))) {
+            cleaned = cleaned.substring(prefix.length()).trim();
+        }
+        return cleaned.length() > 96 ? cleaned.substring(0, 93) + "..." : cleaned;
     }
 
     private ChainHistoryEntry addChainHistory(ChainAction action, String status) {
@@ -5160,11 +5260,20 @@ final class ChainHistoryEntry {
     static String normalizeStatus(String status) {
         String cleaned = status == null ? "" : status.trim();
         String lower = cleaned.toLowerCase(Locale.US);
+        if (lower.contains("gagal kirim") || lower.contains("gagal sync")) {
+            return "belum sync";
+        }
         if ("pending signer".equals(lower) || "pending lokal".equals(lower)) {
             return "belum on-chain";
         }
         if ("pending wallet".equals(lower)) {
             return "butuh wallet";
+        }
+        if ("lokal".equals(lower)) {
+            return "lokal tersimpan";
+        }
+        if ("dikirim".equals(lower)) {
+            return "terkirim signer";
         }
         return cleaned;
     }
