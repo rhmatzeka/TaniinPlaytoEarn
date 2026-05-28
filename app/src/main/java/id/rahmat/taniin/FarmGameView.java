@@ -9,6 +9,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.ColorDrawable;
@@ -24,6 +25,7 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -50,6 +52,10 @@ final class FarmGameView extends CanvasGameView {
     private static final float SHOP_BOTTOM_TILE = 31.2f;
     private static final float SHOP_SIGN_X_TILE = 18.5f;
     private static final float SHOP_SIGN_Y_TILE = 22.35f;
+    private static final float SHOP_NPC_X_TILE = 19.18f;
+    private static final float SHOP_NPC_Y_TILE = 25.88f;
+    private static final float SHOP_NPC_SIZE = TILE * 1.16f;
+    private static final float SHOP_NPC_FOOT_ANCHOR = 25f / 32f;
     private static final float SELL_HOUSE_LEFT_TILE = 27.0f;
     private static final float SELL_HOUSE_RIGHT_TILE = 35.4f;
     private static final float SELL_HOUSE_TOP_TILE = 8.7f;
@@ -58,7 +64,9 @@ final class FarmGameView extends CanvasGameView {
     private static final float SELL_SIGN_Y_TILE = 13.35f;
     private static final int SEED_BUNDLE_AMOUNT = 3;
     private static final int MAX_SHOP_BUNDLE_QUANTITY = 9;
+    private static final int LAND_STATE_VERSION = 2;
     private static final long HARVEST_EFFECT_MS = 1450L;
+    private static final long SHOP_NPC_BUBBLE_MS = 4200L;
     private static final String[] SEED_NAMES = {"Kentang", "Bawang", "Stroberi", "Bit"};
     private static final String[] SEED_SHOP_NAMES = {"Potato Seed", "Leek Seed", "Strawberry Seed", "Beetroot Seed"};
     private static final int[] SEED_PRICES = {60, 75, 110, 90};
@@ -99,6 +107,8 @@ final class FarmGameView extends CanvasGameView {
     private final Bitmap chicken;
     private final Bitmap babyChicken;
     private final Bitmap cow;
+    private final Bitmap shopNpcSheet;
+    private final Bitmap outdoorDecorSheet;
 
     private float playerX = 18.5f * TILE;
     private float playerY = 28.5f * TILE;
@@ -114,6 +124,7 @@ final class FarmGameView extends CanvasGameView {
     private long statusPopupUntilMs;
     private long shopUntilMs;
     private long chainPanelUntilMs;
+    private long shopNpcBubbleUntilMs;
     private String message = "Dekati lahan atau toko, lalu tekan tombol aksi.";
     private String statusPopupTitle = "";
     private String statusPopupMessage = "";
@@ -159,7 +170,7 @@ final class FarmGameView extends CanvasGameView {
         pixelPaint.setFilterBitmap(false);
         gameAudio = new GameAudio(context);
         preferences = context.getSharedPreferences("taniin_chain", Context.MODE_PRIVATE);
-        walletAddress = preferences.getString("wallet_address", "");
+        walletAddress = resolveInitialWalletAddress();
         loadAudioSettings();
         idleSheet = decodePixelResource(R.drawable.idle);
         walkSheet = decodePixelResource(R.drawable.walk);
@@ -168,12 +179,27 @@ final class FarmGameView extends CanvasGameView {
         chicken = decodePixelResource(R.drawable.chicken_blonde_green);
         babyChicken = decodePixelResource(R.drawable.baby_chicken_yellow);
         cow = decodePixelResource(R.drawable.female_cow_brown);
+        shopNpcSheet = decodePixelAsset(context, "game/Tileset/Cute_Fantasy_Free/Player/Player.png", idleSheet);
+        outdoorDecorSheet = decodePixelAsset(context, "game/Tileset/Cute_Fantasy_Free/Outdoor decoration/Outdoor_Decor_Free.png", null);
         loadTmxMap(context);
         createWorld();
         loadGameState();
         if (!walletAddress.isEmpty()) {
             refreshWalletState(false);
         }
+    }
+
+    private String resolveInitialWalletAddress() {
+        String defaultWalletAddress = blockchainClient.defaultWalletAddress();
+        String savedWalletAddress = preferences.getString("wallet_address", "");
+        if (!defaultWalletAddress.isEmpty()) {
+            if (!defaultWalletAddress.equalsIgnoreCase(savedWalletAddress)) {
+                preferences.edit().putString("wallet_address", defaultWalletAddress).apply();
+            }
+            chainStatus = "Wallet otomatis dari .env: " + shortAddress(defaultWalletAddress);
+            return defaultWalletAddress;
+        }
+        return savedWalletAddress;
     }
 
     void resumeAudio() {
@@ -210,6 +236,17 @@ final class FarmGameView extends CanvasGameView {
         BitmapFactory.Options options = new BitmapFactory.Options();
         options.inScaled = false;
         return BitmapFactory.decodeResource(getResources(), resId, options);
+    }
+
+    private Bitmap decodePixelAsset(Context context, String assetPath, Bitmap fallback) {
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inScaled = false;
+        try (InputStream inputStream = context.getAssets().open(assetPath)) {
+            Bitmap bitmap = BitmapFactory.decodeStream(inputStream, null, options);
+            return bitmap == null ? fallback : bitmap;
+        } catch (Exception exception) {
+            return fallback;
+        }
     }
 
     private void loadTmxMap(Context context) {
@@ -369,6 +406,7 @@ final class FarmGameView extends CanvasGameView {
 
         drawWorld(canvas);
         drawMapDecorations(canvas, false);
+        drawShopNpc(canvas, now);
         drawPlots(canvas, now);
         drawHarvestEffects(canvas, now);
         if (tmxMap == null) {
@@ -380,6 +418,7 @@ final class FarmGameView extends CanvasGameView {
         }
         drawMapDecorations(canvas, true);
         drawPlotActionSigns(canvas, now);
+        drawShopNpcBubble(canvas, now);
         drawHud(canvas, now);
     }
 
@@ -569,6 +608,7 @@ final class FarmGameView extends CanvasGameView {
             drawSellHouseSign(canvas);
             return;
         }
+        drawOpenGrassDecorations(canvas);
         drawSpriteWithShadowWorld(canvas, chicken, 0, 16, 16, 4, 22.35f * TILE, 17.45f * TILE, TILE * 0.50f, TILE * 0.50f);
         drawSpriteWithShadowWorld(canvas, chicken, 1, 16, 16, 4, 23.35f * TILE, 18.20f * TILE, TILE * 0.50f, TILE * 0.50f);
         drawSpriteWithShadowWorld(canvas, cow, 0, 32, 32, 4, 22.85f * TILE, 20.00f * TILE, TILE, TILE);
@@ -577,6 +617,42 @@ final class FarmGameView extends CanvasGameView {
         drawSpriteWithShadowWorld(canvas, chicken, 4, 16, 16, 4, 22.95f * TILE, 22.75f * TILE, TILE * 0.50f, TILE * 0.50f);
         drawSpriteWithShadowWorld(canvas, babyChicken, 0, 16, 16, 4, 23.80f * TILE, 22.55f * TILE, TILE * 0.38f, TILE * 0.38f);
         drawSpriteWithShadowWorld(canvas, chest, 0, 32, 16, 1, 23.85f * TILE, 23.15f * TILE, TILE * 0.75f, TILE * 0.38f);
+    }
+
+    private void drawOpenGrassDecorations(Canvas canvas) {
+        long now = System.currentTimeMillis();
+        int chickenFrame = (int) ((now / 440L) % 4L);
+        int babyFrame = (int) ((now / 520L) % 4L);
+
+        drawDecorTile(canvas, 0, 0, 9.55f * TILE, 23.95f * TILE, TILE * 0.34f);
+        drawDecorTile(canvas, 1, 0, 14.60f * TILE, 24.82f * TILE, TILE * 0.34f);
+        drawDecorTile(canvas, 2, 0, 16.28f * TILE, 27.50f * TILE, TILE * 0.34f);
+        drawDecorTile(canvas, 1, 1, 12.15f * TILE, 24.20f * TILE, TILE * 0.58f);
+        drawDecorTile(canvas, 2, 1, 16.95f * TILE, 26.55f * TILE, TILE * 0.50f);
+        drawDecorTile(canvas, 0, 2, 14.18f * TILE, 26.24f * TILE, TILE * 0.48f);
+        drawDecorTile(canvas, 3, 4, 13.20f * TILE, 27.32f * TILE, TILE * 0.42f);
+        drawDecorTile(canvas, 0, 6, 10.90f * TILE, 25.12f * TILE, TILE * 0.42f);
+        drawDecorTile(canvas, 2, 6, 15.86f * TILE, 25.82f * TILE, TILE * 0.42f);
+        drawDecorTile(canvas, 4, 7, 16.62f * TILE, 27.15f * TILE, TILE * 0.42f);
+
+        drawSpriteWithShadowWorld(canvas, chicken, chickenFrame, 16, 16, 4,
+                11.38f * TILE, 25.88f * TILE, TILE * 0.50f, TILE * 0.50f);
+        drawSpriteWithShadowWorld(canvas, babyChicken, babyFrame, 16, 16, 4,
+                12.34f * TILE, 26.42f * TILE, TILE * 0.37f, TILE * 0.37f);
+        drawSpriteWithShadowWorld(canvas, chicken, (chickenFrame + 2) % 4, 16, 16, 4,
+                15.48f * TILE, 27.02f * TILE, TILE * 0.48f, TILE * 0.48f);
+        drawSpriteWithShadowWorld(canvas, babyChicken, (babyFrame + 1) % 4, 16, 16, 4,
+                16.18f * TILE, 27.44f * TILE, TILE * 0.35f, TILE * 0.35f);
+    }
+
+    private void drawDecorTile(Canvas canvas, int col, int row, float worldX, float worldY, float size) {
+        if (outdoorDecorSheet == null) {
+            return;
+        }
+        int tileSize = 16;
+        src.set(col * tileSize, row * tileSize, col * tileSize + tileSize, row * tileSize + tileSize);
+        dst.set(worldX - cameraX, worldY - cameraY, worldX - cameraX + size, worldY - cameraY + size);
+        canvas.drawBitmap(outdoorDecorSheet, src, dst, pixelPaint);
     }
 
     private void drawShopHouseSign(Canvas canvas) {
@@ -595,6 +671,107 @@ final class FarmGameView extends CanvasGameView {
         }
 
         drawWoodSignBoard(canvas, sign, "JUAL PANEN", 28f, true);
+    }
+
+    private void drawShopNpc(Canvas canvas, long now) {
+        RectF body = shopNpcBodyBounds();
+        if (isOffscreen(body)) {
+            return;
+        }
+
+        float footWorldX = SHOP_NPC_X_TILE * TILE;
+        float footWorldY = SHOP_NPC_Y_TILE * TILE;
+        float footX = footWorldX - cameraX;
+        float footY = footWorldY - cameraY;
+        float sway = (float) Math.sin(now / 620.0) * 1.2f;
+        float worldX = footWorldX - SHOP_NPC_SIZE * 0.5f + sway;
+        float worldY = footWorldY - SHOP_NPC_SIZE * SHOP_NPC_FOOT_ANCHOR;
+        int frame = (int) ((now / 340L) % 6L);
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.argb(82, 0, 0, 0));
+        canvas.drawOval(
+                footX - SHOP_NPC_SIZE * 0.18f,
+                footY - SHOP_NPC_SIZE * 0.045f,
+                footX + SHOP_NPC_SIZE * 0.18f,
+                footY + SHOP_NPC_SIZE * 0.055f,
+                paint);
+        drawSpriteWorld(canvas, shopNpcSheet, frame, 32, 32, 6, worldX, worldY, SHOP_NPC_SIZE, SHOP_NPC_SIZE);
+
+        if (shopNpcBubbleUntilMs <= now && isNearShop()) {
+            drawNpcHintIcon(canvas, footX, footY - SHOP_NPC_SIZE * 0.82f, now);
+        }
+    }
+
+    private void drawNpcHintIcon(Canvas canvas, float x, float y, long now) {
+        float bob = (float) Math.sin(now / 180.0) * 3f;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(255, 223, 82));
+        canvas.drawCircle(x, y + bob, 18f, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(4f);
+        paint.setColor(Color.rgb(91, 52, 16));
+        canvas.drawCircle(x, y + bob, 18f, paint);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(91, 52, 16));
+        paint.setTextSize(26f);
+        paint.setFakeBoldText(true);
+        drawCenteredText(canvas, "!", x, y + bob + 9f);
+        paint.setFakeBoldText(false);
+    }
+
+    private void drawShopNpcBubble(Canvas canvas, long now) {
+        if (shopNpcBubbleUntilMs <= now) {
+            return;
+        }
+
+        float npcX = SHOP_NPC_X_TILE * TILE - cameraX;
+        float npcY = SHOP_NPC_Y_TILE * TILE - cameraY - SHOP_NPC_SIZE * 0.82f;
+        RectF bubble = new RectF(npcX - 205f, npcY - 128f, npcX + 205f, npcY - 28f);
+        float shift = 0f;
+        if (bubble.left < 18f) {
+            shift = 18f - bubble.left;
+        } else if (bubble.right > getWidth() - 18f) {
+            shift = getWidth() - 18f - bubble.right;
+        }
+        bubble.offset(shift, 0f);
+        if (bubble.top < 18f) {
+            bubble.offset(0f, 18f - bubble.top);
+        }
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.argb(115, 0, 0, 0));
+        canvas.drawRoundRect(bubble.left + 5f, bubble.top + 7f, bubble.right + 5f, bubble.bottom + 7f, 16, 16, paint);
+        paint.setColor(Color.rgb(56, 37, 23));
+        canvas.drawRoundRect(bubble, 16, 16, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(4f);
+        paint.setColor(Color.rgb(245, 176, 74));
+        canvas.drawRoundRect(bubble, 16, 16, paint);
+
+        Path tail = new Path();
+        tail.moveTo(npcX - 18f, bubble.bottom - 2f);
+        tail.lineTo(npcX + 18f, bubble.bottom - 2f);
+        tail.lineTo(npcX, bubble.bottom + 28f);
+        tail.close();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(56, 37, 23));
+        canvas.drawPath(tail, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(4f);
+        paint.setColor(Color.rgb(245, 176, 74));
+        canvas.drawLine(npcX - 18f, bubble.bottom - 2f, npcX, bubble.bottom + 28f, paint);
+        canvas.drawLine(npcX + 18f, bubble.bottom - 2f, npcX, bubble.bottom + 28f, paint);
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(255, 226, 121));
+        paint.setTextSize(22f);
+        paint.setFakeBoldText(true);
+        canvas.drawText("Penjual Benih", bubble.left + 24f, bubble.top + 35f, paint);
+        paint.setColor(Color.WHITE);
+        paint.setTextSize(fitTextSize("SHOP: tap aku atau tekan A untuk beli benih.", 21f, bubble.width() - 48f));
+        paint.setFakeBoldText(false);
+        canvas.drawText("SHOP: tap aku atau tekan A untuk beli benih.", bubble.left + 24f, bubble.top + 72f, paint);
     }
 
     private void drawPlotActionSigns(Canvas canvas, long now) {
@@ -711,6 +888,22 @@ final class FarmGameView extends CanvasGameView {
     private RectF shopSignTapBounds() {
         RectF bounds = new RectF(shopSignBounds());
         bounds.inset(-24f, -22f);
+        return bounds;
+    }
+
+    private RectF shopNpcBodyBounds() {
+        float footX = SHOP_NPC_X_TILE * TILE - cameraX;
+        float footY = SHOP_NPC_Y_TILE * TILE - cameraY;
+        return new RectF(
+                footX - SHOP_NPC_SIZE * 0.32f,
+                footY - SHOP_NPC_SIZE * 0.82f,
+                footX + SHOP_NPC_SIZE * 0.32f,
+                footY + SHOP_NPC_SIZE * 0.10f);
+    }
+
+    private RectF shopNpcTapBounds() {
+        RectF bounds = new RectF(shopNpcBodyBounds());
+        bounds.inset(-26f, -22f);
         return bounds;
     }
 
@@ -1648,11 +1841,29 @@ final class FarmGameView extends CanvasGameView {
 
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(236, 248, 226));
-        paint.setTextSize(21f);
+        paint.setTextSize(connected ? 20f : 21f);
         paint.setFakeBoldText(true);
         String label = connected ? shortAddress(walletAddress) : "CONNECT WALLET";
-        canvas.drawText(label, bounds.left + 76f, bounds.top + 42f, paint);
+        paint.setTextSize(fitTextSize(label, connected ? 20f : 21f, bounds.width() - 96f));
+        canvas.drawText(label, bounds.left + 76f, bounds.top + (connected ? 34f : 44f), paint);
+        if (connected) {
+            paint.setFakeBoldText(false);
+            paint.setColor(Color.rgb(177, 238, 185));
+            String subtitle = walletSubtitle();
+            paint.setTextSize(fitTextSize(subtitle, 15f, bounds.width() - 96f));
+            canvas.drawText(subtitle, bounds.left + 76f, bounds.top + 58f, paint);
+        }
         paint.setFakeBoldText(false);
+    }
+
+    private String walletSubtitle() {
+        if (checkingChain) {
+            return "sync Sepolia...";
+        }
+        if (!walletNativeBalance.isEmpty()) {
+            return "Sepolia ETH " + compactEth(walletNativeBalance);
+        }
+        return "tap untuk sync saldo";
     }
 
     private void drawWalletHudIcon(Canvas canvas, float cx, float cy, boolean connected) {
@@ -1669,6 +1880,9 @@ final class FarmGameView extends CanvasGameView {
 
     private void drawContextMessage(Canvas canvas, long now) {
         String text = contextText(now);
+        if (text.isEmpty()) {
+            return;
+        }
         paint.setTextSize(20f);
         float textW = paint.measureText(text);
         float x = (getWidth() - textW) / 2f;
@@ -1687,7 +1901,7 @@ final class FarmGameView extends CanvasGameView {
         InteractionKind kind = currentInteractionKind(now);
         switch (kind) {
             case SHOP:
-                return "SHOP: tap papan atau A untuk beli benih.";
+                return "";
             case SELL_HARVEST:
                 return harvests > 0 ? "A: jual hasil panen ke wallet." : "Rumah jual panen: belum ada hasil panen.";
             case BUY_LAND:
@@ -1771,7 +1985,7 @@ final class FarmGameView extends CanvasGameView {
         canvas.drawText(chainStatus, x + 22, y + 72, paint);
         paint.setTextSize(18f);
         canvas.drawText("Wallet: " + (walletAddress.isEmpty() ? "belum diset" : shortAddress(walletAddress)), x + 22, y + 102, paint);
-        String balanceLine = "TANI " + coins + (walletNativeBalance.isEmpty() ? "" : " | ETH " + walletNativeBalance);
+        String balanceLine = "TANI on-chain " + coins + (walletNativeBalance.isEmpty() ? "" : " | Sepolia ETH " + compactEth(walletNativeBalance));
         canvas.drawText(balanceLine, x + 22, y + 132, paint);
         paint.setTextSize(fitTextSize(chainModeText(), 17f, w - 44f));
         canvas.drawText(chainModeText(), x + 22, y + 162, paint);
@@ -1783,7 +1997,7 @@ final class FarmGameView extends CanvasGameView {
         paint.setTextSize(18f);
         canvas.drawText(nextAction, x + 22, y + 194, paint);
         paint.setColor(Color.rgb(210, 225, 216));
-        canvas.drawText("Tap CONNECT WALLET untuk sync saldo wallet.", x + 22, y + 220, paint);
+        canvas.drawText("Tap wallet di kanan atas untuk sync saldo.", x + 22, y + 220, paint);
     }
 
     private RectF chainPanelBounds(long now) {
@@ -2226,6 +2440,11 @@ final class FarmGameView extends CanvasGameView {
                 playClickSound();
                 selectedPlot = tappedPlot;
                 openInteractionDialog(plotInteractionKind(plots.get(tappedPlot), System.currentTimeMillis()));
+                return true;
+            }
+            if (isNearShop() && shopNpcTapBounds().contains(x, y)) {
+                playClickSound();
+                showShopNpcBubble();
                 return true;
             }
             if (isNearShop() && shopSignTapBounds().contains(x, y)) {
@@ -2856,6 +3075,7 @@ final class FarmGameView extends CanvasGameView {
             return;
         }
         if (isNearShop()) {
+            showShopNpcBubble();
             openInteractionDialog(InteractionKind.SHOP);
             return;
         }
@@ -2864,6 +3084,11 @@ final class FarmGameView extends CanvasGameView {
             return;
         }
         showErrorMessage("Dekati lahan, shop, atau rumah jual panen dulu.");
+    }
+
+    private void showShopNpcBubble() {
+        shopNpcBubbleUntilMs = System.currentTimeMillis() + SHOP_NPC_BUBBLE_MS;
+        invalidate();
     }
 
     private void performPlotAction(int plotIndex) {
@@ -2970,6 +3195,11 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void performWallet() {
+        if (!walletAddress.isEmpty()) {
+            refreshWalletState(true);
+            showMessage("Wallet sync: " + shortAddress(walletAddress));
+            return;
+        }
         checkSepolia(false);
         Context context = getContext();
         if (!(context instanceof Activity)) {
@@ -3198,6 +3428,7 @@ final class FarmGameView extends CanvasGameView {
         harvests = preferences.getInt("game_harvests", harvests);
         selectedSeedIndex = clampInt(preferences.getInt("game_selected_seed", selectedSeedIndex), 0, SEED_NAMES.length - 1);
         shopBundleQuantity = clampInt(preferences.getInt("game_shop_quantity", shopBundleQuantity), 1, MAX_SHOP_BUNDLE_QUANTITY);
+        boolean repairFreeLandState = preferences.getInt("game_land_state_version", 0) < LAND_STATE_VERSION;
         for (int i = 0; i < seedCounts.length; i++) {
             seedCounts[i] = Math.max(0, preferences.getInt("game_seed_" + i, seedCounts[i]));
         }
@@ -3205,15 +3436,25 @@ final class FarmGameView extends CanvasGameView {
         long now = System.currentTimeMillis();
         for (int i = 0; i < plots.size(); i++) {
             Plot plot = plots.get(i);
-            plot.owned = preferences.getBoolean("game_plot_" + i + "_owned", plot.owned);
-            plot.seedIndex = clampInt(preferences.getInt("game_plot_" + i + "_seed", plot.seedIndex), 0, SEED_NAMES.length - 1);
-            plot.state = plotStateFromOrdinal(preferences.getInt("game_plot_" + i + "_state", plot.state.ordinal()));
-            plot.plantedAtMs = preferences.getLong("game_plot_" + i + "_planted_at", plot.plantedAtMs);
+            if (repairFreeLandState) {
+                plot.owned = i == 0;
+                plot.seedIndex = 0;
+                plot.state = PlotState.EMPTY;
+                plot.plantedAtMs = 0L;
+            } else {
+                plot.owned = preferences.getBoolean("game_plot_" + i + "_owned", plot.owned);
+                plot.seedIndex = clampInt(preferences.getInt("game_plot_" + i + "_seed", plot.seedIndex), 0, SEED_NAMES.length - 1);
+                plot.state = plotStateFromOrdinal(preferences.getInt("game_plot_" + i + "_state", plot.state.ordinal()));
+                plot.plantedAtMs = preferences.getLong("game_plot_" + i + "_planted_at", plot.plantedAtMs);
+            }
             if (plot.state == PlotState.GROWING && now - plot.plantedAtMs >= GROW_TIME_MS) {
                 plot.state = PlotState.READY;
             }
         }
         ownedLand = calculateOwnedLand();
+        if (repairFreeLandState) {
+            saveGameState();
+        }
     }
 
     private void saveGameState() {
@@ -3221,6 +3462,7 @@ final class FarmGameView extends CanvasGameView {
                 .putInt("game_coins", coins)
                 .putInt("game_harvests", harvests)
                 .putInt("game_owned_land", ownedLand)
+                .putInt("game_land_state_version", LAND_STATE_VERSION)
                 .putInt("game_selected_seed", selectedSeedIndex)
                 .putInt("game_shop_quantity", shopBundleQuantity);
         for (int i = 0; i < seedCounts.length; i++) {
@@ -3626,6 +3868,23 @@ final class FarmGameView extends CanvasGameView {
 
     private static boolean isValidAddress(String address) {
         return BlockchainClient.isValidAddress(address);
+    }
+
+    private static String compactEth(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return "0";
+        }
+        String cleaned = value.trim();
+        int dot = cleaned.indexOf('.');
+        if (dot < 0) {
+            return cleaned;
+        }
+        int end = Math.min(cleaned.length(), dot + 7);
+        String compact = cleaned.substring(0, end);
+        while (compact.endsWith("0") && compact.indexOf('.') >= 0) {
+            compact = compact.substring(0, compact.length() - 1);
+        }
+        return compact.endsWith(".") ? compact.substring(0, compact.length() - 1) : compact;
     }
 
     private static String shortAddress(String address) {
