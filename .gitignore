@@ -20,6 +20,7 @@ local.properties
 contracts/.env
 contracts/.env.*
 !contracts/.env.example
+contracts/vercel-import.env
 contracts/node_modules/
 contracts/artifacts/
 contracts/cache/
