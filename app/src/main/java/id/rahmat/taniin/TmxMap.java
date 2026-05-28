@@ -273,7 +273,11 @@ final class TmxMap {
         if ("Tile Layer 1".equals(layerName)) {
             return;
         }
-        if (isHouseTile(gid) || isFenceTile(gid)) {
+        if (isHouseTile(gid)) {
+            appendHouseCollision(rects, gid, left, top, size);
+            return;
+        }
+        if (isFenceTile(gid)) {
             rects.add(new RectF(left, top, left + size, top + size));
             return;
         }
@@ -286,7 +290,7 @@ final class TmxMap {
             return;
         }
         if (isSmallObstacleTile(gid)) {
-            addInsetRect(rects, left, top, size, 0.14f, 0.18f, 0.86f, 0.94f);
+            appendSmallObstacleCollision(rects, gid, left, top, size);
         }
     }
 
@@ -306,6 +310,14 @@ final class TmxMap {
                 top + size * bottomInset));
     }
 
+    private static void appendHouseCollision(List<RectF> rects, int gid, float left, float top, int size) {
+        if (isHouseFrontEdgeTile(gid)) {
+            addInsetRect(rects, left, top, size, 0f, 0f, 1f, 0.42f);
+            return;
+        }
+        rects.add(new RectF(left, top, left + size, top + size));
+    }
+
     private static void appendLampCollision(List<RectF> rects, int gid, float left, float top, int size) {
         if (gid == 624) {
             return;
@@ -314,6 +326,18 @@ final class TmxMap {
             return;
         }
         addInsetRect(rects, left, top, size, 0.40f, 0.66f, 0.60f, 0.92f);
+    }
+
+    private static void appendSmallObstacleCollision(List<RectF> rects, int gid, float left, float top, int size) {
+        if (isRockTile(gid)) {
+            addInsetRect(rects, left, top, size, 0.28f, 0.54f, 0.76f, 0.83f);
+            return;
+        }
+        if (isLogTile(gid)) {
+            addInsetRect(rects, left, top, size, 0.05f, 0.52f, 0.95f, 0.84f);
+            return;
+        }
+        addInsetRect(rects, left, top, size, 0.24f, 0.42f, 0.76f, 0.82f);
     }
 
     private static boolean isWaterTile(int gid) {
@@ -340,6 +364,10 @@ final class TmxMap {
 
     private static boolean isHouseTile(int gid) {
         return (gid >= 241 && gid < 339) || gid >= 1431;
+    }
+
+    private static boolean isHouseFrontEdgeTile(int gid) {
+        return (gid >= 320 && gid <= 324) || (gid >= 2414 && gid <= 2417);
     }
 
     private static boolean isFenceTile(int gid) {
@@ -431,6 +459,14 @@ final class TmxMap {
             default:
                 return false;
         }
+    }
+
+    private static boolean isRockTile(int gid) {
+        return gid == 643 || gid == 866 || gid == 867 || gid == 887;
+    }
+
+    private static boolean isLogTile(int gid) {
+        return gid == 606 || gid == 607 || gid == 608;
     }
 
     private static boolean isForegroundLayer(String layerName) {

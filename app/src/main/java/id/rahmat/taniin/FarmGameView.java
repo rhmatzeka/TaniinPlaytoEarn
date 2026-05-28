@@ -2565,13 +2565,24 @@ final class FarmGameView extends CanvasGameView {
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(hasHash ? Color.rgb(107, 224, 130) : Color.rgb(255, 219, 95));
         canvas.drawCircle(cx, cy, 27f, paint);
+
+        int iconColor = Color.rgb(31, 49, 36);
+        RectF arc = new RectF(cx - 16f, cy - 16f, cx + 16f, cy + 16f);
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(6f);
-        paint.setColor(Color.rgb(31, 49, 36));
-        canvas.drawLine(cx - 11f, cy - 10f, cx + 12f, cy - 10f, paint);
-        canvas.drawLine(cx - 11f, cy, cx + 12f, cy, paint);
-        canvas.drawLine(cx - 11f, cy + 10f, cx + 12f, cy + 10f, paint);
+        paint.setStrokeWidth(5f);
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setColor(iconColor);
+        canvas.drawArc(arc, -210f, 285f, false, paint);
+        canvas.drawLine(cx + 14f, cy - 9f, cx + 14f, cy - 21f, paint);
+        canvas.drawLine(cx + 14f, cy - 9f, cx + 3f, cy - 9f, paint);
+
+        paint.setStrokeWidth(4f);
+        canvas.drawLine(cx, cy, cx, cy - 10f, paint);
+        canvas.drawLine(cx, cy, cx + 9f, cy + 5f, paint);
+        paint.setStrokeCap(Paint.Cap.BUTT);
         paint.setStyle(Paint.Style.FILL);
+        paint.setColor(iconColor);
+        canvas.drawCircle(cx, cy, 3.6f, paint);
     }
 
     private void drawChainHistoryRow(Canvas canvas, RectF row, ChainHistoryEntry entry) {
