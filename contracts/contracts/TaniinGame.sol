@@ -17,10 +17,12 @@ contract TaniinCoin is ERC20, Ownable {
 
 contract TaniinLand is ERC721URIStorage, Ownable {
     uint256 public constant LAND_PRICE_WEI = 0.001 ether;
+    uint256 public constant LAND_SELL_PRICE_WEI = 0.0007 ether;
     uint256 public nextLandId = 1;
     mapping(uint256 => bool) public planted;
 
     event LandPurchased(address indexed player, uint256 indexed landId);
+    event LandSold(address indexed player, uint256 indexed landId, uint256 refundWei);
     event SeedPlanted(address indexed player, uint256 indexed landId);
     event LandHarvested(address indexed player, uint256 indexed landId, uint256 cropAmount);
 
@@ -32,6 +34,19 @@ contract TaniinLand is ERC721URIStorage, Ownable {
         _safeMint(msg.sender, landId);
         _setTokenURI(landId, tokenUri);
         emit LandPurchased(msg.sender, landId);
+    }
+
+    function sellLand(uint256 landId) external {
+        require(ownerOf(landId) == msg.sender, "NOT_LAND_OWNER");
+        require(!planted[landId], "LAND_PLANTED");
+        require(address(this).balance >= LAND_SELL_PRICE_WEI, "INSUFFICIENT_CONTRACT_BALANCE");
+
+        delete planted[landId];
+        _burn(landId);
+
+        (bool sent, ) = payable(msg.sender).call{value: LAND_SELL_PRICE_WEI}("");
+        require(sent, "SELL_REFUND_FAILED");
+        emit LandSold(msg.sender, landId, LAND_SELL_PRICE_WEI);
     }
 
     function plant(uint256 landId) external {

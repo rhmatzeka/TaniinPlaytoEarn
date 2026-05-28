@@ -27,6 +27,10 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -64,6 +68,8 @@ final class FarmGameView extends CanvasGameView {
     private static final float SELL_HOUSE_BOTTOM_TILE = 17.1f;
     private static final float SELL_SIGN_X_TILE = 31.0f;
     private static final float SELL_SIGN_Y_TILE = 13.35f;
+    private static final int LAND_BUY_PRICE = 250;
+    private static final int LAND_SELL_PRICE = 175;
     private static final int SEED_BUNDLE_AMOUNT = 3;
     private static final int MAX_SHOP_BUNDLE_QUANTITY = 9;
     private static final int LAND_STATE_VERSION = 2;
@@ -89,6 +95,9 @@ final class FarmGameView extends CanvasGameView {
     private static final int MENU_TAB_INVENTORY = 0;
     private static final int MENU_TAB_SETTINGS = 1;
     private static final int MENU_TAB_ABOUT = 2;
+    private static final int CHAIN_HISTORY_LIMIT = 8;
+    private static final int CHAIN_HISTORY_VISIBLE_ROWS = 3;
+    private static final String PREF_CHAIN_HISTORY = "game_chain_history";
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint pixelPaint = new Paint();
@@ -97,6 +106,7 @@ final class FarmGameView extends CanvasGameView {
     private final List<Plot> plots = new ArrayList<>();
     private final List<RectF> collisionRects = new ArrayList<>();
     private final List<ChainAction> pendingChainActions = new ArrayList<>();
+    private final List<ChainHistoryEntry> chainHistory = new ArrayList<>();
     private final List<HarvestEffect> harvestEffects = new ArrayList<>();
     private final BlockchainClient blockchainClient = new BlockchainClient();
     private final GameAudio gameAudio;
@@ -193,6 +203,7 @@ final class FarmGameView extends CanvasGameView {
         loadTmxMap(context);
         createWorld();
         loadGameState();
+        loadChainHistory();
         if (!walletAddress.isEmpty()) {
             refreshWalletState(false);
         }
@@ -675,6 +686,17 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void drawShopPenNatureDecorations(Canvas canvas) {
+        drawOutdoorTile(canvas, 0, 8, 16.18f * TILE, 18.70f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 1, 8, 16.66f * TILE, 18.86f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 4, 8, 18.34f * TILE, 20.46f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 5, 8, 18.84f * TILE, 20.38f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 0, 2, 20.06f * TILE, 18.62f * TILE, TILE * 0.62f);
+        drawOutdoorTile(canvas, 2, 3, 20.88f * TILE, 19.02f * TILE, TILE * 0.54f);
+        drawOutdoorTile(canvas, 0, 10, 17.16f * TILE, 22.12f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 1, 10, 17.64f * TILE, 22.08f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 5, 1, 20.76f * TILE, 22.02f * TILE, TILE * 0.60f);
+        drawOutdoorTile(canvas, 6, 1, 21.36f * TILE, 22.00f * TILE, TILE * 0.60f);
+
         drawOutdoorTile(canvas, 1, 2, 22.05f * TILE, 18.22f * TILE, TILE * 0.52f);
         drawOutdoorTile(canvas, 2, 3, 23.98f * TILE, 18.58f * TILE, TILE * 0.56f);
         drawOutdoorTile(canvas, 0, 2, 22.18f * TILE, 19.86f * TILE, TILE * 0.70f);
@@ -956,7 +978,9 @@ final class FarmGameView extends CanvasGameView {
             case BUY_LAND:
                 return "BELI LAHAN";
             case PLANT:
-                return "TANAM";
+                return "TANAM/JUAL";
+            case SELL_LAND:
+                return "JUAL LAHAN";
             case WAIT_CROP:
                 return "TUNGGU";
             case HARVEST:
@@ -1095,6 +1119,7 @@ final class FarmGameView extends CanvasGameView {
         drawJoystick(canvas);
         drawActionButton(canvas);
         drawWalletButton(canvas);
+        drawChainHistoryPanel(canvas);
         drawContextMessage(canvas, now);
         if (shopUntilMs > now) {
             drawShopPanel(canvas);
@@ -2110,6 +2135,101 @@ final class FarmGameView extends CanvasGameView {
         paint.setFakeBoldText(false);
     }
 
+    private void drawChainHistoryPanel(Canvas canvas) {
+        RectF panel = chainHistoryPanelBounds();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.argb(88, 0, 0, 0));
+        canvas.drawRoundRect(panel.left + 5f, panel.top + 6f, panel.right + 5f, panel.bottom + 6f, 12, 12, paint);
+        paint.setColor(Color.argb(224, 25, 48, 42));
+        canvas.drawRoundRect(panel, 12, 12, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(3f);
+        paint.setColor(Color.rgb(78, 148, 98));
+        canvas.drawRoundRect(panel, 12, 12, paint);
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(172, 239, 180));
+        paint.setTextSize(17f);
+        paint.setFakeBoldText(true);
+        canvas.drawText("Riwayat transaksi", panel.left + 14f, panel.top + 27f, paint);
+        paint.setFakeBoldText(false);
+
+        if (chainHistory.isEmpty()) {
+            paint.setColor(Color.rgb(202, 221, 207));
+            String emptyText = "Belum ada transaksi.";
+            paint.setTextSize(fitTextSize(emptyText, 15f, panel.width() - 28f));
+            canvas.drawText(emptyText, panel.left + 14f, panel.top + 56f, paint);
+            return;
+        }
+
+        int rows = visibleChainHistoryRows();
+        for (int i = 0; i < rows; i++) {
+            drawChainHistoryRow(canvas, chainHistoryRowBounds(i), chainHistory.get(i));
+        }
+    }
+
+    private void drawChainHistoryRow(Canvas canvas, RectF row, ChainHistoryEntry entry) {
+        boolean hasHash = BlockchainClient.isValidTransactionHash(entry.txHash);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(hasHash ? Color.rgb(33, 78, 58) : Color.rgb(44, 63, 53));
+        canvas.drawRoundRect(row, 8, 8, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(2f);
+        paint.setColor(hasHash ? Color.rgb(102, 207, 123) : Color.rgb(83, 116, 92));
+        canvas.drawRoundRect(row, 8, 8, paint);
+
+        drawChainHistoryStateDot(canvas, row.left + 18f, row.top + 18f, hasHash, entry.status);
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(241, 252, 232));
+        paint.setFakeBoldText(true);
+        paint.setTextSize(fitTextSize(entry.label, 14f, row.width() - 108f));
+        canvas.drawText(entry.label, row.left + 36f, row.top + 16f, paint);
+
+        paint.setFakeBoldText(false);
+        paint.setColor(hasHash ? Color.rgb(181, 248, 188) : Color.rgb(203, 219, 207));
+        String status = hasHash ? BlockchainClient.shortTransactionHash(entry.txHash) : entry.status;
+        paint.setTextSize(fitTextSize(status, 12f, row.width() - 70f));
+        canvas.drawText(status, row.left + 36f, row.top + 33f, paint);
+
+        if (hasHash) {
+            drawExternalLinkIcon(canvas, row.right - 25f, row.centerY());
+        }
+    }
+
+    private void drawChainHistoryStateDot(Canvas canvas, float cx, float cy, boolean hasHash, String status) {
+        paint.setStyle(Paint.Style.FILL);
+        if (hasHash) {
+            paint.setColor(Color.rgb(105, 224, 129));
+        } else if (status != null && status.toLowerCase(Locale.US).contains("pending")) {
+            paint.setColor(Color.rgb(255, 216, 89));
+        } else {
+            paint.setColor(Color.rgb(157, 184, 165));
+        }
+        canvas.drawCircle(cx, cy, 6f, paint);
+    }
+
+    private RectF chainHistoryPanelBounds() {
+        RectF wallet = walletButtonBounds();
+        float top = wallet.bottom + 8f;
+        int rows = visibleChainHistoryRows();
+        float height = chainHistory.isEmpty() ? 76f : 44f + rows * 40f;
+        float maxBottom = Math.max(top + 76f, getHeight() - 122f);
+        height = Math.min(height, maxBottom - top);
+        return new RectF(wallet.left, top, wallet.right, top + height);
+    }
+
+    private RectF chainHistoryRowBounds(int rowIndex) {
+        RectF panel = chainHistoryPanelBounds();
+        float left = panel.left + 12f;
+        float top = panel.top + 38f + rowIndex * 40f;
+        return new RectF(left, top, panel.right - 12f, top + 34f);
+    }
+
+    private int visibleChainHistoryRows() {
+        return Math.min(CHAIN_HISTORY_VISIBLE_ROWS, chainHistory.size());
+    }
+
     private String walletSubtitle() {
         if (checkingChain) {
             return "sync Sepolia...";
@@ -2159,9 +2279,11 @@ final class FarmGameView extends CanvasGameView {
             case SELL_HARVEST:
                 return harvests > 0 ? "A: jual hasil panen ke wallet." : "Rumah jual panen: belum ada hasil panen.";
             case BUY_LAND:
-                return "A: beli lahan 250 coin.";
+                return "A: beli lahan " + LAND_BUY_PRICE + " coin.";
             case PLANT:
-                return "A: tanam benih " + SEED_NAMES[selectedSeedIndex] + ".";
+                return "A: tanam atau jual lahan kosong.";
+            case SELL_LAND:
+                return "A: jual lahan kosong +" + LAND_SELL_PRICE + " coin.";
             case WAIT_CROP:
                 return "Tanaman masih tumbuh.";
             case HARVEST:
@@ -2214,10 +2336,15 @@ final class FarmGameView extends CanvasGameView {
         canvas.drawText("Toko Aset", x + 22, y + 38, paint);
         paint.setFakeBoldText(false);
         paint.setColor(Color.WHITE);
-        paint.setTextSize(19f);
-        canvas.drawText("SHOP: pilih benih, bayar pakai coin wallet", x + 22, y + 78, paint);
-        canvas.drawText("Dekati lahan terkunci lalu A: beli tanah", x + 22, y + 108, paint);
-        canvas.drawText("Rumah Jual Panen: tukar panen = 35 coin", x + 22, y + 138, paint);
+        String shopLine = "SHOP: pilih benih, bayar pakai coin wallet";
+        String landLine = "Lahan: beli " + LAND_BUY_PRICE + ", jual kosong +" + LAND_SELL_PRICE + " coin";
+        String harvestLine = "Rumah Jual Panen: tukar panen = 35 coin";
+        paint.setTextSize(fitTextSize(shopLine, 19f, w - 44f));
+        canvas.drawText(shopLine, x + 22, y + 78, paint);
+        paint.setTextSize(fitTextSize(landLine, 19f, w - 44f));
+        canvas.drawText(landLine, x + 22, y + 108, paint);
+        paint.setTextSize(fitTextSize(harvestLine, 19f, w - 44f));
+        canvas.drawText(harvestLine, x + 22, y + 138, paint);
     }
 
     private void drawChainPanel(Canvas canvas, long now) {
@@ -2330,6 +2457,8 @@ final class FarmGameView extends CanvasGameView {
 
         if (activeInteractionKind == InteractionKind.PLANT) {
             drawPlantSeedSelector(canvas);
+            drawDialogButton(canvas, interactionSellLandButtonBounds(), "Jual lahan",
+                    Color.rgb(114, 71, 24), Color.rgb(255, 178, 63), Color.rgb(255, 237, 205));
         }
 
         drawDialogButton(canvas, interactionPrimaryButtonBounds(), interactionPrimaryText(),
@@ -2459,7 +2588,7 @@ final class FarmGameView extends CanvasGameView {
         canvas.drawRoundRect(bounds, 12, 12, paint);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(textColor);
-        paint.setTextSize(23f);
+        paint.setTextSize(fitTextSize(label, 23f, bounds.width() - 24f));
         paint.setFakeBoldText(true);
         drawCenteredText(canvas, label, bounds.centerX(), bounds.top + bounds.height() * 0.62f);
         paint.setFakeBoldText(false);
@@ -2720,6 +2849,8 @@ final class FarmGameView extends CanvasGameView {
             } else if (isInsideWallet(x, y)) {
                 playClickSound();
                 performWallet();
+            } else if (handleChainHistoryTouch(x, y)) {
+                return true;
             }
             return true;
         }
@@ -2989,6 +3120,39 @@ final class FarmGameView extends CanvasGameView {
         }
     }
 
+    private boolean handleChainHistoryTouch(float x, float y) {
+        if (!chainHistoryPanelBounds().contains(x, y)) {
+            return false;
+        }
+        playClickSound();
+        int rows = visibleChainHistoryRows();
+        for (int i = 0; i < rows; i++) {
+            if (chainHistoryRowBounds(i).contains(x, y)) {
+                openEtherscanTransaction(chainHistory.get(i));
+                return true;
+            }
+        }
+        showMessage(chainHistory.isEmpty() ? "Belum ada transaksi." : "Pilih baris transaksi.");
+        return true;
+    }
+
+    private void openEtherscanTransaction(ChainHistoryEntry entry) {
+        if (!BlockchainClient.isValidTransactionHash(entry.txHash)) {
+            showMessage("Transaksi ini belum punya hash Etherscan.");
+            return;
+        }
+        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://sepolia.etherscan.io/tx/" + entry.txHash));
+        if (!(getContext() instanceof Activity)) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        }
+        try {
+            getContext().startActivity(intent);
+            showMessage("Membuka Etherscan " + BlockchainClient.shortTransactionHash(entry.txHash));
+        } catch (RuntimeException e) {
+            showErrorMessage("Tidak bisa membuka Etherscan di perangkat ini.");
+        }
+    }
+
     private boolean handleInteractionDialogTouch(float x, float y) {
         if (activeInteractionKind == InteractionKind.PLANT) {
             for (int i = 0; i < SEED_NAMES.length; i++) {
@@ -2998,6 +3162,11 @@ final class FarmGameView extends CanvasGameView {
                     showMessage("Benih dipilih: " + SEED_NAMES[selectedSeedIndex]);
                     return true;
                 }
+            }
+            if (interactionSellLandButtonBounds().contains(x, y)) {
+                playClickSound();
+                activeInteractionKind = InteractionKind.SELL_LAND;
+                return true;
             }
         }
         if (interactionPrimaryButtonBounds().contains(x, y)) {
@@ -3027,6 +3196,13 @@ final class FarmGameView extends CanvasGameView {
         if (activeInteractionKind == InteractionKind.SELL_HARVEST) {
             interactionDialogOpen = false;
             sellHarvestToWallet();
+            return;
+        }
+        if (activeInteractionKind == InteractionKind.SELL_LAND) {
+            interactionDialogOpen = false;
+            if (canSellActiveLand()) {
+                sellLand(activeInteractionPlot);
+            }
             return;
         }
         if (activeInteractionKind == InteractionKind.WAIT_CROP) {
@@ -3163,6 +3339,8 @@ final class FarmGameView extends CanvasGameView {
                 return "Lahan";
             case PLANT:
                 return "Tanam";
+            case SELL_LAND:
+                return "Jual Lahan";
             case WAIT_CROP:
                 return "Tumbuh";
             case HARVEST:
@@ -3184,11 +3362,16 @@ final class FarmGameView extends CanvasGameView {
                         ? "Jual " + harvests + " hasil panen? Coin akan masuk ke wallet."
                         : "Belum ada hasil panen untuk dijual.";
             case BUY_LAND:
-                return "Lahan ini bisa dibeli seharga 250 coin.";
+                return "Lahan ini bisa dibeli seharga " + LAND_BUY_PRICE + " coin.";
             case PLANT:
                 return seedCounts[selectedSeedIndex] > 0
-                        ? "Konfirmasi tanam benih " + SEED_NAMES[selectedSeedIndex] + " di lahan ini?"
-                        : "Benih " + SEED_NAMES[selectedSeedIndex] + " habis. Pilih atau beli benih dulu.";
+                        ? "Tanam " + SEED_NAMES[selectedSeedIndex] + " atau jual lahan kosong +" + LAND_SELL_PRICE + " coin."
+                        : "Benih habis. Buka toko atau jual lahan kosong +" + LAND_SELL_PRICE + " coin.";
+            case SELL_LAND:
+                if (!canSellActiveLand()) {
+                    return "Lahan terakhir atau lahan berisi tanaman tidak bisa dijual.";
+                }
+                return "Jual lahan kosong ini? Coin akan bertambah +" + LAND_SELL_PRICE + ".";
             case WAIT_CROP:
                 return "Tanaman siap dalam " + activeCropRemainingSeconds(now) + " detik.";
             case HARVEST:
@@ -3211,6 +3394,8 @@ final class FarmGameView extends CanvasGameView {
                 return "Ya, beli lahan";
             case PLANT:
                 return seedCounts[selectedSeedIndex] > 0 ? "Ya, tanam " + SEED_NAMES[selectedSeedIndex] : "Buka toko";
+            case SELL_LAND:
+                return canSellActiveLand() ? "Ya, jual lahan" : "Oke";
             case WAIT_CROP:
                 return "Oke";
             case HARVEST:
@@ -3224,6 +3409,7 @@ final class FarmGameView extends CanvasGameView {
         switch (activeInteractionKind) {
             case BUY_LAND:
             case PLANT:
+            case SELL_LAND:
             case HARVEST:
             case SELL_HARVEST:
                 return "Batal";
@@ -3269,15 +3455,40 @@ final class FarmGameView extends CanvasGameView {
 
     private RectF interactionPrimaryButtonBounds() {
         RectF panel = interactionDialogPanelBounds();
-        float width = Math.min(380f, panel.width() * 0.43f);
         float height = 78f;
+        if (activeInteractionKind == InteractionKind.PLANT) {
+            float gap = 18f;
+            float width = Math.min(340f, panel.width() * 0.36f);
+            float sellWidth = Math.min(240f, panel.width() * 0.27f);
+            float cancelWidth = Math.min(170f, panel.width() * 0.20f);
+            float totalWidth = width + sellWidth + cancelWidth + gap * 2f;
+            float left = panel.centerX() - totalWidth * 0.5f;
+            float top = panel.bottom - 126f;
+            return new RectF(left, top, left + width, top + height);
+        }
+        float width = Math.min(380f, panel.width() * 0.43f);
         float gap = 24f;
         float left = panel.centerX() - width - gap * 0.5f;
         float top = panel.bottom - 126f;
         return new RectF(left, top, left + width, top + height);
     }
 
+    private RectF interactionSellLandButtonBounds() {
+        RectF primary = interactionPrimaryButtonBounds();
+        RectF panel = interactionDialogPanelBounds();
+        float gap = 18f;
+        float width = Math.min(240f, panel.width() * 0.27f);
+        return new RectF(primary.right + gap, primary.top, primary.right + gap + width, primary.bottom);
+    }
+
     private RectF interactionSecondaryButtonBounds() {
+        if (activeInteractionKind == InteractionKind.PLANT) {
+            RectF sell = interactionSellLandButtonBounds();
+            RectF panel = interactionDialogPanelBounds();
+            float gap = 18f;
+            float width = Math.min(170f, panel.width() * 0.20f);
+            return new RectF(sell.right + gap, sell.top, sell.right + gap + width, sell.bottom);
+        }
         RectF primary = interactionPrimaryButtonBounds();
         float gap = 24f;
         return new RectF(primary.right + gap, primary.top, primary.right + gap + primary.width() * 0.66f, primary.bottom);
@@ -3385,13 +3596,13 @@ final class FarmGameView extends CanvasGameView {
         }
         Plot plot = plots.get(plotIndex);
         if (!plot.owned) {
-            if (coins < 250) {
+            if (coins < LAND_BUY_PRICE) {
                 showErrorMessage("Coin belum cukup untuk beli tanah.");
                 return;
             }
-            coins -= 250;
-            ownedLand++;
+            coins -= LAND_BUY_PRICE;
             plot.owned = true;
+            ownedLand = calculateOwnedLand();
             queueChainAction(new ChainAction("BUY_LAND", plotIndex + 1, 1));
             saveGameState();
             showSuccessPopup("Tanah berhasil dibeli.");
@@ -3423,6 +3634,42 @@ final class FarmGameView extends CanvasGameView {
         queueChainAction(new ChainAction("HARVEST", plotIndex + 1, harvestAmount));
         saveGameState();
         showSuccessPopup("Panen " + SEED_NAMES[harvestedSeedIndex] + " +" + harvestAmount + " masuk inventory.");
+    }
+
+    private void sellLand(int plotIndex) {
+        if (plotIndex < 0 || plotIndex >= plots.size()) {
+            showErrorMessage("Dekati lahan dulu.");
+            return;
+        }
+        Plot plot = plots.get(plotIndex);
+        if (!plot.owned) {
+            showErrorMessage("Lahan ini belum dimiliki.");
+            return;
+        }
+        if (plot.state != PlotState.EMPTY) {
+            showErrorMessage("Kosongkan lahan sebelum dijual.");
+            return;
+        }
+        if (actualOwnedLandCount() <= 1) {
+            showErrorMessage("Minimal satu lahan harus tetap dimiliki.");
+            return;
+        }
+        plot.owned = false;
+        plot.seedIndex = 0;
+        plot.plantedAtMs = 0L;
+        ownedLand = calculateOwnedLand();
+        coins += LAND_SELL_PRICE;
+        queueChainAction(new ChainAction("SELL_LAND", plotIndex + 1, LAND_SELL_PRICE));
+        saveGameState();
+        showSuccessPopup("Lahan terjual. Coin +" + LAND_SELL_PRICE + ".");
+    }
+
+    private boolean canSellActiveLand() {
+        if (activeInteractionPlot < 0 || activeInteractionPlot >= plots.size()) {
+            return false;
+        }
+        Plot plot = plots.get(activeInteractionPlot);
+        return plot.owned && plot.state == PlotState.EMPTY && actualOwnedLandCount() > 1;
     }
 
     private void startHarvestEffect(Plot plot, int seedIndex, int amount, long now) {
@@ -3692,12 +3939,17 @@ final class FarmGameView extends CanvasGameView {
 
     private void queueChainAction(ChainAction action) {
         pendingChainActions.add(action);
+        ChainHistoryEntry historyEntry = addChainHistory(action, initialChainHistoryStatus());
         chainPanelUntilMs = System.currentTimeMillis() + 2200L;
         if (!walletAddress.isEmpty() && blockchainClient.hasGameApi()) {
             blockchainClient.submitGameAction(walletAddress, action, result -> {
                 chainStatus = result.message;
                 if (result.success) {
                     pendingChainActions.remove(action);
+                    String status = BlockchainClient.isValidTransactionHash(result.txHash) ? "on-chain" : "dikirim";
+                    updateChainHistory(historyEntry, status, result.txHash);
+                } else {
+                    updateChainHistory(historyEntry, "pending lokal", "");
                 }
                 chainPanelUntilMs = System.currentTimeMillis() + 3600L;
                 invalidate();
@@ -3706,6 +3958,41 @@ final class FarmGameView extends CanvasGameView {
             chainStatus = walletAddress.isEmpty()
                     ? "Wallet belum connect; aksi chain masih pending lokal."
                     : "Signer backend belum diset; aksi chain masih pending lokal.";
+        }
+    }
+
+    private String initialChainHistoryStatus() {
+        if (walletAddress.isEmpty()) {
+            return "pending wallet";
+        }
+        if (blockchainClient.hasGameApi()) {
+            return "mengirim";
+        }
+        if (blockchainClient.hasCoinContract()) {
+            return "pending signer";
+        }
+        return "lokal";
+    }
+
+    private ChainHistoryEntry addChainHistory(ChainAction action, String status) {
+        ChainHistoryEntry entry = new ChainHistoryEntry(action.label(), action.type, action.createdAtMs, status, "");
+        chainHistory.add(0, entry);
+        trimChainHistory();
+        saveChainHistory();
+        return entry;
+    }
+
+    private void updateChainHistory(ChainHistoryEntry entry, String status, String txHash) {
+        entry.status = status;
+        if (BlockchainClient.isValidTransactionHash(txHash)) {
+            entry.txHash = txHash.trim();
+        }
+        saveChainHistory();
+    }
+
+    private void trimChainHistory() {
+        while (chainHistory.size() > CHAIN_HISTORY_LIMIT) {
+            chainHistory.remove(chainHistory.size() - 1);
         }
     }
 
@@ -3743,6 +4030,40 @@ final class FarmGameView extends CanvasGameView {
         }
     }
 
+    private void loadChainHistory() {
+        chainHistory.clear();
+        String raw = preferences.getString(PREF_CHAIN_HISTORY, "");
+        if (raw == null || raw.trim().isEmpty()) {
+            return;
+        }
+        try {
+            JSONArray array = new JSONArray(raw);
+            for (int i = 0; i < array.length(); i++) {
+                JSONObject object = array.optJSONObject(i);
+                ChainHistoryEntry entry = ChainHistoryEntry.fromJson(object);
+                if (entry != null) {
+                    chainHistory.add(entry);
+                }
+            }
+            trimChainHistory();
+        } catch (JSONException exception) {
+            chainHistory.clear();
+            preferences.edit().remove(PREF_CHAIN_HISTORY).apply();
+        }
+    }
+
+    private void saveChainHistory() {
+        try {
+            JSONArray array = new JSONArray();
+            for (ChainHistoryEntry entry : chainHistory) {
+                array.put(entry.toJson());
+            }
+            preferences.edit().putString(PREF_CHAIN_HISTORY, array.toString()).apply();
+        } catch (JSONException ignored) {
+            // A malformed local history entry should not block gameplay saves.
+        }
+    }
+
     private void saveGameState() {
         SharedPreferences.Editor editor = preferences.edit()
                 .putInt("game_coins", coins)
@@ -3765,13 +4086,17 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private int calculateOwnedLand() {
+        return Math.max(1, actualOwnedLandCount());
+    }
+
+    private int actualOwnedLandCount() {
         int total = 0;
         for (Plot plot : plots) {
             if (plot.owned) {
                 total++;
             }
         }
-        return Math.max(1, total);
+        return total;
     }
 
     private static PlotState plotStateFromOrdinal(int ordinal) {
@@ -4189,6 +4514,7 @@ enum InteractionKind {
     SELL_HARVEST,
     BUY_LAND,
     PLANT,
+    SELL_LAND,
     WAIT_CROP,
     HARVEST
 }
@@ -4208,6 +4534,47 @@ final class HarvestEffect {
         this.amount = amount;
         this.startedAtMs = startedAtMs;
         this.phase = (centerX * 0.017f + centerY * 0.011f) % 6.28f;
+    }
+}
+
+final class ChainHistoryEntry {
+    final String label;
+    final String type;
+    final long createdAtMs;
+    String status;
+    String txHash;
+
+    ChainHistoryEntry(String label, String type, long createdAtMs, String status, String txHash) {
+        this.label = label == null ? "Transaksi" : label;
+        this.type = type == null ? "" : type;
+        this.createdAtMs = createdAtMs;
+        this.status = status == null ? "" : status;
+        this.txHash = txHash == null ? "" : txHash;
+    }
+
+    JSONObject toJson() throws JSONException {
+        JSONObject object = new JSONObject();
+        object.put("label", label);
+        object.put("type", type);
+        object.put("createdAtMs", createdAtMs);
+        object.put("status", status);
+        object.put("txHash", txHash);
+        return object;
+    }
+
+    static ChainHistoryEntry fromJson(JSONObject object) {
+        if (object == null) {
+            return null;
+        }
+        String label = object.optString("label", "Transaksi");
+        String type = object.optString("type", "");
+        long createdAtMs = object.optLong("createdAtMs", System.currentTimeMillis());
+        String status = object.optString("status", "");
+        String txHash = object.optString("txHash", "");
+        if (!BlockchainClient.isValidTransactionHash(txHash)) {
+            txHash = "";
+        }
+        return new ChainHistoryEntry(label, type, createdAtMs, status, txHash);
     }
 }
 

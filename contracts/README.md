@@ -3,7 +3,7 @@
 This folder contains the Solidity contracts and a small Hardhat deploy scaffold for the Android prototype.
 
 - `TaniinCoin`: ERC-20 reward token displayed by the Android wallet/coin UI.
-- `TaniinLand`: ERC-721 land ownership prototype.
+- `TaniinLand`: ERC-721 land ownership prototype with buy, sell/burn, plant, and harvest actions.
 - `TaniinItems`: ERC-1155 seed/crop inventory prototype.
 
 ## Setup
@@ -29,4 +29,4 @@ TANIIN_ITEMS_CONTRACT_ADDRESS=...
 
 Do not put `DEPLOYER_PRIVATE_KEY` in Android code, app assets, Gradle committed files, screenshots, or GitHub. If a key was shared in chat, consider it compromised and replace the wallet before deploying or funding it.
 
-The Android app can read wallet balances through Sepolia JSON-RPC. Actual game transaction signing should be handled by WalletConnect or a backend signer endpoint configured through `TANIIN_GAME_API_URL`.
+The Android app can read wallet balances through Sepolia JSON-RPC. Actual game transaction signing should be handled by WalletConnect or a backend signer endpoint configured through `TANIIN_GAME_API_URL`. For transaction history links, the backend should return a Sepolia transaction hash after submitting a game action.

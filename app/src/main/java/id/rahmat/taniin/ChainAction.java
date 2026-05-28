@@ -17,6 +17,9 @@ final class ChainAction {
         if ("BUY_LAND".equals(type)) {
             return "Mint lahan #" + plotId;
         }
+        if ("SELL_LAND".equals(type)) {
+            return "Jual lahan #" + plotId;
+        }
         if ("PLANT".equals(type)) {
             return "Tanam lahan #" + plotId;
         }

@@ -128,8 +128,11 @@ final class BlockchainClient {
                     body.put("plotId", action.plotId);
                     body.put("amount", action.amount);
                     body.put("createdAtMs", action.createdAtMs);
-                    postJson(gameApiUrl + "/game-actions", body.toString());
-                    result = Result.ok("Aksi dikirim ke signer backend.");
+                    String response = postJson(gameApiUrl + "/game-actions", body.toString());
+                    String txHash = extractTransactionHash(response);
+                    result = txHash.isEmpty()
+                            ? Result.ok("Aksi dikirim ke signer backend.")
+                            : Result.ok("Transaksi dikirim ke Sepolia: " + shortTransactionHash(txHash) + ".", txHash);
                 }
             } catch (IOException | JSONException exception) {
                 result = Result.error("Gagal kirim aksi chain: " + exception.getMessage());
@@ -275,11 +278,73 @@ final class BlockchainClient {
         return address != null && address.matches("^0x[0-9a-fA-F]{40}$");
     }
 
+    static boolean isValidTransactionHash(String hash) {
+        return hash != null && hash.matches("^0x[0-9a-fA-F]{64}$");
+    }
+
     static String shortAddress(String address) {
         if (address == null || address.length() < 12) {
             return "";
         }
         return address.substring(0, 6) + "..." + address.substring(address.length() - 4);
+    }
+
+    static String shortTransactionHash(String hash) {
+        if (!isValidTransactionHash(hash)) {
+            return "";
+        }
+        return hash.substring(0, 10) + "..." + hash.substring(hash.length() - 6);
+    }
+
+    private static String extractTransactionHash(String response) {
+        String cleaned = response == null ? "" : response.trim();
+        if (isValidTransactionHash(cleaned)) {
+            return cleaned;
+        }
+        if (cleaned.isEmpty()) {
+            return "";
+        }
+        try {
+            JSONObject object = new JSONObject(cleaned);
+            String direct = firstValidTransactionHash(
+                    object.optString("txHash", ""),
+                    object.optString("transactionHash", ""),
+                    object.optString("hash", ""),
+                    object.optString("result", ""));
+            if (!direct.isEmpty()) {
+                return direct;
+            }
+            JSONObject data = object.optJSONObject("data");
+            if (data != null) {
+                String nested = firstValidTransactionHash(
+                        data.optString("txHash", ""),
+                        data.optString("transactionHash", ""),
+                        data.optString("hash", ""));
+                if (!nested.isEmpty()) {
+                    return nested;
+                }
+            }
+            JSONObject result = object.optJSONObject("result");
+            if (result != null) {
+                return firstValidTransactionHash(
+                        result.optString("txHash", ""),
+                        result.optString("transactionHash", ""),
+                        result.optString("hash", ""));
+            }
+        } catch (JSONException ignored) {
+            return "";
+        }
+        return "";
+    }
+
+    private static String firstValidTransactionHash(String... values) {
+        for (String value : values) {
+            String cleaned = value == null ? "" : value.trim();
+            if (isValidTransactionHash(cleaned)) {
+                return cleaned;
+            }
+        }
+        return "";
     }
 
     interface Callback {
@@ -293,18 +358,24 @@ final class BlockchainClient {
     static final class Result {
         final boolean success;
         final String message;
+        final String txHash;
 
-        private Result(boolean success, String message) {
+        private Result(boolean success, String message, String txHash) {
             this.success = success;
             this.message = message;
+            this.txHash = txHash;
         }
 
         static Result ok(String message) {
-            return new Result(true, message);
+            return ok(message, "");
+        }
+
+        static Result ok(String message, String txHash) {
+            return new Result(true, message, txHash == null ? "" : txHash.trim());
         }
 
         static Result error(String message) {
-            return new Result(false, message);
+            return new Result(false, message, "");
         }
     }
 

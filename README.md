@@ -6,12 +6,13 @@ Taniin is a landscape Android farming game prototype with Web3 hooks for Sepolia
 
 - Java Canvas game loop with TMX map rendering, collisions, foreground layers, minimap, joystick, and hardware key support.
 - Fullscreen loading screen using `app/src/main/res/drawable/loadingscreen.jpg` with animated 1-100 progress before entering the game.
-- Farming loop for land ownership, seed selection, quantity-based seed purchase, planting confirmation, harvest confirmation, success popups, and harvest effects.
+- Farming loop for land ownership, land selling, seed selection, quantity-based seed purchase, planting confirmation, harvest confirmation, success popups, and harvest effects.
 - Separate seed shop and crop-selling house interactions.
 - Local game state persistence for coins, seeds, harvest inventory, land ownership, and planted crops when the app is closed and reopened.
 - Background music plus click/error/walking SFX from `res/raw`, with toggles in the hamburger menu's Audio tab.
 - Wallet button that can auto-connect from a public `.env` wallet address, checks Sepolia RPC, reads ETH balance, and reads ERC-20 TANI balance when the deployed coin contract address is configured.
-- Pending Web3 action queue for buy land, buy seed, plant, harvest, and sell crop actions. If `TANIIN_GAME_API_URL` is configured, actions are posted to that backend signer endpoint.
+- Pending Web3 action queue for buy land, sell land, buy seed, plant, harvest, and sell crop actions. If `TANIIN_GAME_API_URL` is configured, actions are posted to that backend signer endpoint.
+- In-game transaction history panel. Backend responses may return `txHash`, `transactionHash`, `hash`, or a nested `data`/`result` hash; rows with a hash open the Sepolia Etherscan transaction page.
 - Solidity contracts and Hardhat deploy scaffold in `contracts/`.
 
 ## Project Structure
@@ -74,9 +75,11 @@ cmd.exe /c gradlew.bat :app:assembleDebug --console=plain
 3. Rebuild the Android app so Gradle writes the addresses into `BuildConfig`.
 4. Optionally set `TANIIN_DEFAULT_WALLET_ADDRESS` to a public Sepolia wallet address before building. The app will auto-connect that wallet and tapping the wallet button will sync balances.
 5. The shop coin display uses the ERC-20 TANI balance when `TANIIN_COIN_CONTRACT_ADDRESS` is set. Otherwise it falls back to local prototype coins saved on the device.
-6. Gameplay actions are queued locally. When `TANIIN_GAME_API_URL` is set, the app posts each action to `/game-actions` for a backend signer to process.
+6. Gameplay actions are queued locally. When `TANIIN_GAME_API_URL` is set, the app posts each action to `/game-actions` for a backend signer to process. If the backend returns a transaction hash, the app saves it in the transaction history and opens Sepolia Etherscan when tapped.
 
 The Android app does not sign transactions with a private key. A production setup should use WalletConnect or a backend signer with strict server-side validation.
+
+Land ownership is represented by `TaniinLand` ERC-721 on-chain, but the Android gameplay state remains local unless the backend signer maps each game action to the deployed contracts and returns confirmed transaction hashes.
 
 ## Deploy Contracts
 
@@ -107,6 +110,8 @@ npm run mint:tani
 Set `TANIIN_MINT_AMOUNT=2500` in `.env` to override the default `1000` TANI amount.
 
 Current Sepolia deployment:
+
+Redeploy and replace these addresses after contract changes, including the `sellLand` function, before expecting land selling to execute on-chain.
 
 ```properties
 TANIIN_COIN_CONTRACT_ADDRESS=0xc3F787EF326Cec3EFD9DC50258B7b4F0639F385e
