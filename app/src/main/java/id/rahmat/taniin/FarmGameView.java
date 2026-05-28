@@ -3,6 +3,7 @@ package id.rahmat.taniin;
 import android.app.Activity;
 import android.app.Dialog;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -14,6 +15,7 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -86,6 +88,7 @@ final class FarmGameView extends CanvasGameView {
     };
     private static final int MENU_TAB_INVENTORY = 0;
     private static final int MENU_TAB_SETTINGS = 1;
+    private static final int MENU_TAB_ABOUT = 2;
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint pixelPaint = new Paint();
@@ -107,8 +110,11 @@ final class FarmGameView extends CanvasGameView {
     private final Bitmap chicken;
     private final Bitmap babyChicken;
     private final Bitmap cow;
+    private final Bitmap maleCow;
+    private final Bitmap chickenRed;
     private final Bitmap shopNpcSheet;
     private final Bitmap outdoorDecorSheet;
+    private final Bitmap appIcon;
 
     private float playerX = 18.5f * TILE;
     private float playerY = 28.5f * TILE;
@@ -179,6 +185,9 @@ final class FarmGameView extends CanvasGameView {
         chicken = decodePixelResource(R.drawable.chicken_blonde_green);
         babyChicken = decodePixelResource(R.drawable.baby_chicken_yellow);
         cow = decodePixelResource(R.drawable.female_cow_brown);
+        maleCow = decodePixelResource(R.drawable.male_cow_brown);
+        chickenRed = decodePixelResource(R.drawable.chicken_red);
+        appIcon = decodePixelResource(R.drawable.iconaplikasi);
         shopNpcSheet = decodePixelAsset(context, "game/Tileset/Cute_Fantasy_Free/Player/Player.png", idleSheet);
         outdoorDecorSheet = decodePixelAsset(context, "game/Tileset/Cute_Fantasy_Free/Outdoor decoration/Outdoor_Decor_Free.png", null);
         loadTmxMap(context);
@@ -405,7 +414,7 @@ final class FarmGameView extends CanvasGameView {
         cameraY = Math.round(clamp(playerY - height * 0.56f, 0, Math.max(0, worldHeightPixels - height)));
 
         drawWorld(canvas);
-        drawMapDecorations(canvas, false);
+        drawMapDecorations(canvas, false, now);
         drawShopNpc(canvas, now);
         drawPlots(canvas, now);
         drawHarvestEffects(canvas, now);
@@ -416,7 +425,7 @@ final class FarmGameView extends CanvasGameView {
         if (tmxMap != null) {
             tmxMap.drawForeground(canvas, cameraX, cameraY, TILE);
         }
-        drawMapDecorations(canvas, true);
+        drawMapDecorations(canvas, true, now);
         drawPlotActionSigns(canvas, now);
         drawShopNpcBubble(canvas, now);
         drawHud(canvas, now);
@@ -599,7 +608,7 @@ final class FarmGameView extends CanvasGameView {
         drawBitmapWorld(canvas, cow, 45 * TILE, 30 * TILE, 86, 64);
     }
 
-    private void drawMapDecorations(Canvas canvas, boolean foreground) {
+    private void drawMapDecorations(Canvas canvas, boolean foreground, long now) {
         if (tmxMap == null) {
             return;
         }
@@ -608,19 +617,41 @@ final class FarmGameView extends CanvasGameView {
             drawSellHouseSign(canvas);
             return;
         }
-        drawFieldEdgeNatureDecorations(canvas);
+        drawFieldEdgeNatureDecorations(canvas, now);
         drawShopPenNatureDecorations(canvas);
-        drawSpriteWithShadowWorld(canvas, chicken, 0, 16, 16, 4, 22.35f * TILE, 17.45f * TILE, TILE * 0.50f, TILE * 0.50f);
-        drawSpriteWithShadowWorld(canvas, chicken, 1, 16, 16, 4, 23.35f * TILE, 18.20f * TILE, TILE * 0.50f, TILE * 0.50f);
-        drawSpriteWithShadowWorld(canvas, cow, 0, 32, 32, 4, 22.85f * TILE, 20.00f * TILE, TILE, TILE);
-        drawSpriteWithShadowWorld(canvas, chicken, 2, 16, 16, 4, 24.20f * TILE, 21.80f * TILE, TILE * 0.50f, TILE * 0.50f);
-        drawSpriteWithShadowWorld(canvas, babyChicken, 1, 16, 16, 4, 22.45f * TILE, 22.00f * TILE, TILE * 0.38f, TILE * 0.38f);
-        drawSpriteWithShadowWorld(canvas, chicken, 4, 16, 16, 4, 22.95f * TILE, 22.75f * TILE, TILE * 0.50f, TILE * 0.50f);
-        drawSpriteWithShadowWorld(canvas, babyChicken, 0, 16, 16, 4, 23.80f * TILE, 22.55f * TILE, TILE * 0.38f, TILE * 0.38f);
+        drawOpenMeadowDecorations(canvas, now);
+        drawRoadsideDecorations(canvas, now);
+        drawVillageNpcDecorations(canvas, now);
+        drawShopPenAnimals(canvas, now);
     }
 
-    private void drawFieldEdgeNatureDecorations(Canvas canvas) {
-        long now = System.currentTimeMillis();
+    private void drawShopPenAnimals(Canvas canvas, long now) {
+        int chickenFrame = (int) ((now / 440L) % 4L);
+        int babyFrame = (int) ((now / 520L) % 4L);
+        int cowFrame = (int) ((now / 620L) % 4L);
+
+        float chickenWiggleA = (float) Math.sin(now / 360.0) * TILE * 0.025f;
+        float chickenWiggleB = (float) Math.sin(now / 430.0 + 1.7) * TILE * 0.025f;
+        float babyWiggle = (float) Math.sin(now / 390.0 + 2.4) * TILE * 0.020f;
+        float cowWiggle = (float) Math.sin(now / 720.0 + 0.8) * TILE * 0.018f;
+
+        drawSpriteWithShadowWorld(canvas, chicken, chickenFrame, 16, 16, 4,
+                22.38f * TILE + chickenWiggleA, 18.08f * TILE, TILE * 0.50f, TILE * 0.50f);
+        drawSpriteWithShadowWorld(canvas, chicken, (chickenFrame + 1) % 4, 16, 16, 4,
+                23.34f * TILE + chickenWiggleB, 18.42f * TILE, TILE * 0.50f, TILE * 0.50f);
+        drawSpriteWithShadowWorld(canvas, cow, cowFrame, 32, 32, 4,
+                22.82f * TILE + cowWiggle, 20.04f * TILE, TILE, TILE);
+        drawSpriteWithShadowWorld(canvas, chicken, (chickenFrame + 2) % 4, 16, 16, 4,
+                23.58f * TILE - chickenWiggleA, 21.68f * TILE, TILE * 0.50f, TILE * 0.50f);
+        drawSpriteWithShadowWorld(canvas, babyChicken, babyFrame, 16, 16, 4,
+                22.42f * TILE + babyWiggle, 22.00f * TILE, TILE * 0.38f, TILE * 0.38f);
+        drawSpriteWithShadowWorld(canvas, chicken, (chickenFrame + 3) % 4, 16, 16, 4,
+                22.98f * TILE - chickenWiggleB, 22.50f * TILE, TILE * 0.50f, TILE * 0.50f);
+        drawSpriteWithShadowWorld(canvas, babyChicken, (babyFrame + 1) % 4, 16, 16, 4,
+                23.66f * TILE - babyWiggle, 22.34f * TILE, TILE * 0.38f, TILE * 0.38f);
+    }
+
+    private void drawFieldEdgeNatureDecorations(Canvas canvas, long now) {
         int chickenFrame = (int) ((now / 440L) % 4L);
         int babyFrame = (int) ((now / 520L) % 4L);
 
@@ -628,30 +659,110 @@ final class FarmGameView extends CanvasGameView {
         drawOutdoorTile(canvas, 1, 2, 11.22f * TILE, 24.08f * TILE, TILE * 0.56f);
         drawOutdoorTile(canvas, 2, 3, 13.10f * TILE, 23.76f * TILE, TILE * 0.56f);
         drawOutdoorTile(canvas, 1, 2, 14.35f * TILE, 23.18f * TILE, TILE * 0.50f);
-        drawOutdoorTile(canvas, 2, 3, 16.18f * TILE, 23.86f * TILE, TILE * 0.54f);
+        drawOutdoorTile(canvas, 2, 3, 14.92f * TILE, 23.76f * TILE, TILE * 0.54f);
         drawOutdoorTile(canvas, 0, 8, 12.12f * TILE, 22.70f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 0, 11, 15.42f * TILE, 24.38f * TILE, TILE * 0.52f);
-        drawOutdoorTile(canvas, 1, 11, 17.02f * TILE, 24.26f * TILE, TILE * 0.52f);
+        drawOutdoorTile(canvas, 0, 11, 12.82f * TILE, 24.58f * TILE, TILE * 0.52f);
+        drawOutdoorTile(canvas, 1, 11, 13.74f * TILE, 24.42f * TILE, TILE * 0.52f);
 
         drawSpriteWithShadowWorld(canvas, chicken, chickenFrame, 16, 16, 4,
                 10.86f * TILE, 24.54f * TILE, TILE * 0.50f, TILE * 0.50f);
         drawSpriteWithShadowWorld(canvas, babyChicken, babyFrame, 16, 16, 4,
                 11.62f * TILE, 24.92f * TILE, TILE * 0.37f, TILE * 0.37f);
         drawSpriteWithShadowWorld(canvas, chicken, (chickenFrame + 2) % 4, 16, 16, 4,
-                14.52f * TILE, 24.64f * TILE, TILE * 0.48f, TILE * 0.48f);
+                13.74f * TILE, 24.64f * TILE, TILE * 0.48f, TILE * 0.48f);
         drawSpriteWithShadowWorld(canvas, babyChicken, (babyFrame + 1) % 4, 16, 16, 4,
-                15.18f * TILE, 24.96f * TILE, TILE * 0.35f, TILE * 0.35f);
+                14.42f * TILE, 24.96f * TILE, TILE * 0.35f, TILE * 0.35f);
     }
 
     private void drawShopPenNatureDecorations(Canvas canvas) {
-        drawOutdoorTile(canvas, 1, 2, 21.20f * TILE, 18.18f * TILE, TILE * 0.52f);
-        drawOutdoorTile(canvas, 2, 3, 24.70f * TILE, 18.52f * TILE, TILE * 0.56f);
-        drawOutdoorTile(canvas, 0, 2, 21.18f * TILE, 19.90f * TILE, TILE * 0.70f);
-        drawOutdoorTile(canvas, 1, 3, 24.72f * TILE, 20.18f * TILE, TILE * 0.52f);
-        drawOutdoorTile(canvas, 1, 2, 21.74f * TILE, 21.28f * TILE, TILE * 0.54f);
-        drawOutdoorTile(canvas, 2, 3, 24.76f * TILE, 21.62f * TILE, TILE * 0.54f);
-        drawOutdoorTile(canvas, 0, 11, 21.84f * TILE, 23.15f * TILE, TILE * 0.46f);
-        drawOutdoorTile(canvas, 2, 10, 24.72f * TILE, 23.12f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 1, 2, 22.05f * TILE, 18.22f * TILE, TILE * 0.52f);
+        drawOutdoorTile(canvas, 2, 3, 23.98f * TILE, 18.58f * TILE, TILE * 0.56f);
+        drawOutdoorTile(canvas, 0, 2, 22.18f * TILE, 19.86f * TILE, TILE * 0.70f);
+        drawOutdoorTile(canvas, 1, 3, 23.78f * TILE, 20.20f * TILE, TILE * 0.52f);
+        drawOutdoorTile(canvas, 1, 2, 22.38f * TILE, 21.26f * TILE, TILE * 0.54f);
+        drawOutdoorTile(canvas, 2, 3, 23.88f * TILE, 21.58f * TILE, TILE * 0.54f);
+        drawOutdoorTile(canvas, 0, 11, 22.42f * TILE, 22.84f * TILE, TILE * 0.46f);
+        drawOutdoorTile(canvas, 2, 10, 23.72f * TILE, 22.90f * TILE, TILE * 0.48f);
+    }
+
+    private void drawOpenMeadowDecorations(Canvas canvas, long now) {
+        int chickenFrame = (int) ((now / 430L) % 4L);
+        int babyFrame = (int) ((now / 510L) % 4L);
+        int cowFrame = (int) ((now / 660L) % 4L);
+        float swayA = (float) Math.sin(now / 520.0) * TILE * 0.018f;
+        float swayB = (float) Math.sin(now / 610.0 + 1.8) * TILE * 0.018f;
+
+        drawOutdoorTile(canvas, 0, 8, 18.70f * TILE, 28.86f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 1, 8, 19.25f * TILE, 29.06f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 5, 8, 20.45f * TILE, 28.82f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 6, 8, 21.00f * TILE, 29.08f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 0, 1, 22.18f * TILE, 29.10f * TILE, TILE * 0.58f);
+        drawOutdoorTile(canvas, 2, 1, 23.02f * TILE, 29.34f * TILE, TILE * 0.50f);
+
+        drawOutdoorTile(canvas, 0, 2, 19.18f * TILE, 30.84f * TILE, TILE * 0.68f);
+        drawOutdoorTile(canvas, 1, 2, 20.16f * TILE, 31.20f * TILE, TILE * 0.54f);
+        drawOutdoorTile(canvas, 0, 3, 22.48f * TILE, 30.96f * TILE, TILE * 0.70f);
+        drawOutdoorTile(canvas, 2, 3, 23.54f * TILE, 31.52f * TILE, TILE * 0.56f);
+        drawOutdoorTile(canvas, 4, 5, 18.52f * TILE, 32.84f * TILE, TILE * 0.78f);
+        drawOutdoorTile(canvas, 5, 5, 24.26f * TILE, 32.58f * TILE, TILE * 0.78f);
+        drawOutdoorTile(canvas, 6, 4, 21.36f * TILE, 33.04f * TILE, TILE * 1.10f);
+
+        drawSpriteWithShadowWorld(canvas, chickenRed, chickenFrame, 16, 16, 4,
+                19.70f * TILE + swayA, 28.24f * TILE, TILE * 0.54f, TILE * 0.54f);
+        drawSpriteWithShadowWorld(canvas, babyChicken, babyFrame, 16, 16, 4,
+                20.38f * TILE - swayB, 28.68f * TILE, TILE * 0.38f, TILE * 0.38f);
+        drawSpriteWithShadowWorld(canvas, maleCow, cowFrame, 32, 32, 4,
+                24.10f * TILE + swayB, 28.14f * TILE, TILE * 1.04f, TILE * 1.04f);
+        drawSpriteWithShadowWorld(canvas, chicken, (chickenFrame + 2) % 4, 16, 16, 4,
+                24.18f * TILE - swayA, 30.22f * TILE, TILE * 0.52f, TILE * 0.52f);
+        drawSpriteWithShadowWorld(canvas, babyChicken, (babyFrame + 1) % 4, 16, 16, 4,
+                24.82f * TILE + swayA, 30.58f * TILE, TILE * 0.38f, TILE * 0.38f);
+    }
+
+    private void drawRoadsideDecorations(Canvas canvas, long now) {
+        int chickenFrame = (int) ((now / 470L) % 4L);
+        int cowFrame = (int) ((now / 690L) % 4L);
+        float drift = (float) Math.sin(now / 720.0) * TILE * 0.016f;
+
+        drawOutdoorTile(canvas, 2, 8, 29.12f * TILE, 25.92f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 3, 8, 29.60f * TILE, 25.84f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 0, 9, 31.70f * TILE, 25.12f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 1, 9, 32.24f * TILE, 25.10f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 0, 2, 34.10f * TILE, 31.08f * TILE, TILE * 0.64f);
+        drawOutdoorTile(canvas, 2, 3, 35.00f * TILE, 31.30f * TILE, TILE * 0.58f);
+
+        drawOutdoorTile(canvas, 0, 10, 29.22f * TILE, 32.70f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 1, 10, 29.68f * TILE, 32.66f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 4, 8, 32.72f * TILE, 33.18f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 5, 8, 33.16f * TILE, 33.12f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 3, 5, 35.54f * TILE, 32.72f * TILE, TILE * 0.80f);
+        drawOutdoorTile(canvas, 6, 5, 36.50f * TILE, 32.98f * TILE, TILE * 0.78f);
+
+        drawSpriteWithShadowWorld(canvas, cow, cowFrame, 32, 32, 4,
+                31.18f * TILE + drift, 29.22f * TILE, TILE * 1.02f, TILE * 1.02f);
+        drawSpriteWithShadowWorld(canvas, chicken, chickenFrame, 16, 16, 4,
+                34.62f * TILE - drift, 31.48f * TILE, TILE * 0.52f, TILE * 0.52f);
+        drawSpriteWithShadowWorld(canvas, chickenRed, (chickenFrame + 1) % 4, 16, 16, 4,
+                35.20f * TILE + drift, 31.82f * TILE, TILE * 0.52f, TILE * 0.52f);
+
+        drawOutdoorTile(canvas, 0, 11, 13.26f * TILE, 35.88f * TILE, TILE * 0.50f);
+        drawOutdoorTile(canvas, 1, 11, 13.74f * TILE, 35.82f * TILE, TILE * 0.50f);
+        drawOutdoorTile(canvas, 2, 11, 14.22f * TILE, 35.88f * TILE, TILE * 0.50f);
+        drawOutdoorTile(canvas, 5, 1, 16.66f * TILE, 36.18f * TILE, TILE * 0.62f);
+        drawOutdoorTile(canvas, 6, 1, 17.30f * TILE, 36.18f * TILE, TILE * 0.62f);
+        drawOutdoorTile(canvas, 0, 3, 20.62f * TILE, 35.82f * TILE, TILE * 0.68f);
+        drawOutdoorTile(canvas, 2, 3, 21.52f * TILE, 36.20f * TILE, TILE * 0.56f);
+    }
+
+    private void drawVillageNpcDecorations(Canvas canvas, long now) {
+        int frame = (int) ((now / 360L) % 6L);
+        float bob = (float) Math.sin(now / 540.0) * 1.5f;
+        drawNpcWorld(canvas, 6 + frame, 17.80f * TILE, 27.70f * TILE + bob, TILE * 1.05f);
+        drawNpcWorld(canvas, 18 + frame, 33.96f * TILE, 31.92f * TILE - bob, TILE * 1.02f);
+    }
+
+    private void drawNpcWorld(Canvas canvas, int frame, float worldX, float worldY, float size) {
+        drawSpriteWithShadowWorld(canvas, shopNpcSheet, frame, 32, 32, 6, worldX, worldY, size, size);
     }
 
     private void drawOutdoorTile(Canvas canvas, int col, int row, float worldX, float worldY, float size) {
@@ -785,10 +896,13 @@ final class FarmGameView extends CanvasGameView {
 
     private void drawPlotActionSigns(Canvas canvas, long now) {
         for (int i = 0; i < plots.size(); i++) {
+            if (i != selectedPlot) {
+                continue;
+            }
             Plot plot = plots.get(i);
             InteractionKind kind = plotInteractionKind(plot, now);
             RectF sign = plotActionSignBounds(plot);
-            if (isOffscreen(sign)) {
+            if (isOffscreen(sign) || sign.top < 8f) {
                 continue;
             }
 
@@ -1258,9 +1372,14 @@ final class FarmGameView extends CanvasGameView {
 
         drawBackpackSideTab(canvas, backpackSeedTabBounds(), menuTab == MENU_TAB_INVENTORY, "SEEDS", Color.rgb(255, 207, 14));
         drawBackpackSideTab(canvas, backpackAudioTabBounds(), menuTab == MENU_TAB_SETTINGS, "AUDIO", Color.rgb(105, 196, 250));
+        drawBackpackSideTab(canvas, backpackAboutTabBounds(), menuTab == MENU_TAB_ABOUT, "ABOUT", Color.rgb(255, 151, 83));
 
         if (menuTab == MENU_TAB_SETTINGS) {
             drawAudioSettingsPanel(canvas, panel, bodyLeft, bodyTop);
+            return;
+        }
+        if (menuTab == MENU_TAB_ABOUT) {
+            drawAboutPanel(canvas, panel, bodyLeft, bodyTop);
             return;
         }
 
@@ -1327,11 +1446,13 @@ final class FarmGameView extends CanvasGameView {
         canvas.drawRoundRect(tab, 12, 12, paint);
 
         float cx = (tab.left + tab.right) * 0.5f;
-        float iconY = tab.top + 55f;
+        float iconY = tab.top + tab.height() * 0.37f;
         if ("SEEDS".equals(label)) {
             drawSeedSproutIcon(canvas, cx, iconY, active ? Color.rgb(80, 210, 83) : Color.rgb(235, 185, 70));
         } else if ("AUDIO".equals(label)) {
             drawSpeakerIcon(canvas, cx, iconY, active ? Color.rgb(64, 180, 240) : Color.rgb(235, 185, 70));
+        } else if ("ABOUT".equals(label)) {
+            drawAboutIcon(canvas, cx, iconY, active ? Color.rgb(255, 151, 83) : Color.rgb(235, 185, 70));
         } else {
             drawHarvestIcon(canvas, cx, iconY, accent);
         }
@@ -1339,7 +1460,74 @@ final class FarmGameView extends CanvasGameView {
         paint.setColor(active ? Color.rgb(48, 29, 11) : Color.rgb(242, 228, 198));
         paint.setTextSize(19f);
         paint.setFakeBoldText(true);
-        drawCenteredText(canvas, label, cx, tab.bottom - 31f);
+        drawCenteredText(canvas, label, cx, tab.bottom - 18f);
+        paint.setFakeBoldText(false);
+    }
+
+    private void drawAboutPanel(Canvas canvas, RectF panel, float bodyLeft, float bodyTop) {
+        float left = bodyLeft + 58f;
+        float top = bodyTop + 48f;
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(255, 235, 171));
+        paint.setTextSize(30f);
+        paint.setFakeBoldText(true);
+        canvas.drawText("About", left, top, paint);
+        paint.setFakeBoldText(false);
+
+        RectF chip = new RectF(left + 116f, top - 27f, left + 304f, top + 4f);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(120, 58, 22));
+        canvas.drawRoundRect(chip, 15, 15, paint);
+        paint.setColor(Color.rgb(255, 218, 93));
+        paint.setTextSize(15f);
+        paint.setFakeBoldText(true);
+        drawCenteredText(canvas, "TANIIN", chip.centerX(), chip.top + 21f);
+        paint.setFakeBoldText(false);
+
+        RectF card = new RectF(left, top + 58f, panel.right - 58f, top + 318f);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.argb(76, 0, 0, 0));
+        canvas.drawRoundRect(card.left + 5f, card.top + 6f, card.right + 5f, card.bottom + 6f, 18, 18, paint);
+        paint.setColor(Color.rgb(104, 47, 15));
+        canvas.drawRoundRect(card, 18, 18, paint);
+        paint.setColor(Color.rgb(124, 58, 21));
+        canvas.drawRoundRect(card.left + 8f, card.top + 8f, card.right - 8f, card.top + 34f, 11, 11, paint);
+        paint.setColor(Color.rgb(255, 151, 83));
+        canvas.drawRoundRect(card.left, card.top, card.left + 10f, card.bottom, 8, 8, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(3f);
+        paint.setColor(Color.rgb(164, 85, 31));
+        canvas.drawRoundRect(card, 14, 14, paint);
+
+        RectF icon = new RectF(card.left + 42f, card.top + 42f, card.left + 154f, card.top + 154f);
+        drawAboutAppIcon(canvas, icon);
+
+        float textLeft = icon.right + 34f;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(255, 241, 212));
+        paint.setTextSize(fitTextSize("Rahmat Eka Satria", 30f, card.right - textLeft - 30f));
+        paint.setFakeBoldText(true);
+        canvas.drawText("Rahmat Eka Satria", textLeft, card.top + 82f, paint);
+        paint.setFakeBoldText(false);
+        paint.setColor(Color.rgb(232, 202, 164));
+        paint.setTextSize(18f);
+        canvas.drawText("Creator", textLeft, card.top + 116f, paint);
+
+        RectF github = aboutGithubButtonBounds();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(41, 92, 68));
+        canvas.drawRoundRect(github, 13, 13, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(3f);
+        paint.setColor(Color.rgb(118, 218, 140));
+        canvas.drawRoundRect(github, 13, 13, paint);
+        drawExternalLinkIcon(canvas, github.left + 34f, github.centerY());
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.WHITE);
+        paint.setTextSize(fitTextSize("github.com/rhmatzeka", 21f, github.width() - 78f));
+        paint.setFakeBoldText(true);
+        canvas.drawText("github.com/rhmatzeka", github.left + 62f, github.top + 31f, paint);
         paint.setFakeBoldText(false);
     }
 
@@ -1509,6 +1697,48 @@ final class FarmGameView extends CanvasGameView {
         paint.setColor(Color.rgb(255, 236, 190));
         canvas.drawArc(cx + 8f, cy - 23f, cx + 40f, cy + 23f, -38, 76, false, paint);
         canvas.drawArc(cx + 19f, cy - 36f, cx + 60f, cy + 36f, -38, 76, false, paint);
+        paint.setStyle(Paint.Style.FILL);
+    }
+
+    private void drawAboutIcon(Canvas canvas, float cx, float cy, int accent) {
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(accent);
+        canvas.drawCircle(cx, cy, 28f, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(5f);
+        paint.setColor(Color.rgb(255, 236, 190));
+        canvas.drawCircle(cx, cy, 21f, paint);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(64, 31, 13));
+        canvas.drawCircle(cx, cy - 11f, 4f, paint);
+        canvas.drawRoundRect(cx - 4f, cy - 2f, cx + 4f, cy + 18f, 4, 4, paint);
+    }
+
+    private void drawAboutAppIcon(Canvas canvas, RectF icon) {
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(67, 31, 12));
+        canvas.drawRoundRect(icon.left - 7f, icon.top - 7f, icon.right + 7f, icon.bottom + 7f, 24, 24, paint);
+        Path clip = new Path();
+        clip.addRoundRect(icon, 20f, 20f, Path.Direction.CW);
+        canvas.save();
+        canvas.clipPath(clip);
+        canvas.drawBitmap(appIcon, null, icon, pixelPaint);
+        canvas.restore();
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(4f);
+        paint.setColor(Color.rgb(255, 205, 87));
+        canvas.drawRoundRect(icon, 20, 20, paint);
+        paint.setStyle(Paint.Style.FILL);
+    }
+
+    private void drawExternalLinkIcon(Canvas canvas, float cx, float cy) {
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(4f);
+        paint.setColor(Color.rgb(232, 255, 224));
+        canvas.drawRoundRect(cx - 12f, cy - 10f, cx + 9f, cy + 12f, 4, 4, paint);
+        canvas.drawLine(cx - 2f, cy + 3f, cx + 14f, cy - 13f, paint);
+        canvas.drawLine(cx + 5f, cy - 14f, cx + 15f, cy - 14f, paint);
+        canvas.drawLine(cx + 15f, cy - 14f, cx + 15f, cy - 4f, paint);
         paint.setStyle(Paint.Style.FILL);
     }
 
@@ -1741,13 +1971,28 @@ final class FarmGameView extends CanvasGameView {
     private RectF backpackSeedTabBounds() {
         RectF panel = inventoryPanelBounds();
         float bodyTop = panel.top + 118f;
-        return new RectF(panel.left + 34f, bodyTop + 42f, panel.left + 170f, bodyTop + 188f);
+        return new RectF(panel.left + 34f, bodyTop + 30f, panel.left + 170f, bodyTop + 138f);
     }
 
     private RectF backpackAudioTabBounds() {
         RectF panel = inventoryPanelBounds();
         float bodyTop = panel.top + 118f;
-        return new RectF(panel.left + 34f, bodyTop + 218f, panel.left + 170f, bodyTop + 364f);
+        return new RectF(panel.left + 34f, bodyTop + 160f, panel.left + 170f, bodyTop + 268f);
+    }
+
+    private RectF backpackAboutTabBounds() {
+        RectF panel = inventoryPanelBounds();
+        float bodyTop = panel.top + 118f;
+        return new RectF(panel.left + 34f, bodyTop + 290f, panel.left + 170f, bodyTop + 398f);
+    }
+
+    private RectF aboutGithubButtonBounds() {
+        RectF panel = inventoryPanelBounds();
+        float bodyTop = panel.top + 118f;
+        float bodyLeft = panel.left + 220f;
+        float left = bodyLeft + 252f;
+        float top = bodyTop + 252f;
+        return new RectF(left, top, Math.min(panel.right - 86f, left + 326f), top + 50f);
     }
 
     private RectF audioBgmRowBounds() {
@@ -2430,10 +2675,7 @@ final class FarmGameView extends CanvasGameView {
             }
             if (topMenuButtonBounds().contains(x, y)) {
                 playClickSound();
-                menuOpen = !menuOpen;
-                if (menuOpen) {
-                    menuTab = MENU_TAB_INVENTORY;
-                }
+                toggleMenuPanel();
                 return true;
             }
             if (menuOpen) {
@@ -2522,6 +2764,11 @@ final class FarmGameView extends CanvasGameView {
         if (interactionDialogOpen) {
             return handleInteractionDialogKey(keyCode);
         }
+        if (keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_M) {
+            playClickSound();
+            toggleMenuPanel();
+            return true;
+        }
         if (isPrimaryKey(keyCode)) {
             playClickSound();
             performAction();
@@ -2538,6 +2785,13 @@ final class FarmGameView extends CanvasGameView {
             }
         }
         return false;
+    }
+
+    private void toggleMenuPanel() {
+        menuOpen = !menuOpen;
+        if (menuOpen) {
+            menuTab = MENU_TAB_INVENTORY;
+        }
     }
 
     private boolean moveWithHardwareKey(int keyCode) {
@@ -2677,6 +2931,11 @@ final class FarmGameView extends CanvasGameView {
             menuTab = MENU_TAB_SETTINGS;
             return true;
         }
+        if (backpackAboutTabBounds().contains(x, y)) {
+            playClickSound();
+            menuTab = MENU_TAB_ABOUT;
+            return true;
+        }
         if (menuTab == MENU_TAB_SETTINGS) {
             if (audioBgmRowBounds().contains(x, y) || audioBgmToggleBounds().contains(x, y)) {
                 audioBgmEnabled = !audioBgmEnabled;
@@ -2709,7 +2968,25 @@ final class FarmGameView extends CanvasGameView {
                 return true;
             }
         }
+        if (menuTab == MENU_TAB_ABOUT && aboutGithubButtonBounds().contains(x, y)) {
+            playClickSound();
+            openCreatorGithub();
+            return true;
+        }
         return true;
+    }
+
+    private void openCreatorGithub() {
+        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/rhmatzeka"));
+        if (!(getContext() instanceof Activity)) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        }
+        try {
+            getContext().startActivity(intent);
+            showMessage("Membuka GitHub rhmatzeka.");
+        } catch (RuntimeException e) {
+            showErrorMessage("Tidak bisa membuka GitHub di perangkat ini.");
+        }
     }
 
     private boolean handleInteractionDialogTouch(float x, float y) {
@@ -3592,7 +3869,7 @@ final class FarmGameView extends CanvasGameView {
 
     private int findTappedPlotSign(float x, float y) {
         for (int i = 0; i < plots.size(); i++) {
-            if (plotActionSignTapBounds(plots.get(i)).contains(x, y)) {
+            if (i == selectedPlot && plotActionSignTapBounds(plots.get(i)).contains(x, y)) {
                 return i;
             }
         }

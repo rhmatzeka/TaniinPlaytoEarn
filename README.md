@@ -10,7 +10,7 @@ Taniin is a landscape Android farming game prototype with Web3 hooks for Sepolia
 - Separate seed shop and crop-selling house interactions.
 - Local game state persistence for coins, seeds, harvest inventory, land ownership, and planted crops when the app is closed and reopened.
 - Background music plus click/error/walking SFX from `res/raw`, with toggles in the hamburger menu's Audio tab.
-- Wallet button that stores a public wallet address, checks Sepolia RPC, reads ETH balance, and reads ERC-20 TANI balance when the deployed coin contract address is configured.
+- Wallet button that can auto-connect from a public `.env` wallet address, checks Sepolia RPC, reads ETH balance, and reads ERC-20 TANI balance when the deployed coin contract address is configured.
 - Pending Web3 action queue for buy land, buy seed, plant, harvest, and sell crop actions. If `TANIIN_GAME_API_URL` is configured, actions are posted to that backend signer endpoint.
 - Solidity contracts and Hardhat deploy scaffold in `contracts/`.
 
@@ -41,10 +41,11 @@ TANIIN_COIN_CONTRACT_ADDRESS=
 TANIIN_ITEMS_CONTRACT_ADDRESS=
 TANIIN_LAND_CONTRACT_ADDRESS=
 TANIIN_GAME_API_URL=
+TANIIN_DEFAULT_WALLET_ADDRESS=
 DEPLOYER_PRIVATE_KEY=replace_with_new_private_key_do_not_commit
 ```
 
-The Android build reads these values into `BuildConfig`. The default local `.env` uses the public Sepolia RPC and leaves contract/API values blank, so the app runs in local prototype mode until deployed addresses are added. Only public values should be shipped in the APK. Never put a real private key in Android source, Gradle config, screenshots, commits, or APK assets. If a private key has been pasted into chat or git, treat it as compromised and move funds/assets to a new wallet.
+The Android build reads the public values into `BuildConfig`. `TANIIN_DEFAULT_WALLET_ADDRESS` is optional and lets the debug app auto-connect without typing a wallet address. The default local `.env` uses the public Sepolia RPC and leaves contract/API values blank, so the app runs in local prototype mode until deployed addresses are added. Only public values should be shipped in the APK. Never put a real private key in Android source, Gradle config, screenshots, commits, or APK assets. If a private key has been pasted into chat or git, treat it as compromised and move funds/assets to a new wallet.
 
 ## Build And Run
 
@@ -71,7 +72,7 @@ cmd.exe /c gradlew.bat :app:assembleDebug --console=plain
 1. Deploy the contracts from `contracts/`.
 2. Put the deployed public addresses into the root `.env`.
 3. Rebuild the Android app so Gradle writes the addresses into `BuildConfig`.
-4. In the app, tap `CONNECT WALLET` and enter the public wallet address.
+4. Optionally set `TANIIN_DEFAULT_WALLET_ADDRESS` to a public Sepolia wallet address before building. The app will auto-connect that wallet and tapping the wallet button will sync balances.
 5. The shop coin display uses the ERC-20 TANI balance when `TANIIN_COIN_CONTRACT_ADDRESS` is set. Otherwise it falls back to local prototype coins saved on the device.
 6. Gameplay actions are queued locally. When `TANIIN_GAME_API_URL` is set, the app posts each action to `/game-actions` for a backend signer to process.
 
@@ -95,6 +96,15 @@ TANIIN_ITEMS_CONTRACT_ADDRESS=...
 ```
 
 Copy those public addresses into the root `.env`, then rebuild the Android app.
+
+Mint test TANI to the default public wallet when the deployer is the coin owner:
+
+```bash
+cd contracts
+npm run mint:tani
+```
+
+Set `TANIIN_MINT_AMOUNT=2500` in `.env` to override the default `1000` TANI amount.
 
 Current Sepolia deployment:
 

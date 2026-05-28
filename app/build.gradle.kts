@@ -36,6 +36,7 @@ android {
         buildConfigField("String", "TANIIN_ITEMS_CONTRACT_ADDRESS", escapedBuildConfig(envValue("TANIIN_ITEMS_CONTRACT_ADDRESS")))
         buildConfigField("String", "TANIIN_LAND_CONTRACT_ADDRESS", escapedBuildConfig(envValue("TANIIN_LAND_CONTRACT_ADDRESS")))
         buildConfigField("String", "TANIIN_GAME_API_URL", escapedBuildConfig(envValue("TANIIN_GAME_API_URL")))
+        buildConfigField("String", "TANIIN_DEFAULT_WALLET_ADDRESS", escapedBuildConfig(envValue("TANIIN_DEFAULT_WALLET_ADDRESS")))
     }
 
     buildFeatures {

@@ -35,6 +35,7 @@ final class BlockchainClient {
     private final String itemsContractAddress;
     private final String landContractAddress;
     private final String gameApiUrl;
+    private final String defaultWalletAddress;
 
     BlockchainClient() {
         rpcUrl = nonEmpty(BuildConfig.SEPOLIA_RPC_URL, DEFAULT_RPC_URL);
@@ -42,6 +43,7 @@ final class BlockchainClient {
         itemsContractAddress = cleanAddress(BuildConfig.TANIIN_ITEMS_CONTRACT_ADDRESS);
         landContractAddress = cleanAddress(BuildConfig.TANIIN_LAND_CONTRACT_ADDRESS);
         gameApiUrl = trimTrailingSlash(BuildConfig.TANIIN_GAME_API_URL);
+        defaultWalletAddress = cleanAddress(BuildConfig.TANIIN_DEFAULT_WALLET_ADDRESS);
     }
 
     boolean hasCoinContract() {
@@ -50,6 +52,10 @@ final class BlockchainClient {
 
     boolean hasGameApi() {
         return !gameApiUrl.isEmpty();
+    }
+
+    String defaultWalletAddress() {
+        return defaultWalletAddress;
     }
 
     String contractSummary() {
