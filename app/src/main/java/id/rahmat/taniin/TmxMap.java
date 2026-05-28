@@ -282,7 +282,7 @@ final class TmxMap {
             return;
         }
         if (isMapleTreeFootTile(gid) || isWoodTreeFootTile(gid)) {
-            addInsetRect(rects, left, top, size, 0.18f, 0.38f, 0.82f, 0.95f);
+            appendTreeFootCollision(rects, gid, left, top, size);
             return;
         }
         if (isLampTile(gid)) {
@@ -326,6 +326,29 @@ final class TmxMap {
             return;
         }
         addInsetRect(rects, left, top, size, 0.40f, 0.66f, 0.60f, 0.92f);
+    }
+
+    private static void appendTreeFootCollision(List<RectF> rects, int gid, float left, float top, int size) {
+        if (isOakTreeLeftOuterFootTile(gid) || isOakTreeRightOuterFootTile(gid)) {
+            return;
+        }
+        if (isOakTreeLeftTrunkFootTile(gid)) {
+            addInsetRect(rects, left, top, size, 0.50f, 0.52f, 1.00f, 0.95f);
+            return;
+        }
+        if (isOakTreeRightTrunkFootTile(gid)) {
+            addInsetRect(rects, left, top, size, 0.00f, 0.52f, 0.50f, 0.95f);
+            return;
+        }
+        if (isLeftTreeFootTile(gid)) {
+            addInsetRect(rects, left, top, size, 0.55f, 0.50f, 1.00f, 0.95f);
+            return;
+        }
+        if (isRightTreeFootTile(gid)) {
+            addInsetRect(rects, left, top, size, 0.00f, 0.50f, 0.45f, 0.95f);
+            return;
+        }
+        addInsetRect(rects, left, top, size, 0.34f, 0.50f, 0.66f, 0.95f);
     }
 
     private static void appendSmallObstacleCollision(List<RectF> rects, int gid, float left, float top, int size) {
@@ -376,6 +399,52 @@ final class TmxMap {
 
     private static boolean isMapleTreeFootTile(int gid) {
         return gid >= 363 && gid <= 368;
+    }
+
+    private static boolean isLeftTreeFootTile(int gid) {
+        switch (gid) {
+            case 363:
+            case 365:
+            case 367:
+            case 781:
+            case 783:
+            case 847:
+            case 849:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static boolean isRightTreeFootTile(int gid) {
+        switch (gid) {
+            case 364:
+            case 366:
+            case 368:
+            case 782:
+            case 784:
+            case 848:
+            case 850:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static boolean isOakTreeLeftOuterFootTile(int gid) {
+        return gid == 1427;
+    }
+
+    private static boolean isOakTreeLeftTrunkFootTile(int gid) {
+        return gid == 1428;
+    }
+
+    private static boolean isOakTreeRightTrunkFootTile(int gid) {
+        return gid == 1429;
+    }
+
+    private static boolean isOakTreeRightOuterFootTile(int gid) {
+        return gid == 1430;
     }
 
     private static boolean isMapleTreeTile(int gid) {
