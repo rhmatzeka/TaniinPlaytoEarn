@@ -96,7 +96,6 @@ final class FarmGameView extends CanvasGameView {
     private static final int MENU_TAB_SETTINGS = 1;
     private static final int MENU_TAB_ABOUT = 2;
     private static final int CHAIN_HISTORY_LIMIT = 8;
-    private static final int CHAIN_HISTORY_VISIBLE_ROWS = 3;
     private static final String PREF_CHAIN_HISTORY = "game_chain_history";
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -164,6 +163,7 @@ final class FarmGameView extends CanvasGameView {
     private boolean interactionDialogOpen;
     private boolean shopCatalogOpen;
     private boolean shopPurchaseConfirmOpen;
+    private boolean chainHistoryOpen;
     private boolean audioBgmEnabled = true;
     private boolean audioSfxEnabled = true;
     private int menuTab = MENU_TAB_INVENTORY;
@@ -1119,7 +1119,7 @@ final class FarmGameView extends CanvasGameView {
         drawJoystick(canvas);
         drawActionButton(canvas);
         drawWalletButton(canvas);
-        drawChainHistoryPanel(canvas);
+        drawChainHistoryButton(canvas);
         drawContextMessage(canvas, now);
         if (shopUntilMs > now) {
             drawShopPanel(canvas);
@@ -1138,6 +1138,9 @@ final class FarmGameView extends CanvasGameView {
         }
         if (shopPurchaseConfirmOpen) {
             drawShopPurchaseConfirm(canvas);
+        }
+        if (chainHistoryOpen) {
+            drawChainHistoryDialog(canvas);
         }
         drawStatusPopup(canvas, now);
     }
@@ -2135,65 +2138,134 @@ final class FarmGameView extends CanvasGameView {
         paint.setFakeBoldText(false);
     }
 
-    private void drawChainHistoryPanel(Canvas canvas) {
-        RectF panel = chainHistoryPanelBounds();
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.argb(88, 0, 0, 0));
-        canvas.drawRoundRect(panel.left + 5f, panel.top + 6f, panel.right + 5f, panel.bottom + 6f, 12, 12, paint);
-        paint.setColor(Color.argb(224, 25, 48, 42));
-        canvas.drawRoundRect(panel, 12, 12, paint);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(3f);
-        paint.setColor(Color.rgb(78, 148, 98));
-        canvas.drawRoundRect(panel, 12, 12, paint);
+    private void drawChainHistoryButton(Canvas canvas) {
+        RectF bounds = chainHistoryButtonBounds();
+        boolean hasHash = !chainHistory.isEmpty() && BlockchainClient.isValidTransactionHash(chainHistory.get(0).txHash);
 
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(172, 239, 180));
-        paint.setTextSize(17f);
+        paint.setColor(Color.argb(90, 0, 0, 0));
+        canvas.drawRoundRect(bounds.left + 5f, bounds.top + 6f, bounds.right + 5f, bounds.bottom + 6f, 14, 14, paint);
+        paint.setColor(Color.rgb(28, 69, 52));
+        canvas.drawRoundRect(bounds, 14, 14, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(4f);
+        paint.setColor(hasHash ? Color.rgb(105, 207, 123) : Color.rgb(92, 151, 105));
+        canvas.drawRoundRect(bounds, 14, 14, paint);
+
+        drawChainHistoryListIcon(canvas, bounds.centerX(), bounds.centerY(), hasHash);
+
+        paint.setColor(chainHistory.isEmpty() ? Color.rgb(76, 112, 84) : Color.rgb(255, 219, 95));
+        canvas.drawCircle(bounds.right - 8f, bounds.top + 9f, 15f, paint);
+        paint.setColor(Color.rgb(30, 42, 28));
+        paint.setTextSize(15f);
         paint.setFakeBoldText(true);
-        canvas.drawText("Riwayat transaksi", panel.left + 14f, panel.top + 27f, paint);
+        drawCenteredText(canvas, String.valueOf(chainHistory.size()), bounds.right - 8f, bounds.top + 14f);
         paint.setFakeBoldText(false);
+    }
+
+    private void drawChainHistoryDialog(Canvas canvas) {
+        canvas.drawColor(Color.argb(166, 0, 0, 0));
+
+        RectF panel = chainHistoryDialogBounds();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.argb(135, 0, 0, 0));
+        canvas.drawRoundRect(panel.left + 7f, panel.top + 9f, panel.right + 7f, panel.bottom + 9f, 18, 18, paint);
+        paint.setColor(Color.rgb(23, 45, 39));
+        canvas.drawRoundRect(panel, 18, 18, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(4f);
+        paint.setColor(Color.rgb(92, 178, 114));
+        canvas.drawRoundRect(panel, 18, 18, paint);
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(190, 248, 188));
+        paint.setTextSize(32f);
+        paint.setFakeBoldText(true);
+        canvas.drawText("Riwayat transaksi", panel.left + 34f, panel.top + 52f, paint);
+        paint.setFakeBoldText(false);
+        paint.setColor(Color.rgb(202, 223, 207));
+        String mode = blockchainClient.hasGameApi() ? "Signer backend aktif" : "Belum on-chain: signer backend kosong";
+        paint.setTextSize(fitTextSize(mode, 20f, panel.width() - 138f));
+        canvas.drawText(mode, panel.left + 34f, panel.top + 86f, paint);
+
+        drawChainHistoryCloseButton(canvas, chainHistoryDialogCloseBounds());
 
         if (chainHistory.isEmpty()) {
-            paint.setColor(Color.rgb(202, 221, 207));
-            String emptyText = "Belum ada transaksi.";
-            paint.setTextSize(fitTextSize(emptyText, 15f, panel.width() - 28f));
-            canvas.drawText(emptyText, panel.left + 14f, panel.top + 56f, paint);
+            RectF empty = new RectF(panel.left + 30f, panel.top + 120f, panel.right - 30f, panel.bottom - 30f);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.rgb(34, 61, 51));
+            canvas.drawRoundRect(empty, 12, 12, paint);
+            paint.setColor(Color.rgb(211, 228, 211));
+            paint.setTextSize(fitTextSize("Belum ada transaksi.", 22f, empty.width() - 40f));
+            drawCenteredText(canvas, "Belum ada transaksi.", empty.centerX(), empty.centerY() + 7f);
             return;
         }
 
-        int rows = visibleChainHistoryRows();
+        int rows = visibleChainHistoryDialogRows();
         for (int i = 0; i < rows; i++) {
-            drawChainHistoryRow(canvas, chainHistoryRowBounds(i), chainHistory.get(i));
+            drawChainHistoryRow(canvas, chainHistoryDialogRowBounds(i), chainHistory.get(i));
         }
+
+        if (chainHistory.size() > rows) {
+            String more = "+" + (chainHistory.size() - rows) + " riwayat lain";
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.rgb(197, 218, 201));
+            paint.setTextSize(18f);
+            drawCenteredText(canvas, more, panel.centerX(), panel.bottom - 22f);
+        }
+    }
+
+    private void drawChainHistoryCloseButton(Canvas canvas, RectF close) {
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(43, 78, 61));
+        canvas.drawRoundRect(close, 12, 12, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(5f);
+        paint.setColor(Color.rgb(213, 248, 211));
+        canvas.drawLine(close.left + 17f, close.top + 17f, close.right - 17f, close.bottom - 17f, paint);
+        canvas.drawLine(close.right - 17f, close.top + 17f, close.left + 17f, close.bottom - 17f, paint);
+        paint.setStyle(Paint.Style.FILL);
+    }
+
+    private void drawChainHistoryListIcon(Canvas canvas, float cx, float cy, boolean hasHash) {
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(hasHash ? Color.rgb(107, 224, 130) : Color.rgb(255, 219, 95));
+        canvas.drawCircle(cx, cy, 22f, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(5f);
+        paint.setColor(Color.rgb(31, 49, 36));
+        canvas.drawLine(cx - 9f, cy - 8f, cx + 10f, cy - 8f, paint);
+        canvas.drawLine(cx - 9f, cy, cx + 10f, cy, paint);
+        canvas.drawLine(cx - 9f, cy + 8f, cx + 10f, cy + 8f, paint);
+        paint.setStyle(Paint.Style.FILL);
     }
 
     private void drawChainHistoryRow(Canvas canvas, RectF row, ChainHistoryEntry entry) {
         boolean hasHash = BlockchainClient.isValidTransactionHash(entry.txHash);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(hasHash ? Color.rgb(33, 78, 58) : Color.rgb(44, 63, 53));
-        canvas.drawRoundRect(row, 8, 8, paint);
+        canvas.drawRoundRect(row, 10, 10, paint);
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(2f);
+        paint.setStrokeWidth(3f);
         paint.setColor(hasHash ? Color.rgb(102, 207, 123) : Color.rgb(83, 116, 92));
-        canvas.drawRoundRect(row, 8, 8, paint);
+        canvas.drawRoundRect(row, 10, 10, paint);
 
-        drawChainHistoryStateDot(canvas, row.left + 18f, row.top + 18f, hasHash, entry.status);
+        drawChainHistoryStateDot(canvas, row.left + 24f, row.top + 25f, hasHash, entry.status);
 
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(241, 252, 232));
         paint.setFakeBoldText(true);
-        paint.setTextSize(fitTextSize(entry.label, 14f, row.width() - 108f));
-        canvas.drawText(entry.label, row.left + 36f, row.top + 16f, paint);
+        paint.setTextSize(fitTextSize(entry.label, 21f, row.width() - 134f));
+        canvas.drawText(entry.label, row.left + 50f, row.top + 27f, paint);
 
         paint.setFakeBoldText(false);
         paint.setColor(hasHash ? Color.rgb(181, 248, 188) : Color.rgb(203, 219, 207));
         String status = hasHash ? BlockchainClient.shortTransactionHash(entry.txHash) : entry.status;
-        paint.setTextSize(fitTextSize(status, 12f, row.width() - 70f));
-        canvas.drawText(status, row.left + 36f, row.top + 33f, paint);
+        paint.setTextSize(fitTextSize(status, 16f, row.width() - 110f));
+        canvas.drawText(status, row.left + 50f, row.top + 54f, paint);
 
         if (hasHash) {
-            drawExternalLinkIcon(canvas, row.right - 25f, row.centerY());
+            drawExternalLinkIcon(canvas, row.right - 32f, row.centerY());
         }
     }
 
@@ -2201,33 +2273,56 @@ final class FarmGameView extends CanvasGameView {
         paint.setStyle(Paint.Style.FILL);
         if (hasHash) {
             paint.setColor(Color.rgb(105, 224, 129));
-        } else if (status != null && status.toLowerCase(Locale.US).contains("pending")) {
+        } else if (status != null && status.toLowerCase(Locale.US).contains("gagal")) {
+            paint.setColor(Color.rgb(232, 105, 88));
+        } else if (status != null && status.toLowerCase(Locale.US).contains("mengirim")) {
             paint.setColor(Color.rgb(255, 216, 89));
+        } else if (status != null && status.toLowerCase(Locale.US).contains("belum")) {
+            paint.setColor(Color.rgb(245, 166, 72));
         } else {
             paint.setColor(Color.rgb(157, 184, 165));
         }
         canvas.drawCircle(cx, cy, 6f, paint);
     }
 
-    private RectF chainHistoryPanelBounds() {
+    private RectF chainHistoryButtonBounds() {
         RectF wallet = walletButtonBounds();
         float top = wallet.bottom + 8f;
-        int rows = visibleChainHistoryRows();
-        float height = chainHistory.isEmpty() ? 76f : 44f + rows * 40f;
-        float maxBottom = Math.max(top + 76f, getHeight() - 122f);
-        height = Math.min(height, maxBottom - top);
-        return new RectF(wallet.left, top, wallet.right, top + height);
+        float size = 66f;
+        return new RectF(wallet.right - size, top, wallet.right, top + size);
     }
 
-    private RectF chainHistoryRowBounds(int rowIndex) {
-        RectF panel = chainHistoryPanelBounds();
-        float left = panel.left + 12f;
-        float top = panel.top + 38f + rowIndex * 40f;
-        return new RectF(left, top, panel.right - 12f, top + 34f);
+    private RectF chainHistoryDialogBounds() {
+        int desiredRows = Math.min(CHAIN_HISTORY_LIMIT, chainHistory.size());
+        float desiredWidth = clamp(getWidth() * 0.78f, 740f, 1060f);
+        float width = Math.min(getWidth() - 40f, desiredWidth);
+        float desiredHeight = chainHistory.isEmpty() ? 286f : 158f + desiredRows * 78f;
+        float maxHeight = Math.max(220f, getHeight() - 54f);
+        float height = Math.min(desiredHeight, maxHeight);
+        float left = (getWidth() - width) * 0.5f;
+        float top = (getHeight() - height) * 0.5f;
+        return new RectF(left, top, left + width, top + height);
     }
 
-    private int visibleChainHistoryRows() {
-        return Math.min(CHAIN_HISTORY_VISIBLE_ROWS, chainHistory.size());
+    private RectF chainHistoryDialogCloseBounds() {
+        RectF panel = chainHistoryDialogBounds();
+        return new RectF(panel.right - 82f, panel.top + 24f, panel.right - 30f, panel.top + 76f);
+    }
+
+    private RectF chainHistoryDialogRowBounds(int rowIndex) {
+        RectF panel = chainHistoryDialogBounds();
+        float left = panel.left + 30f;
+        float top = panel.top + 112f + rowIndex * 78f;
+        return new RectF(left, top, panel.right - 30f, top + 66f);
+    }
+
+    private int visibleChainHistoryDialogRows() {
+        if (chainHistory.isEmpty()) {
+            return 0;
+        }
+        RectF panel = chainHistoryDialogBounds();
+        int rowsByHeight = Math.max(1, (int) ((panel.height() - 136f) / 78f));
+        return Math.min(Math.min(CHAIN_HISTORY_LIMIT, chainHistory.size()), rowsByHeight);
     }
 
     private String walletSubtitle() {
@@ -2399,7 +2494,7 @@ final class FarmGameView extends CanvasGameView {
             return "Mode on-chain: saldo TANI dibaca dari contract, aksi dikirim ke signer.";
         }
         if (blockchainClient.hasCoinContract()) {
-            return "Saldo TANI on-chain aktif; aksi transaksi masih pending lokal.";
+            return "Saldo TANI on-chain aktif; transaksi gameplay butuh signer backend.";
         }
         if (blockchainClient.hasGameApi()) {
             return "Signer backend aktif; contract TANI belum diset.";
@@ -2793,6 +2888,9 @@ final class FarmGameView extends CanvasGameView {
         if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
             float x = event.getX(index);
             float y = event.getY(index);
+            if (chainHistoryOpen) {
+                return handleChainHistoryDialogTouch(x, y);
+            }
             if (shopPurchaseConfirmOpen) {
                 return handleShopPurchaseConfirmTouch(x, y);
             }
@@ -2849,7 +2947,7 @@ final class FarmGameView extends CanvasGameView {
             } else if (isInsideWallet(x, y)) {
                 playClickSound();
                 performWallet();
-            } else if (handleChainHistoryTouch(x, y)) {
+            } else if (handleChainHistoryButtonTouch(x, y)) {
                 return true;
             }
             return true;
@@ -2882,6 +2980,14 @@ final class FarmGameView extends CanvasGameView {
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (chainHistoryOpen) {
+            if (isBackKey(keyCode)) {
+                playClickSound();
+                chainHistoryOpen = false;
+                invalidate();
+            }
+            return true;
+        }
         return handleHardwareKey(keyCode) || super.onKeyDown(keyCode, event);
     }
 
@@ -3120,25 +3226,51 @@ final class FarmGameView extends CanvasGameView {
         }
     }
 
-    private boolean handleChainHistoryTouch(float x, float y) {
-        if (!chainHistoryPanelBounds().contains(x, y)) {
+    private boolean handleChainHistoryButtonTouch(float x, float y) {
+        if (!chainHistoryButtonBounds().contains(x, y)) {
             return false;
         }
         playClickSound();
-        int rows = visibleChainHistoryRows();
+        openChainHistoryDialog();
+        return true;
+    }
+
+    private void openChainHistoryDialog() {
+        chainHistoryOpen = true;
+        menuOpen = false;
+        interactionDialogOpen = false;
+        shopCatalogOpen = false;
+        shopPurchaseConfirmOpen = false;
+        shopUntilMs = 0L;
+        invalidate();
+    }
+
+    private boolean handleChainHistoryDialogTouch(float x, float y) {
+        RectF panel = chainHistoryDialogBounds();
+        if (chainHistoryDialogCloseBounds().contains(x, y) || !panel.contains(x, y)) {
+            playClickSound();
+            chainHistoryOpen = false;
+            invalidate();
+            return true;
+        }
+
+        playClickSound();
+        int rows = visibleChainHistoryDialogRows();
         for (int i = 0; i < rows; i++) {
-            if (chainHistoryRowBounds(i).contains(x, y)) {
+            if (chainHistoryDialogRowBounds(i).contains(x, y)) {
                 openEtherscanTransaction(chainHistory.get(i));
                 return true;
             }
         }
-        showMessage(chainHistory.isEmpty() ? "Belum ada transaksi." : "Pilih baris transaksi.");
+        showMessage(chainHistory.isEmpty() ? "Belum ada transaksi." : "Pilih transaksi yang sudah punya hash.");
         return true;
     }
 
     private void openEtherscanTransaction(ChainHistoryEntry entry) {
         if (!BlockchainClient.isValidTransactionHash(entry.txHash)) {
-            showMessage("Transaksi ini belum punya hash Etherscan.");
+            chainHistoryOpen = false;
+            showMessage(missingTransactionHashMessage());
+            invalidate();
             return;
         }
         Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://sepolia.etherscan.io/tx/" + entry.txHash));
@@ -3147,10 +3279,19 @@ final class FarmGameView extends CanvasGameView {
         }
         try {
             getContext().startActivity(intent);
+            chainHistoryOpen = false;
             showMessage("Membuka Etherscan " + BlockchainClient.shortTransactionHash(entry.txHash));
         } catch (RuntimeException e) {
             showErrorMessage("Tidak bisa membuka Etherscan di perangkat ini.");
         }
+        invalidate();
+    }
+
+    private String missingTransactionHashMessage() {
+        if (!blockchainClient.hasGameApi()) {
+            return "Belum on-chain: signer backend belum diset.";
+        }
+        return "Transaksi ini belum punya hash Etherscan.";
     }
 
     private boolean handleInteractionDialogTouch(float x, float y) {
@@ -3938,40 +4079,50 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void queueChainAction(ChainAction action) {
-        pendingChainActions.add(action);
         ChainHistoryEntry historyEntry = addChainHistory(action, initialChainHistoryStatus());
         chainPanelUntilMs = System.currentTimeMillis() + 2200L;
         if (!walletAddress.isEmpty() && blockchainClient.hasGameApi()) {
+            pendingChainActions.add(action);
             blockchainClient.submitGameAction(walletAddress, action, result -> {
                 chainStatus = result.message;
+                pendingChainActions.remove(action);
                 if (result.success) {
-                    pendingChainActions.remove(action);
                     String status = BlockchainClient.isValidTransactionHash(result.txHash) ? "on-chain" : "dikirim";
                     updateChainHistory(historyEntry, status, result.txHash);
                 } else {
-                    updateChainHistory(historyEntry, "pending lokal", "");
+                    updateChainHistory(historyEntry, "gagal kirim", "");
                 }
                 chainPanelUntilMs = System.currentTimeMillis() + 3600L;
                 invalidate();
             });
-        } else if (blockchainClient.hasCoinContract() || blockchainClient.hasGameApi()) {
-            chainStatus = walletAddress.isEmpty()
-                    ? "Wallet belum connect; aksi chain masih pending lokal."
-                    : "Signer backend belum diset; aksi chain masih pending lokal.";
+        } else {
+            chainStatus = localChainStatus(action);
+            chainPanelUntilMs = System.currentTimeMillis() + 3600L;
+            invalidate();
         }
     }
 
     private String initialChainHistoryStatus() {
         if (walletAddress.isEmpty()) {
-            return "pending wallet";
+            return "butuh wallet";
         }
         if (blockchainClient.hasGameApi()) {
             return "mengirim";
         }
         if (blockchainClient.hasCoinContract()) {
-            return "pending signer";
+            return "belum on-chain";
         }
         return "lokal";
+    }
+
+    private String localChainStatus(ChainAction action) {
+        if (walletAddress.isEmpty()) {
+            return "Wallet belum connect; " + action.label() + " belum dikirim ke chain.";
+        }
+        if (!blockchainClient.hasGameApi()) {
+            return "Signer backend belum diset; " + action.label() + " baru tersimpan lokal.";
+        }
+        return action.label() + " tersimpan lokal.";
     }
 
     private ChainHistoryEntry addChainHistory(ChainAction action, String status) {
@@ -3983,7 +4134,7 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void updateChainHistory(ChainHistoryEntry entry, String status, String txHash) {
-        entry.status = status;
+        entry.status = ChainHistoryEntry.normalizeStatus(status);
         if (BlockchainClient.isValidTransactionHash(txHash)) {
             entry.txHash = txHash.trim();
         }
@@ -4046,6 +4197,7 @@ final class FarmGameView extends CanvasGameView {
                 }
             }
             trimChainHistory();
+            saveChainHistory();
         } catch (JSONException exception) {
             chainHistory.clear();
             preferences.edit().remove(PREF_CHAIN_HISTORY).apply();
@@ -4548,8 +4700,20 @@ final class ChainHistoryEntry {
         this.label = label == null ? "Transaksi" : label;
         this.type = type == null ? "" : type;
         this.createdAtMs = createdAtMs;
-        this.status = status == null ? "" : status;
+        this.status = normalizeStatus(status);
         this.txHash = txHash == null ? "" : txHash;
+    }
+
+    static String normalizeStatus(String status) {
+        String cleaned = status == null ? "" : status.trim();
+        String lower = cleaned.toLowerCase(Locale.US);
+        if ("pending signer".equals(lower) || "pending lokal".equals(lower)) {
+            return "belum on-chain";
+        }
+        if ("pending wallet".equals(lower)) {
+            return "butuh wallet";
+        }
+        return cleaned;
     }
 
     JSONObject toJson() throws JSONException {

@@ -118,9 +118,9 @@ final class BlockchainClient {
             Result result;
             try {
                 if (!hasGameApi()) {
-                    result = Result.error("TANIIN_GAME_API_URL belum diset; aksi disimpan sebagai pending lokal.");
+                    result = Result.error("TANIIN_GAME_API_URL belum diset; aksi belum dikirim on-chain.");
                 } else if (!isValidAddress(walletAddress)) {
-                    result = Result.error("Wallet belum valid; aksi disimpan sebagai pending lokal.");
+                    result = Result.error("Wallet belum valid; aksi belum dikirim on-chain.");
                 } else {
                     JSONObject body = new JSONObject();
                     body.put("wallet", walletAddress);
@@ -131,7 +131,7 @@ final class BlockchainClient {
                     String response = postJson(gameApiUrl + "/game-actions", body.toString());
                     String txHash = extractTransactionHash(response);
                     result = txHash.isEmpty()
-                            ? Result.ok("Aksi dikirim ke signer backend.")
+                            ? Result.ok("Aksi dikirim, tapi backend belum mengembalikan txHash.")
                             : Result.ok("Transaksi dikirim ke Sepolia: " + shortTransactionHash(txHash) + ".", txHash);
                 }
             } catch (IOException | JSONException exception) {
