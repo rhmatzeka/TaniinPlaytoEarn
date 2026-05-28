@@ -630,6 +630,7 @@ final class FarmGameView extends CanvasGameView {
         }
         drawFieldEdgeNatureDecorations(canvas, now);
         drawShopPenNatureDecorations(canvas);
+        drawWestMeadowDecorations(canvas);
         drawOpenMeadowDecorations(canvas, now);
         drawRoadsideDecorations(canvas, now);
         drawVillageNpcDecorations(canvas, now);
@@ -732,6 +733,55 @@ final class FarmGameView extends CanvasGameView {
         drawOutdoorTile(canvas, 2, 10, 24.16f * TILE, 21.36f * TILE, TILE * 0.46f);
     }
 
+    private void drawWestMeadowDecorations(Canvas canvas) {
+        drawOutdoorTile(canvas, 0, 1, 7.86f * TILE, 17.08f * TILE, TILE * 0.52f);
+        drawOutdoorTile(canvas, 2, 0, 9.36f * TILE, 17.72f * TILE, TILE * 0.44f);
+        drawOutdoorTile(canvas, 5, 1, 10.82f * TILE, 18.70f * TILE, TILE * 0.58f);
+        drawOutdoorTile(canvas, 6, 1, 11.36f * TILE, 18.84f * TILE, TILE * 0.52f);
+        drawOutdoorTile(canvas, 0, 2, 12.92f * TILE, 17.92f * TILE, TILE * 0.62f);
+        drawOutdoorTile(canvas, 2, 3, 13.72f * TILE, 18.36f * TILE, TILE * 0.54f);
+        drawOutdoorTile(canvas, 4, 8, 8.72f * TILE, 20.12f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 5, 8, 9.20f * TILE, 20.04f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 3, 5, 10.92f * TILE, 20.86f * TILE, TILE * 0.74f);
+        drawOutdoorTile(canvas, 0, 3, 12.80f * TILE, 20.66f * TILE, TILE * 0.68f);
+        drawOutdoorTile(canvas, 1, 3, 14.06f * TILE, 21.20f * TILE, TILE * 0.52f);
+        drawOutdoorTile(canvas, 0, 10, 15.42f * TILE, 20.30f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 1, 10, 15.92f * TILE, 20.22f * TILE, TILE * 0.48f);
+
+        drawOutdoorTile(canvas, 0, 1, 6.96f * TILE, 26.08f * TILE, TILE * 0.52f);
+        drawOutdoorTile(canvas, 1, 1, 7.58f * TILE, 26.36f * TILE, TILE * 0.44f);
+        drawOutdoorTile(canvas, 0, 2, 8.88f * TILE, 25.82f * TILE, TILE * 0.68f);
+        drawOutdoorTile(canvas, 2, 3, 9.72f * TILE, 26.22f * TILE, TILE * 0.54f);
+        drawOutdoorTile(canvas, 2, 0, 11.54f * TILE, 25.46f * TILE, TILE * 0.44f);
+        drawOutdoorTile(canvas, 5, 1, 12.92f * TILE, 26.26f * TILE, TILE * 0.58f);
+        drawOutdoorTile(canvas, 6, 1, 13.46f * TILE, 26.42f * TILE, TILE * 0.52f);
+        drawOutdoorTile(canvas, 3, 5, 15.08f * TILE, 25.62f * TILE, TILE * 0.74f);
+        drawOutdoorTile(canvas, 4, 8, 16.44f * TILE, 38.20f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 5, 8, 16.92f * TILE, 38.12f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 0, 9, 18.02f * TILE, 38.80f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 1, 9, 18.50f * TILE, 38.72f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 2, 1, 19.82f * TILE, 39.20f * TILE, TILE * 0.54f);
+        drawOutdoorTile(canvas, 0, 11, 21.06f * TILE, 38.18f * TILE, TILE * 0.48f);
+
+        drawOutdoorTile(canvas, 2, 1, 6.76f * TILE, 34.72f * TILE, TILE * 0.54f);
+        drawOutdoorTile(canvas, 0, 2, 8.16f * TILE, 35.10f * TILE, TILE * 0.66f);
+        drawOutdoorTile(canvas, 1, 2, 9.02f * TILE, 35.34f * TILE, TILE * 0.52f);
+        drawOutdoorTile(canvas, 4, 5, 10.52f * TILE, 34.82f * TILE, TILE * 0.76f);
+        drawOutdoorTile(canvas, 2, 3, 12.18f * TILE, 35.20f * TILE, TILE * 0.54f);
+        drawOutdoorTile(canvas, 2, 0, 14.94f * TILE, 34.74f * TILE, TILE * 0.44f);
+        drawOutdoorTile(canvas, 6, 5, 15.78f * TILE, 35.14f * TILE, TILE * 0.76f);
+        drawOutdoorTile(canvas, 0, 1, 17.92f * TILE, 38.04f * TILE, TILE * 0.52f);
+        drawOutdoorTile(canvas, 1, 1, 18.60f * TILE, 38.26f * TILE, TILE * 0.46f);
+        drawOutdoorTile(canvas, 0, 9, 20.02f * TILE, 38.52f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 1, 9, 20.52f * TILE, 38.44f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 5, 1, 22.58f * TILE, 38.24f * TILE, TILE * 0.58f);
+        drawOutdoorTile(canvas, 6, 1, 23.12f * TILE, 38.40f * TILE, TILE * 0.52f);
+        drawOutdoorTile(canvas, 5, 8, 8.94f * TILE, 38.60f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 6, 8, 9.42f * TILE, 38.72f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 0, 11, 11.70f * TILE, 39.00f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 2, 10, 16.94f * TILE, 39.06f * TILE, TILE * 0.46f);
+    }
+
     private void drawOpenMeadowDecorations(Canvas canvas, long now) {
         int chickenFrame = (int) ((now / 430L) % 4L);
         int babyFrame = (int) ((now / 510L) % 4L);
@@ -800,12 +850,12 @@ final class FarmGameView extends CanvasGameView {
         drawOutdoorTile(canvas, 5, 1, 33.08f * TILE, 22.72f * TILE, TILE * 0.56f);
         drawOutdoorTile(canvas, 6, 1, 33.44f * TILE, 23.06f * TILE, TILE * 0.46f);
 
-        drawOutdoorTile(canvas, 0, 10, 29.22f * TILE, 32.70f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 1, 10, 29.68f * TILE, 32.66f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 4, 8, 32.72f * TILE, 33.18f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 5, 8, 33.16f * TILE, 33.12f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 3, 5, 35.54f * TILE, 32.72f * TILE, TILE * 0.80f);
-        drawOutdoorTile(canvas, 6, 5, 36.50f * TILE, 32.98f * TILE, TILE * 0.78f);
+        drawOutdoorTile(canvas, 0, 10, 29.22f * TILE, 38.30f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 1, 10, 29.68f * TILE, 38.24f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 4, 8, 32.72f * TILE, 38.64f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 5, 8, 33.16f * TILE, 38.58f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 3, 5, 35.54f * TILE, 38.50f * TILE, TILE * 0.80f);
+        drawOutdoorTile(canvas, 6, 5, 36.50f * TILE, 38.76f * TILE, TILE * 0.78f);
 
         drawSpriteWithShadowWorld(canvas, cow, cowFrame, 32, 32, 4,
                 31.18f * TILE + drift, 29.22f * TILE, TILE * 1.02f, TILE * 1.02f);
@@ -2202,11 +2252,11 @@ final class FarmGameView extends CanvasGameView {
         drawChainHistoryListIcon(canvas, bounds.centerX(), bounds.centerY(), hasHash);
 
         paint.setColor(chainHistory.isEmpty() ? Color.rgb(76, 112, 84) : Color.rgb(255, 219, 95));
-        canvas.drawCircle(bounds.right - 8f, bounds.top + 9f, 15f, paint);
+        canvas.drawCircle(bounds.right - 10f, bounds.top + 12f, 17f, paint);
         paint.setColor(Color.rgb(30, 42, 28));
-        paint.setTextSize(15f);
+        paint.setTextSize(16f);
         paint.setFakeBoldText(true);
-        drawCenteredText(canvas, String.valueOf(chainHistory.size()), bounds.right - 8f, bounds.top + 14f);
+        drawCenteredText(canvas, String.valueOf(chainHistory.size()), bounds.right - 10f, bounds.top + 18f);
         paint.setFakeBoldText(false);
     }
 
@@ -2232,9 +2282,15 @@ final class FarmGameView extends CanvasGameView {
         paint.setFakeBoldText(false);
         paint.setColor(Color.rgb(202, 223, 207));
         String mode = blockchainClient.hasGameApi() ? "Signer backend aktif" : "Belum on-chain: signer backend kosong";
-        paint.setTextSize(fitTextSize(mode, 20f, panel.width() - 138f));
+        float modeMaxWidth = chainHistory.isEmpty()
+                ? panel.width() - 138f
+                : chainHistoryDialogClearAllBounds().left - panel.left - 46f;
+        paint.setTextSize(fitTextSize(mode, 20f, Math.max(160f, modeMaxWidth)));
         canvas.drawText(mode, panel.left + 34f, panel.top + 86f, paint);
 
+        if (!chainHistory.isEmpty()) {
+            drawChainHistoryClearAllButton(canvas, chainHistoryDialogClearAllBounds());
+        }
         drawChainHistoryCloseButton(canvas, chainHistoryDialogCloseBounds());
 
         if (chainHistory.isEmpty()) {
@@ -2274,21 +2330,44 @@ final class FarmGameView extends CanvasGameView {
         paint.setStyle(Paint.Style.FILL);
     }
 
+    private void drawChainHistoryClearAllButton(Canvas canvas, RectF bounds) {
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.argb(72, 0, 0, 0));
+        canvas.drawRoundRect(bounds.left + 3f, bounds.top + 4f, bounds.right + 3f, bounds.bottom + 4f, 11, 11, paint);
+        paint.setColor(Color.rgb(105, 50, 42));
+        canvas.drawRoundRect(bounds, 11, 11, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(3f);
+        paint.setColor(Color.rgb(229, 143, 117));
+        canvas.drawRoundRect(bounds, 11, 11, paint);
+
+        drawChainHistoryTrashIcon(canvas, bounds.left + 28f, bounds.centerY(), 0.82f, Color.rgb(255, 225, 200));
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(255, 238, 218));
+        paint.setTextSize(fitTextSize("Hapus all", 18f, bounds.width() - 58f));
+        paint.setFakeBoldText(true);
+        canvas.drawText("Hapus all", bounds.left + 52f, bounds.centerY() + 7f, paint);
+        paint.setFakeBoldText(false);
+    }
+
     private void drawChainHistoryListIcon(Canvas canvas, float cx, float cy, boolean hasHash) {
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(hasHash ? Color.rgb(107, 224, 130) : Color.rgb(255, 219, 95));
-        canvas.drawCircle(cx, cy, 22f, paint);
+        canvas.drawCircle(cx, cy, 27f, paint);
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(5f);
+        paint.setStrokeWidth(6f);
         paint.setColor(Color.rgb(31, 49, 36));
-        canvas.drawLine(cx - 9f, cy - 8f, cx + 10f, cy - 8f, paint);
-        canvas.drawLine(cx - 9f, cy, cx + 10f, cy, paint);
-        canvas.drawLine(cx - 9f, cy + 8f, cx + 10f, cy + 8f, paint);
+        canvas.drawLine(cx - 11f, cy - 10f, cx + 12f, cy - 10f, paint);
+        canvas.drawLine(cx - 11f, cy, cx + 12f, cy, paint);
+        canvas.drawLine(cx - 11f, cy + 10f, cx + 12f, cy + 10f, paint);
         paint.setStyle(Paint.Style.FILL);
     }
 
     private void drawChainHistoryRow(Canvas canvas, RectF row, ChainHistoryEntry entry) {
         boolean hasHash = BlockchainClient.isValidTransactionHash(entry.txHash);
+        RectF delete = chainHistoryRowDeleteBounds(row);
+        float textRight = hasHash ? delete.left - 52f : delete.left - 14f;
+        float textWidth = Math.max(120f, textRight - (row.left + 50f));
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(hasHash ? Color.rgb(33, 78, 58) : Color.rgb(44, 63, 53));
         canvas.drawRoundRect(row, 10, 10, paint);
@@ -2302,18 +2381,48 @@ final class FarmGameView extends CanvasGameView {
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(241, 252, 232));
         paint.setFakeBoldText(true);
-        paint.setTextSize(fitTextSize(entry.label, 21f, row.width() - 134f));
+        paint.setTextSize(fitTextSize(entry.label, 21f, textWidth));
         canvas.drawText(entry.label, row.left + 50f, row.top + 27f, paint);
 
         paint.setFakeBoldText(false);
         paint.setColor(hasHash ? Color.rgb(181, 248, 188) : Color.rgb(203, 219, 207));
         String status = hasHash ? BlockchainClient.shortTransactionHash(entry.txHash) : entry.status;
-        paint.setTextSize(fitTextSize(status, 16f, row.width() - 110f));
+        paint.setTextSize(fitTextSize(status, 16f, textWidth));
         canvas.drawText(status, row.left + 50f, row.top + 54f, paint);
 
         if (hasHash) {
-            drawExternalLinkIcon(canvas, row.right - 32f, row.centerY());
+            drawExternalLinkIcon(canvas, delete.left - 28f, row.centerY());
         }
+        drawChainHistoryDeleteButton(canvas, delete);
+    }
+
+    private void drawChainHistoryDeleteButton(Canvas canvas, RectF bounds) {
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(92, 46, 40));
+        canvas.drawRoundRect(bounds, 9, 9, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(2.5f);
+        paint.setColor(Color.rgb(218, 119, 101));
+        canvas.drawRoundRect(bounds, 9, 9, paint);
+        drawChainHistoryTrashIcon(canvas, bounds.centerX(), bounds.centerY(), 0.76f, Color.rgb(255, 225, 207));
+    }
+
+    private void drawChainHistoryTrashIcon(Canvas canvas, float cx, float cy, float scale, int color) {
+        float w = 22f * scale;
+        float h = 22f * scale;
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(3.2f * scale);
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setStrokeJoin(Paint.Join.ROUND);
+        paint.setColor(color);
+        canvas.drawLine(cx - w * 0.50f, cy - h * 0.38f, cx + w * 0.50f, cy - h * 0.38f, paint);
+        canvas.drawLine(cx - w * 0.16f, cy - h * 0.56f, cx + w * 0.16f, cy - h * 0.56f, paint);
+        canvas.drawRoundRect(cx - w * 0.36f, cy - h * 0.26f, cx + w * 0.36f, cy + h * 0.50f, 2.5f, 2.5f, paint);
+        canvas.drawLine(cx - w * 0.12f, cy - h * 0.10f, cx - w * 0.12f, cy + h * 0.30f, paint);
+        canvas.drawLine(cx + w * 0.12f, cy - h * 0.10f, cx + w * 0.12f, cy + h * 0.30f, paint);
+        paint.setStrokeCap(Paint.Cap.BUTT);
+        paint.setStrokeJoin(Paint.Join.MITER);
+        paint.setStyle(Paint.Style.FILL);
     }
 
     private void drawChainHistoryStateDot(Canvas canvas, float cx, float cy, boolean hasHash, String status) {
@@ -2335,7 +2444,7 @@ final class FarmGameView extends CanvasGameView {
     private RectF chainHistoryButtonBounds() {
         RectF wallet = walletButtonBounds();
         float top = wallet.bottom + 8f;
-        float size = 66f;
+        float size = 86f;
         return new RectF(wallet.right - size, top, wallet.right, top + size);
     }
 
@@ -2343,7 +2452,7 @@ final class FarmGameView extends CanvasGameView {
         int desiredRows = Math.min(CHAIN_HISTORY_LIMIT, chainHistory.size());
         float desiredWidth = clamp(getWidth() * 0.78f, 740f, 1060f);
         float width = Math.min(getWidth() - 40f, desiredWidth);
-        float desiredHeight = chainHistory.isEmpty() ? 286f : 158f + desiredRows * 78f;
+        float desiredHeight = chainHistory.isEmpty() ? 304f : 180f + desiredRows * 78f;
         float maxHeight = Math.max(220f, getHeight() - 54f);
         float height = Math.min(desiredHeight, maxHeight);
         float left = (getWidth() - width) * 0.5f;
@@ -2356,11 +2465,28 @@ final class FarmGameView extends CanvasGameView {
         return new RectF(panel.right - 82f, panel.top + 24f, panel.right - 30f, panel.top + 76f);
     }
 
+    private RectF chainHistoryDialogClearAllBounds() {
+        RectF panel = chainHistoryDialogBounds();
+        float width = Math.min(158f, Math.max(122f, panel.width() * 0.23f));
+        return new RectF(panel.right - width - 98f, panel.top + 27f, panel.right - 98f, panel.top + 73f);
+    }
+
     private RectF chainHistoryDialogRowBounds(int rowIndex) {
         RectF panel = chainHistoryDialogBounds();
         float left = panel.left + 30f;
-        float top = panel.top + 112f + rowIndex * 78f;
+        float top = panel.top + 132f + rowIndex * 78f;
         return new RectF(left, top, panel.right - 30f, top + 66f);
+    }
+
+    private RectF chainHistoryRowDeleteBounds(int rowIndex) {
+        return chainHistoryRowDeleteBounds(chainHistoryDialogRowBounds(rowIndex));
+    }
+
+    private RectF chainHistoryRowDeleteBounds(RectF row) {
+        float size = 44f;
+        float left = row.right - size - 12f;
+        float top = row.centerY() - size * 0.5f;
+        return new RectF(left, top, left + size, top + size);
     }
 
     private int visibleChainHistoryDialogRows() {
@@ -2368,7 +2494,7 @@ final class FarmGameView extends CanvasGameView {
             return 0;
         }
         RectF panel = chainHistoryDialogBounds();
-        int rowsByHeight = Math.max(1, (int) ((panel.height() - 136f) / 78f));
+        int rowsByHeight = Math.max(1, (int) ((panel.height() - 154f) / 78f));
         return Math.min(Math.min(CHAIN_HISTORY_LIMIT, chainHistory.size()), rowsByHeight);
     }
 
@@ -3301,21 +3427,48 @@ final class FarmGameView extends CanvasGameView {
             return true;
         }
 
-        playClickSound();
+        if (!chainHistory.isEmpty() && chainHistoryDialogClearAllBounds().contains(x, y)) {
+            playClickSound();
+            clearChainHistory();
+            return true;
+        }
+
         int rows = visibleChainHistoryDialogRows();
         for (int i = 0; i < rows; i++) {
             if (chainHistoryDialogRowBounds(i).contains(x, y)) {
+                playClickSound();
+                if (chainHistoryRowDeleteBounds(i).contains(x, y)) {
+                    deleteChainHistoryAt(i);
+                    return true;
+                }
                 openEtherscanTransaction(chainHistory.get(i));
                 return true;
             }
         }
+        playClickSound();
         showMessage(chainHistory.isEmpty() ? "Belum ada transaksi." : "Pilih transaksi yang sudah punya hash.");
         return true;
     }
 
+    private void clearChainHistory() {
+        chainHistory.clear();
+        saveChainHistory();
+        showMessage("Semua riwayat transaksi dihapus.");
+        invalidate();
+    }
+
+    private void deleteChainHistoryAt(int index) {
+        if (index < 0 || index >= chainHistory.size()) {
+            return;
+        }
+        chainHistory.remove(index);
+        saveChainHistory();
+        showMessage("Riwayat transaksi dihapus.");
+        invalidate();
+    }
+
     private void openEtherscanTransaction(ChainHistoryEntry entry) {
         if (!BlockchainClient.isValidTransactionHash(entry.txHash)) {
-            chainHistoryOpen = false;
             showMessage(missingTransactionHashMessage());
             invalidate();
             return;
