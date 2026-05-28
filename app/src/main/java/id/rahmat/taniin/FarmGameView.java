@@ -2578,6 +2578,7 @@ final class FarmGameView extends CanvasGameView {
         boolean hasHash = BlockchainClient.isValidTransactionHash(entry.txHash);
         boolean sending = chainStatusContains(entry.status, "mengirim");
         boolean waitingSync = chainStatusContains(entry.status, "belum sync")
+                || chainStatusContains(entry.status, "belum on-chain")
                 || chainStatusContains(entry.status, "butuh wallet");
         boolean localSaved = chainStatusContains(entry.status, "lokal")
                 || chainStatusContains(entry.status, "tersimpan");
@@ -2603,7 +2604,7 @@ final class FarmGameView extends CanvasGameView {
 
         paint.setFakeBoldText(false);
         paint.setColor(hasHash ? Color.rgb(181, 248, 188) : Color.rgb(203, 219, 207));
-        String status = hasHash ? BlockchainClient.shortTransactionHash(entry.txHash) : entry.status;
+        String status = hasHash ? "Sepolia " + BlockchainClient.shortTransactionHash(entry.txHash) : entry.status;
         paint.setTextSize(fitTextSize(status, 16f, textWidth));
         canvas.drawText(status, row.left + 50f, row.top + 54f, paint);
 
@@ -3821,7 +3822,7 @@ final class FarmGameView extends CanvasGameView {
         if (!blockchainClient.hasGameApi()) {
             return "Belum on-chain: signer backend belum diset.";
         }
-        return "Transaksi ini belum punya hash Etherscan.";
+        return "Belum ada hash Sepolia. Pastikan signer aktif, lalu buat aksi baru.";
     }
 
     private boolean handleInteractionDialogTouch(float x, float y) {
@@ -5269,7 +5270,8 @@ final class ChainHistoryEntry {
         if ("pending wallet".equals(lower)) {
             return "butuh wallet";
         }
-        if ("lokal".equals(lower)) {
+        if ("lokal".equals(lower)
+                || "berhasil".equals(lower)) {
             return "lokal tersimpan";
         }
         if ("dikirim".equals(lower)) {
