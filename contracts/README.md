@@ -30,3 +30,19 @@ TANIIN_ITEMS_CONTRACT_ADDRESS=...
 Do not put `DEPLOYER_PRIVATE_KEY` in Android code, app assets, Gradle committed files, screenshots, or GitHub. If a key was shared in chat, consider it compromised and replace the wallet before deploying or funding it.
 
 The Android app can read wallet balances through Sepolia JSON-RPC. Actual game transaction signing should be handled by WalletConnect or a backend signer endpoint configured through `TANIIN_GAME_API_URL`. For transaction history links, the backend should return a Sepolia transaction hash after submitting a game action.
+
+For local emulator testing, run the included signer backend after deploying contracts and filling the root `.env`:
+
+```bash
+cd contracts
+npm run game-api
+```
+
+Then set the Android-facing URL in the root `.env`. For a USB device, run `adb reverse tcp:8787 tcp:8787` and use localhost:
+
+```properties
+TANIIN_GAME_API_URL=http://127.0.0.1:8787
+```
+
+For an emulator without `adb reverse`, use `http://10.0.2.2:8787` instead.
+For WiFi ADB, use the computer LAN IP, for example `http://192.168.1.9:8787`.

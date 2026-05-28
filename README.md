@@ -41,12 +41,13 @@ SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
 TANIIN_COIN_CONTRACT_ADDRESS=
 TANIIN_ITEMS_CONTRACT_ADDRESS=
 TANIIN_LAND_CONTRACT_ADDRESS=
-TANIIN_GAME_API_URL=
+TANIIN_GAME_API_URL=http://127.0.0.1:8787
+TANIIN_GAME_API_PORT=8787
 TANIIN_DEFAULT_WALLET_ADDRESS=
 DEPLOYER_PRIVATE_KEY=replace_with_new_private_key_do_not_commit
 ```
 
-The Android build reads the public values into `BuildConfig`. `TANIIN_DEFAULT_WALLET_ADDRESS` is optional and lets the debug app auto-connect without typing a wallet address. The default local `.env` uses the public Sepolia RPC and leaves contract/API values blank, so the app runs in local prototype mode until deployed addresses are added. Only public values should be shipped in the APK. Never put a real private key in Android source, Gradle config, screenshots, commits, or APK assets. If a private key has been pasted into chat or git, treat it as compromised and move funds/assets to a new wallet.
+The Android build reads the public values into `BuildConfig`. `TANIIN_DEFAULT_WALLET_ADDRESS` is optional and lets the debug app auto-connect without typing a wallet address. For USB device testing, run `adb reverse tcp:8787 tcp:8787` and use `TANIIN_GAME_API_URL=http://127.0.0.1:8787`. For WiFi ADB, use the computer LAN IP, for example `http://192.168.1.9:8787`. For an emulator without `adb reverse`, use `http://10.0.2.2:8787`; the app also tries the matching local fallback. Only public values should be shipped in the APK. Never put a real private key in Android source, Gradle config, screenshots, commits, or APK assets. If a private key has been pasted into chat or git, treat it as compromised and move funds/assets to a new wallet.
 
 ## Build And Run
 
@@ -75,11 +76,14 @@ cmd.exe /c gradlew.bat :app:assembleDebug --console=plain
 3. Rebuild the Android app so Gradle writes the addresses into `BuildConfig`.
 4. Optionally set `TANIIN_DEFAULT_WALLET_ADDRESS` to a public Sepolia wallet address before building. The app will auto-connect that wallet and tapping the wallet button will sync balances.
 5. The shop coin display uses the ERC-20 TANI balance when `TANIIN_COIN_CONTRACT_ADDRESS` is set. Otherwise it falls back to local prototype coins saved on the device.
-6. Gameplay actions are recorded in the local history. When `TANIIN_GAME_API_URL` is set, the app posts each action to `/game-actions` for a backend signer to process. If the backend returns a transaction hash, the app saves it in the transaction history and opens Sepolia Etherscan when tapped. Without that signer URL, the history marks actions as not yet on-chain instead of leaving them pending forever.
+6. Start the local backend signer with `cd contracts && npm run game-api`. It listens on port `8787` and signs `/game-actions` with the deployer wallet from the root `.env`. On a USB device, also run `adb reverse tcp:8787 tcp:8787`.
+7. Gameplay actions are recorded in the local history. When `TANIIN_GAME_API_URL` is set, the app posts each action to `/game-actions` for the backend signer to process. If the backend returns a transaction hash, the app saves it in the transaction history and opens Sepolia Etherscan when tapped. Without that signer URL, the history marks actions as not yet on-chain instead of leaving them pending forever.
 
 The Android app does not sign transactions with a private key. A production setup should use WalletConnect or a backend signer with strict server-side validation.
 
 Land ownership is represented by `TaniinLand` ERC-721 on-chain, but the Android gameplay state remains local unless the backend signer maps each game action to the deployed contracts and returns confirmed transaction hashes.
+
+The included development signer maps gameplay actions like this: land buy mints an ERC-721 land NFT to the player's wallet, land sell burns that plot NFT and mints a TANI reward, plant/harvest update the land contract, seed purchases mint ERC-1155 seed items, harvests mint ERC-1155 crop items, and crop sales mint ERC-20 TANI rewards.
 
 ## Deploy Contracts
 
@@ -111,12 +115,10 @@ Set `TANIIN_MINT_AMOUNT=2500` in `.env` to override the default `1000` TANI amou
 
 Current Sepolia deployment:
 
-Redeploy and replace these addresses after contract changes, including the `sellLand` function, before expecting land selling to execute on-chain.
-
 ```properties
-TANIIN_COIN_CONTRACT_ADDRESS=0xc3F787EF326Cec3EFD9DC50258B7b4F0639F385e
-TANIIN_LAND_CONTRACT_ADDRESS=0x5c612b1dE28Cc5bC63e51580b06b196EDB4f3f78
-TANIIN_ITEMS_CONTRACT_ADDRESS=0xE3651A399FB1818880E5e90fd5d76a80DB2d76CF
+TANIIN_COIN_CONTRACT_ADDRESS=0x8E1584fF95842C888F1FAaB29ed1e55d886A81F8
+TANIIN_LAND_CONTRACT_ADDRESS=0x55D768D736b66B842EE72Ff7fa143f03245F81cc
+TANIIN_ITEMS_CONTRACT_ADDRESS=0x9414eD4F6d9beF484484D72da3d8361989348AEf
 ```
 
 ## License

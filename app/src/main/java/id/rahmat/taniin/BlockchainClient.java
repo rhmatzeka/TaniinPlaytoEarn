@@ -128,7 +128,7 @@ final class BlockchainClient {
                     body.put("plotId", action.plotId);
                     body.put("amount", action.amount);
                     body.put("createdAtMs", action.createdAtMs);
-                    String response = postJson(gameApiUrl + "/game-actions", body.toString());
+                    String response = postGameApi("/game-actions", body.toString());
                     String txHash = extractTransactionHash(response);
                     result = txHash.isEmpty()
                             ? Result.ok("Aksi dikirim, tapi backend belum mengembalikan txHash.")
@@ -187,6 +187,26 @@ final class BlockchainClient {
 
     private String postRpc(String payload) throws IOException {
         return postJson(rpcUrl, payload);
+    }
+
+    private String postGameApi(String path, String payload) throws IOException {
+        IOException lastException = null;
+        for (String baseUrl : gameApiUrlCandidates()) {
+            try {
+                return postJson(baseUrl + path, payload);
+            } catch (IOException exception) {
+                lastException = exception;
+            }
+        }
+        throw lastException == null ? new IOException("Game API tidak valid.") : lastException;
+    }
+
+    private String[] gameApiUrlCandidates() {
+        String fallback = localGameApiFallback(gameApiUrl);
+        if (fallback.isEmpty() || fallback.equals(gameApiUrl)) {
+            return new String[]{gameApiUrl};
+        }
+        return new String[]{gameApiUrl, fallback};
     }
 
     private static String postJson(String urlString, String payload) throws IOException {
@@ -272,6 +292,19 @@ final class BlockchainClient {
             cleaned = cleaned.substring(0, cleaned.length() - 1);
         }
         return cleaned;
+    }
+
+    private static String localGameApiFallback(String url) {
+        if (url.startsWith("http://127.0.0.1:")) {
+            return "http://10.0.2.2:" + url.substring("http://127.0.0.1:".length());
+        }
+        if (url.startsWith("http://localhost:")) {
+            return "http://10.0.2.2:" + url.substring("http://localhost:".length());
+        }
+        if (url.startsWith("http://10.0.2.2:")) {
+            return "http://127.0.0.1:" + url.substring("http://10.0.2.2:".length());
+        }
+        return "";
     }
 
     static boolean isValidAddress(String address) {
