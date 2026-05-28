@@ -2282,10 +2282,10 @@ final class FarmGameView extends CanvasGameView {
         float bodyTop = panel.top + 118f;
         float bodyRight = panel.right - 4f;
         float bodyBottom = panel.bottom - 4f;
-        float maxW = bodyRight - bodyLeft - 70f;
-        float maxH = bodyBottom - bodyTop - 34f;
-        float cardW = Math.max(320f, Math.min(620f, maxW));
-        float cardH = Math.max(318f, Math.min(390f, maxH));
+        float maxW = bodyRight - bodyLeft - 54f;
+        float maxH = bodyBottom - bodyTop - 28f;
+        float cardW = Math.max(520f, Math.min(760f, maxW));
+        float cardH = Math.max(388f, Math.min(462f, maxH));
         float left = bodyLeft + (bodyRight - bodyLeft - cardW) * 0.5f;
         float top = bodyTop + (bodyBottom - bodyTop - cardH) * 0.5f;
         return new RectF(left, top, left + cardW, top + cardH);
@@ -2302,8 +2302,8 @@ final class FarmGameView extends CanvasGameView {
         RectF logout = audioLogoutButtonBounds();
         float left = card.left + 38f;
         float right = card.right - 38f;
-        float firstCenter = card.top + Math.max(134f, Math.min(154f, card.height() * 0.42f));
-        float lastCenter = Math.max(firstCenter + 74f, logout.top - 18f);
+        float firstCenter = card.top + Math.max(142f, Math.min(158f, card.height() * 0.35f));
+        float lastCenter = Math.max(firstCenter + 156f, logout.top - 24f);
         float centerY = firstCenter + index * ((lastCenter - firstCenter) * 0.5f);
         return new RectF(left, centerY - 6f, right, centerY + 6f);
     }
