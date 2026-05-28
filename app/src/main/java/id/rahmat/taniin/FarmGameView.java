@@ -98,6 +98,9 @@ final class FarmGameView extends CanvasGameView {
     private static final int MENU_TAB_SETTINGS = 1;
     private static final int MENU_TAB_ABOUT = 2;
     private static final int CHAIN_HISTORY_LIMIT = 8;
+    private static final float DEFAULT_MASTER_VOLUME = 0.82f;
+    private static final float DEFAULT_MUSIC_VOLUME = 0.70f;
+    private static final float DEFAULT_SFX_VOLUME = 0.90f;
     private static final String PREF_CHAIN_HISTORY = "game_chain_history";
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -168,10 +171,15 @@ final class FarmGameView extends CanvasGameView {
     private boolean chainHistoryOpen;
     private boolean audioBgmEnabled = true;
     private boolean audioSfxEnabled = true;
+    private float masterVolume = DEFAULT_MASTER_VOLUME;
+    private float musicVolume = DEFAULT_MUSIC_VOLUME;
+    private float sfxVolume = DEFAULT_SFX_VOLUME;
     private int menuTab = MENU_TAB_INVENTORY;
     private InteractionKind activeInteractionKind = InteractionKind.NONE;
     private int shopPurchaseSeedIndex = -1;
     private int audioTrackIndex;
+    private int activeAudioSlider = -1;
+    private int activeAudioSliderPointerId = -1;
     private int facingDirection = DIR_DOWN;
     private int walkFrame;
     private long walkTickMs;
@@ -240,18 +248,29 @@ final class FarmGameView extends CanvasGameView {
     private void loadAudioSettings() {
         audioBgmEnabled = preferences.getBoolean("audio_bgm_enabled", true);
         audioSfxEnabled = preferences.getBoolean("audio_sfx_enabled", true);
+        masterVolume = clamp(preferences.getFloat("audio_master_volume", DEFAULT_MASTER_VOLUME), 0f, 1f);
+        musicVolume = clamp(preferences.getFloat("audio_music_volume", DEFAULT_MUSIC_VOLUME), 0f, 1f);
+        sfxVolume = clamp(preferences.getFloat("audio_sfx_volume", DEFAULT_SFX_VOLUME), 0f, 1f);
         audioTrackIndex = clampInt(preferences.getInt("audio_track_index", 0), 0, Math.max(0, gameAudio.getBgmCount() - 1));
         gameAudio.setBgmIndex(audioTrackIndex);
-        gameAudio.setBgmEnabled(audioBgmEnabled);
-        gameAudio.setSfxEnabled(audioSfxEnabled);
+        applyAudioSettings();
     }
 
     private void saveAudioSettings() {
         preferences.edit()
                 .putBoolean("audio_bgm_enabled", audioBgmEnabled)
                 .putBoolean("audio_sfx_enabled", audioSfxEnabled)
+                .putFloat("audio_master_volume", masterVolume)
+                .putFloat("audio_music_volume", musicVolume)
+                .putFloat("audio_sfx_volume", sfxVolume)
                 .putInt("audio_track_index", audioTrackIndex)
                 .apply();
+    }
+
+    private void applyAudioSettings() {
+        gameAudio.setVolumes(masterVolume, musicVolume, sfxVolume);
+        gameAudio.setBgmEnabled(audioBgmEnabled);
+        gameAudio.setSfxEnabled(audioSfxEnabled);
     }
 
     private Bitmap decodePixelResource(int resId) {
@@ -428,7 +447,6 @@ final class FarmGameView extends CanvasGameView {
 
         drawWorld(canvas);
         drawMapDecorations(canvas, false, now);
-        drawShopNpc(canvas, now);
         drawPlots(canvas, now);
         drawHarvestEffects(canvas, now);
         if (tmxMap == null) {
@@ -440,7 +458,6 @@ final class FarmGameView extends CanvasGameView {
         }
         drawMapDecorations(canvas, true, now);
         drawPlotActionSigns(canvas, now);
-        drawShopNpcBubble(canvas, now);
         drawHud(canvas, now);
     }
 
@@ -1728,35 +1745,103 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void drawAudioSettingsPanel(Canvas canvas, RectF panel, float bodyLeft, float bodyTop) {
-        float left = bodyLeft + 58f;
-        float top = bodyTop + 48f;
+        RectF card = audioSettingsCardBounds();
 
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(255, 235, 171));
-        paint.setTextSize(30f);
-        paint.setFakeBoldText(true);
-        canvas.drawText("Audio", left, top, paint);
-        paint.setFakeBoldText(false);
+        paint.setColor(Color.argb(112, 0, 0, 0));
+        canvas.drawRoundRect(card.left + 7f, card.top + 8f, card.right + 7f, card.bottom + 8f, 20, 20, paint);
+        paint.setColor(Color.rgb(150, 75, 22));
+        canvas.drawRoundRect(card, 20, 20, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(5f);
+        paint.setColor(Color.rgb(88, 43, 12));
+        canvas.drawRoundRect(card, 20, 20, paint);
 
-        RectF chip = new RectF(left + 104f, top - 27f, left + 296f, top + 4f);
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(120, 58, 22));
-        canvas.drawRoundRect(chip, 15, 15, paint);
-        paint.setColor(Color.rgb(255, 218, 93));
-        paint.setTextSize(15f);
+        paint.setTypeface(android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD));
         paint.setFakeBoldText(true);
-        drawCenteredText(canvas, "PIXEL SOUND", chip.centerX(), chip.top + 21f);
+        paint.setTextSize(fitTextSize("SETTINGS", 36f, card.width() - 160f));
+        paint.setColor(Color.rgb(255, 224, 21));
+        canvas.drawText("SETTINGS", card.left + 38f, card.top + 58f, paint);
+
+        drawAudioSettingsCloseButton(canvas);
+
+        paint.setTypeface(null);
         paint.setFakeBoldText(false);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(96, 43, 11));
+        canvas.drawRect(card.left + 38f, card.top + 88f, card.right - 38f, card.top + 93f, paint);
 
-        paint.setColor(Color.rgb(248, 224, 188));
-        paint.setTextSize(18f);
-        canvas.drawText("Backsound, efek tombol, error, dan langkah karakter.", left, top + 35f, paint);
+        drawVolumeSlider(canvas, "MASTER VOLUME", masterVolume, 0);
+        drawVolumeSlider(canvas, "MUSIC VOLUME", musicVolume, 1);
+        drawVolumeSlider(canvas, "SFX VOLUME", sfxVolume, 2);
+        drawAudioLogoutButton(canvas);
+    }
 
-        drawAudioSettingRow(canvas, audioBgmRowBounds(), audioBgmToggleBounds(),
-                "Backsound", "Musik latar game", audioBgmEnabled, Color.rgb(255, 203, 65), 0);
-        drawAudioSettingRow(canvas, audioSfxRowBounds(), audioSfxToggleBounds(),
-                "Efek suara", "Klik, error, langkah", audioSfxEnabled, Color.rgb(93, 202, 250), 1);
-        drawAudioTrackRow(canvas, audioTrackRowBounds(), audioTrackButtonBounds());
+    private void drawVolumeSlider(Canvas canvas, String label, float value, int index) {
+        RectF card = audioSettingsCardBounds();
+        RectF slider = audioSliderBounds(index);
+        float labelY = slider.top - 28f;
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setTypeface(android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD));
+        paint.setFakeBoldText(true);
+        paint.setColor(Color.rgb(255, 241, 212));
+        paint.setTextSize(fitTextSize(label, 27f, card.width() * 0.58f));
+        canvas.drawText(label, slider.left, labelY, paint);
+
+        String percent = Math.round(value * 100f) + "%";
+        paint.setTextSize(27f);
+        paint.setTextAlign(Paint.Align.RIGHT);
+        canvas.drawText(percent, slider.right, labelY, paint);
+        paint.setTextAlign(Paint.Align.LEFT);
+
+        paint.setTypeface(null);
+        paint.setFakeBoldText(false);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(96, 43, 11));
+        canvas.drawRoundRect(slider, 8, 8, paint);
+
+        float knobX = slider.left + slider.width() * clamp(value, 0f, 1f);
+        paint.setColor(Color.rgb(255, 141, 9));
+        canvas.drawCircle(knobX, slider.centerY(), 12f, paint);
+        paint.setColor(Color.rgb(255, 186, 55));
+        canvas.drawCircle(knobX - 3f, slider.centerY() - 4f, 4f, paint);
+    }
+
+    private void drawAudioSettingsCloseButton(Canvas canvas) {
+        RectF close = audioSettingsCloseButtonBounds();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(112, 52, 14));
+        canvas.drawRoundRect(close, 7, 7, paint);
+        paint.setStrokeWidth(4f);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setColor(Color.rgb(255, 235, 196));
+        canvas.drawLine(close.left + 10f, close.top + 10f, close.right - 10f, close.bottom - 10f, paint);
+        canvas.drawLine(close.right - 10f, close.top + 10f, close.left + 10f, close.bottom - 10f, paint);
+        paint.setStyle(Paint.Style.FILL);
+    }
+
+    private void drawAudioLogoutButton(Canvas canvas) {
+        RectF button = audioLogoutButtonBounds();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.argb(88, 0, 0, 0));
+        canvas.drawRoundRect(button.left + 4f, button.top + 5f, button.right + 4f, button.bottom + 5f, 11, 11, paint);
+        paint.setColor(Color.rgb(177, 0, 5));
+        canvas.drawRoundRect(button, 11, 11, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(4f);
+        paint.setColor(Color.rgb(111, 0, 5));
+        canvas.drawRoundRect(button, 11, 11, paint);
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setTypeface(android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD));
+        paint.setFakeBoldText(true);
+        paint.setColor(Color.WHITE);
+        paint.setTextSize(fitTextSize("LOGOUT", 29f, button.width() - 56f));
+        drawCenteredText(canvas, "LOGOUT", button.centerX(), button.centerY() + 10f);
+        paint.setTypeface(null);
+        paint.setFakeBoldText(false);
     }
 
     private void drawAudioSettingRow(Canvas canvas, RectF row, RectF toggle, String label,
@@ -2189,6 +2274,49 @@ final class FarmGameView extends CanvasGameView {
         float left = bodyLeft + 252f;
         float top = bodyTop + 252f;
         return new RectF(left, top, Math.min(panel.right - 86f, left + 326f), top + 50f);
+    }
+
+    private RectF audioSettingsCardBounds() {
+        RectF panel = inventoryPanelBounds();
+        float bodyLeft = panel.left + 220f;
+        float bodyTop = panel.top + 118f;
+        float bodyRight = panel.right - 4f;
+        float bodyBottom = panel.bottom - 4f;
+        float maxW = bodyRight - bodyLeft - 70f;
+        float maxH = bodyBottom - bodyTop - 34f;
+        float cardW = Math.max(320f, Math.min(620f, maxW));
+        float cardH = Math.max(318f, Math.min(390f, maxH));
+        float left = bodyLeft + (bodyRight - bodyLeft - cardW) * 0.5f;
+        float top = bodyTop + (bodyBottom - bodyTop - cardH) * 0.5f;
+        return new RectF(left, top, left + cardW, top + cardH);
+    }
+
+    private RectF audioSettingsCloseButtonBounds() {
+        RectF card = audioSettingsCardBounds();
+        float size = 36f;
+        return new RectF(card.right - 78f, card.top + 28f, card.right - 78f + size, card.top + 28f + size);
+    }
+
+    private RectF audioSliderBounds(int index) {
+        RectF card = audioSettingsCardBounds();
+        RectF logout = audioLogoutButtonBounds();
+        float left = card.left + 38f;
+        float right = card.right - 38f;
+        float firstCenter = card.top + Math.max(134f, Math.min(154f, card.height() * 0.42f));
+        float lastCenter = Math.max(firstCenter + 74f, logout.top - 18f);
+        float centerY = firstCenter + index * ((lastCenter - firstCenter) * 0.5f);
+        return new RectF(left, centerY - 6f, right, centerY + 6f);
+    }
+
+    private RectF audioSliderTouchBounds(int index) {
+        RectF slider = audioSliderBounds(index);
+        return new RectF(slider.left - 14f, slider.top - 34f, slider.right + 14f, slider.bottom + 26f);
+    }
+
+    private RectF audioLogoutButtonBounds() {
+        RectF card = audioSettingsCardBounds();
+        float height = Math.max(54f, Math.min(70f, card.height() * 0.17f));
+        return new RectF(card.left + 38f, card.bottom - height - 30f, card.right - 38f, card.bottom - 30f);
     }
 
     private RectF audioBgmRowBounds() {
@@ -3150,7 +3278,7 @@ final class FarmGameView extends CanvasGameView {
                 return true;
             }
             if (menuOpen) {
-                if (handleMenuTouch(x, y)) {
+                if (handleMenuTouch(x, y, pointerId)) {
                     return true;
                 }
                 playClickSound();
@@ -3162,11 +3290,6 @@ final class FarmGameView extends CanvasGameView {
                 playClickSound();
                 selectedPlot = tappedPlot;
                 openInteractionDialog(plotInteractionKind(plots.get(tappedPlot), System.currentTimeMillis()));
-                return true;
-            }
-            if (isNearShop() && shopNpcTapBounds().contains(x, y)) {
-                playClickSound();
-                showShopNpcBubble();
                 return true;
             }
             if (isNearShop() && shopSignTapBounds().contains(x, y)) {
@@ -3198,6 +3321,15 @@ final class FarmGameView extends CanvasGameView {
         }
 
         if (action == MotionEvent.ACTION_MOVE) {
+            if (menuOpen && activeAudioSlider >= 0) {
+                for (int i = 0; i < event.getPointerCount(); i++) {
+                    if (event.getPointerId(i) == activeAudioSliderPointerId) {
+                        updateAudioVolumeFromX(activeAudioSlider, event.getX(i));
+                        break;
+                    }
+                }
+                return true;
+            }
             for (int i = 0; i < event.getPointerCount(); i++) {
                 if (event.getPointerId(i) == joystickPointerId) {
                     updateJoystick(event.getX(i), event.getY(i));
@@ -3210,6 +3342,9 @@ final class FarmGameView extends CanvasGameView {
         if (action == MotionEvent.ACTION_UP
                 || action == MotionEvent.ACTION_POINTER_UP
                 || action == MotionEvent.ACTION_CANCEL) {
+            if (pointerId == activeAudioSliderPointerId || action == MotionEvent.ACTION_CANCEL) {
+                finishAudioSliderDrag();
+            }
             if (pointerId == joystickPointerId) {
                 joystickActive = false;
                 joystickPointerId = -1;
@@ -3392,7 +3527,7 @@ final class FarmGameView extends CanvasGameView {
                 || keyCode == KeyEvent.KEYCODE_BUTTON_B;
     }
 
-    private boolean handleMenuTouch(float x, float y) {
+    private boolean handleMenuTouch(float x, float y, int pointerId) {
         RectF panel = inventoryPanelBounds();
         if (!panel.contains(x, y)) {
             return false;
@@ -3418,34 +3553,22 @@ final class FarmGameView extends CanvasGameView {
             return true;
         }
         if (menuTab == MENU_TAB_SETTINGS) {
-            if (audioBgmRowBounds().contains(x, y) || audioBgmToggleBounds().contains(x, y)) {
-                audioBgmEnabled = !audioBgmEnabled;
-                gameAudio.setBgmEnabled(audioBgmEnabled);
+            if (audioSettingsCloseButtonBounds().contains(x, y)) {
                 playClickSound();
-                saveAudioSettings();
-                showMessage(audioBgmEnabled ? "Backsound dinyalakan." : "Backsound dimatikan.");
+                menuOpen = false;
                 return true;
             }
-            if (audioSfxRowBounds().contains(x, y) || audioSfxToggleBounds().contains(x, y)) {
-                boolean nextEnabled = !audioSfxEnabled;
-                if (audioSfxEnabled) {
-                    playClickSound();
-                }
-                audioSfxEnabled = nextEnabled;
-                gameAudio.setSfxEnabled(audioSfxEnabled);
-                if (audioSfxEnabled) {
-                    playClickSound();
-                }
-                saveAudioSettings();
-                showMessage(audioSfxEnabled ? "Efek suara dinyalakan." : "Efek suara dimatikan.");
+            int sliderIndex = audioSliderIndexAt(x, y);
+            if (sliderIndex >= 0) {
+                activeAudioSlider = sliderIndex;
+                activeAudioSliderPointerId = pointerId;
+                updateAudioVolumeFromX(sliderIndex, x);
+                playClickSound();
                 return true;
             }
-            if (audioTrackRowBounds().contains(x, y) || audioTrackButtonBounds().contains(x, y)) {
-                gameAudio.nextBgm();
-                audioTrackIndex = gameAudio.getBgmIndex();
+            if (audioLogoutButtonBounds().contains(x, y)) {
                 playClickSound();
-                saveAudioSettings();
-                showMessage("Backsound track " + (audioTrackIndex + 1) + " dipilih.");
+                logoutWallet();
                 return true;
             }
         }
@@ -3455,6 +3578,73 @@ final class FarmGameView extends CanvasGameView {
             return true;
         }
         return true;
+    }
+
+    private int audioSliderIndexAt(float x, float y) {
+        for (int i = 0; i < 3; i++) {
+            if (audioSliderTouchBounds(i).contains(x, y)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private void updateAudioVolumeFromX(int index, float x) {
+        RectF slider = audioSliderBounds(index);
+        float value = clamp((x - slider.left) / Math.max(1f, slider.width()), 0f, 1f);
+        value = Math.round(value * 100f) / 100f;
+        if (index == 0) {
+            masterVolume = value;
+        } else if (index == 1) {
+            musicVolume = value;
+        } else if (index == 2) {
+            sfxVolume = value;
+        }
+        applyAudioSettings();
+        invalidate();
+    }
+
+    private void finishAudioSliderDrag() {
+        if (activeAudioSlider < 0) {
+            return;
+        }
+        int slider = activeAudioSlider;
+        activeAudioSlider = -1;
+        activeAudioSliderPointerId = -1;
+        saveAudioSettings();
+        showMessage(volumeSettingName(slider) + " " + Math.round(audioSliderValue(slider) * 100f) + "%.");
+        invalidate();
+    }
+
+    private float audioSliderValue(int index) {
+        if (index == 0) {
+            return masterVolume;
+        }
+        if (index == 1) {
+            return musicVolume;
+        }
+        return sfxVolume;
+    }
+
+    private String volumeSettingName(int index) {
+        if (index == 0) {
+            return "Master volume";
+        }
+        if (index == 1) {
+            return "Music volume";
+        }
+        return "SFX volume";
+    }
+
+    private void logoutWallet() {
+        walletAddress = "";
+        walletNativeBalance = "";
+        coinBalanceOnChain = false;
+        preferences.edit().remove("wallet_address").apply();
+        chainStatus = "Wallet logout. Mode lokal aktif.";
+        chainPanelUntilMs = System.currentTimeMillis() + 3600L;
+        showMessage("Wallet logout. Mode lokal aktif.");
+        invalidate();
     }
 
     private void openCreatorGithub() {
@@ -3984,7 +4174,6 @@ final class FarmGameView extends CanvasGameView {
             return;
         }
         if (isNearShop()) {
-            showShopNpcBubble();
             openInteractionDialog(InteractionKind.SHOP);
             return;
         }

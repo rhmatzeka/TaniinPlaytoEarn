@@ -6,9 +6,7 @@ import android.media.MediaPlayer;
 import android.media.SoundPool;
 
 final class GameAudio {
-    private static final float BGM_VOLUME = 0.34f;
-    private static final float SFX_VOLUME = 0.72f;
-    private static final float WALK_VOLUME = 0.46f;
+    private static final float WALK_VOLUME_RATIO = 0.64f;
 
     private final Context context;
     private final int[] bgmResources = {R.raw.backsound, R.raw.backsound2};
@@ -27,6 +25,9 @@ final class GameAudio {
     private boolean walkLoaded;
     private boolean walkPrewarmed;
     private boolean released;
+    private float masterVolume = 0.82f;
+    private float musicVolume = 0.70f;
+    private float sfxVolume = 0.90f;
 
     GameAudio(Context context) {
         this.context = context.getApplicationContext();
@@ -63,6 +64,7 @@ final class GameAudio {
         }
         ensureBgmPlayer();
         if (bgmPlayer != null && !bgmPlayer.isPlaying()) {
+            updateBgmVolume();
             bgmPlayer.start();
         }
     }
@@ -75,11 +77,11 @@ final class GameAudio {
     }
 
     void playClick() {
-        play(clickSoundId, SFX_VOLUME);
+        play(clickSoundId, 1f);
     }
 
     void playError() {
-        play(errorSoundId, SFX_VOLUME);
+        play(errorSoundId, 1f);
     }
 
     void startWalk() {
@@ -90,7 +92,8 @@ final class GameAudio {
         if (walkStreamId != 0) {
             return;
         }
-        walkStreamId = soundPool.play(walkSoundId, WALK_VOLUME, WALK_VOLUME, 1, -1, 1f);
+        float volume = effectiveWalkVolume();
+        walkStreamId = soundPool.play(walkSoundId, volume, volume, 1, -1, 1f);
     }
 
     void stopWalk() {
@@ -113,6 +116,14 @@ final class GameAudio {
         if (bgmRequested) {
             resumeBgm();
         }
+    }
+
+    void setVolumes(float master, float music, float sfx) {
+        masterVolume = clampVolume(master);
+        musicVolume = clampVolume(music);
+        sfxVolume = clampVolume(sfx);
+        updateBgmVolume();
+        updateWalkVolume();
     }
 
     void setSfxEnabled(boolean enabled) {
@@ -162,7 +173,8 @@ final class GameAudio {
         if (released || !sfxEnabled || soundId == 0) {
             return;
         }
-        soundPool.play(soundId, volume, volume, 1, 0, 1f);
+        float effectiveVolume = clampVolume(volume * effectiveSfxVolume());
+        soundPool.play(soundId, effectiveVolume, effectiveVolume, 1, 0, 1f);
     }
 
     private void prewarmWalk() {
@@ -184,7 +196,7 @@ final class GameAudio {
         if (bgmPlayer == null) {
             return;
         }
-        bgmPlayer.setVolume(BGM_VOLUME, BGM_VOLUME);
+        updateBgmVolume();
         bgmPlayer.setLooping(bgmResources.length == 1);
         bgmPlayer.setOnCompletionListener(player -> {
             releaseBgmPlayer();
@@ -202,5 +214,37 @@ final class GameAudio {
         bgmPlayer.setOnCompletionListener(null);
         bgmPlayer.release();
         bgmPlayer = null;
+    }
+
+    private void updateBgmVolume() {
+        if (bgmPlayer == null) {
+            return;
+        }
+        float volume = effectiveMusicVolume();
+        bgmPlayer.setVolume(volume, volume);
+    }
+
+    private void updateWalkVolume() {
+        if (walkStreamId == 0) {
+            return;
+        }
+        float volume = effectiveWalkVolume();
+        soundPool.setVolume(walkStreamId, volume, volume);
+    }
+
+    private float effectiveMusicVolume() {
+        return clampVolume(masterVolume * musicVolume);
+    }
+
+    private float effectiveSfxVolume() {
+        return clampVolume(masterVolume * sfxVolume);
+    }
+
+    private float effectiveWalkVolume() {
+        return clampVolume(effectiveSfxVolume() * WALK_VOLUME_RATIO);
+    }
+
+    private static float clampVolume(float value) {
+        return Math.max(0f, Math.min(1f, value));
     }
 }

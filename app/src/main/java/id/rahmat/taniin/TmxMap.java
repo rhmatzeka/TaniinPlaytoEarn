@@ -339,7 +339,7 @@ final class TmxMap {
     }
 
     private static boolean isHouseTile(int gid) {
-        return gid >= 241 && gid < 339;
+        return (gid >= 241 && gid < 339) || gid >= 1431;
     }
 
     private static boolean isFenceTile(int gid) {
@@ -355,6 +355,9 @@ final class TmxMap {
     }
 
     private static boolean isWoodTreeTile(int gid) {
+        if (gid >= 1411 && gid <= 1430) {
+            return true;
+        }
         if (gid >= 693 && gid <= 696) {
             return true;
         }
@@ -388,6 +391,9 @@ final class TmxMap {
     }
 
     private static boolean isWoodTreeFootTile(int gid) {
+        if (gid >= 1427 && gid <= 1430) {
+            return true;
+        }
         switch (gid) {
             case 781:
             case 782:
@@ -438,7 +444,6 @@ final class TmxMap {
                 || isSmallObstacleTile(gid)
                 || (isForegroundLayer(layerName)
                 && gid >= 241
-                && gid < 1396
                 && !isWaterTile(gid));
     }
 
