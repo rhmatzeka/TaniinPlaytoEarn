@@ -42,7 +42,6 @@ final class FarmGameView extends CanvasGameView {
     private static final int WORLD_ROWS = 52;
     private static final float PLAYER_SPEED = TILE * 3.9f;
     private static final long GROW_TIME_MS = 12_000L;
-    private static final int CROP_GROWING_STAGE_COUNT = 5;
     private static final int CROP_READY_STAGE_COLUMN = 5;
     private static final int DIR_RIGHT = 0;
     private static final int DIR_UP = 1;
@@ -200,7 +199,8 @@ final class FarmGameView extends CanvasGameView {
         loadAudioSettings();
         idleSheet = decodePixelResource(R.drawable.idle);
         walkSheet = decodePixelResource(R.drawable.walk);
-        cropSheet = decodePixelResource(R.drawable.spring_crops);
+        Bitmap defaultCropSheet = decodePixelResource(R.drawable.spring_crops);
+        cropSheet = decodePixelAsset(context, "game/Tileset/Spring Crops.png", defaultCropSheet);
         chest = decodePixelResource(R.drawable.chest);
         chicken = decodePixelResource(R.drawable.chicken_blonde_green);
         babyChicken = decodePixelResource(R.drawable.baby_chicken_yellow);
@@ -501,13 +501,17 @@ final class FarmGameView extends CanvasGameView {
             boolean selected = i == selectedPlot;
             if (tmxMap == null) {
                 paint.setStyle(Paint.Style.FILL);
-                paint.setColor(plot.owned ? Color.rgb(232, 148, 69) : Color.rgb(88, 64, 40));
+                paint.setColor(Color.rgb(232, 148, 69));
                 drawWorldRoundRect(canvas, plot.x, plot.y, plot.w, plot.h, 8);
+            } else if (!plot.owned) {
+                drawUnownedPlotSurface(canvas, plot);
             }
 
             paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(selected ? 5f : 2f);
-            paint.setColor(selected ? Color.rgb(255, 230, 82) : Color.argb(tmxMap == null ? 255 : 75, 31, 111, 62));
+            paint.setStrokeWidth(selected ? 5f : 2.5f);
+            paint.setColor(selected
+                    ? Color.rgb(255, 230, 82)
+                    : Color.argb(plot.owned ? 75 : 140, 31, 111, 62));
             drawWorldRoundRect(canvas, plot.x, plot.y, plot.w, plot.h, 8);
 
             paint.setStrokeWidth(1f);
@@ -531,31 +535,100 @@ final class FarmGameView extends CanvasGameView {
         }
     }
 
+    private void drawUnownedPlotSurface(Canvas canvas, Plot plot) {
+        float edge = TILE * 0.16f;
+        float topEdge = TILE * 0.13f;
+        float bottomEdge = TILE * 0.14f;
+        float soilX = plot.x + edge;
+        float soilY = plot.y + topEdge;
+        float soilW = plot.w - edge * 2f;
+        float soilH = plot.h - topEdge - bottomEdge;
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.argb(210, 101, 185, 74));
+        drawWorldRoundRect(canvas, plot.x + 4f, plot.y + 3f, plot.w - 8f, plot.h - 6f, 10f);
+        paint.setColor(Color.rgb(235, 154, 71));
+        drawWorldRoundRect(canvas, soilX, soilY, soilW, soilH, 16f);
+        paint.setColor(Color.argb(45, 255, 191, 92));
+        drawWorldRoundRect(canvas, soilX + 10f, soilY + 9f, soilW - 20f, soilH - 18f, 12f);
+
+        drawPlotGrassPixels(canvas, plot, soilX, soilY, soilW, soilH);
+    }
+
+    private void drawPlotGrassPixels(Canvas canvas, Plot plot, float soilX, float soilY, float soilW, float soilH) {
+        paint.setStyle(Paint.Style.FILL);
+        float step = TILE * 0.24f;
+        float blade = Math.max(8f, TILE * 0.07f);
+        paint.setColor(Color.rgb(38, 134, 66));
+        for (float x = soilX - blade; x <= soilX + soilW; x += step) {
+            drawWorldRect(canvas, x, soilY - blade * 0.7f, blade, blade * 1.35f);
+            drawWorldRect(canvas, x + step * 0.42f, soilY + soilH - blade * 0.65f, blade, blade * 1.5f);
+        }
+        paint.setColor(Color.rgb(28, 107, 58));
+        for (float y = soilY + step * 0.4f; y <= soilY + soilH - step * 0.2f; y += step) {
+            drawWorldRect(canvas, soilX - blade * 0.75f, y, blade, blade * 1.45f);
+            drawWorldRect(canvas, soilX + soilW - blade * 0.25f, y + step * 0.18f, blade, blade * 1.45f);
+        }
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(3.5f);
+        paint.setColor(Color.argb(72, 55, 139, 63));
+        drawWorldRoundRect(canvas, plot.x + 5f, plot.y + 4f, plot.w - 10f, plot.h - 8f, 10f);
+        paint.setStyle(Paint.Style.FILL);
+    }
+
     private void drawCrops(Canvas canvas, Plot plot, long now) {
-        int stage = cropStageColumn(plot, now);
         int cell = 16;
         int cropRow = SEED_CROP_ROWS[plot.seedIndex];
-        src.set(stage * cell, cropRow * cell, stage * cell + cell, cropRow * cell + cell);
         int cols = Math.max(1, Math.round(plot.w / TILE));
         int rows = Math.max(1, Math.round(plot.h / TILE));
-        float cropSize = TILE * 0.54f;
+        float cropSize = TILE * 0.58f;
+        float progress = cropGrowthProgress(plot, now);
         for (int row = 0; row < rows; row++) {
             for (int col = 0; col < cols; col++) {
-                float x = plot.x + col * TILE + (TILE - cropSize) * 0.5f - cameraX;
-                float y = plot.y + row * TILE + TILE * 0.34f - cameraY;
-                dst.set(x, y, x + cropSize, y + cropSize);
-                canvas.drawBitmap(cropSheet, src, dst, pixelPaint);
+                float delay = ((row * cols + col) % 5) * 0.035f;
+                float localProgress = plot.state == PlotState.READY
+                        ? 1f
+                        : clamp((progress - delay) / Math.max(0.01f, 1f - delay), 0f, 1f);
+                float centerX = plot.x + col * TILE + TILE * 0.5f - cameraX;
+                float baseY = plot.y + row * TILE + TILE * 0.92f - cameraY;
+                drawGrowingCropSprite(canvas, cropRow, localProgress, centerX, baseY, cropSize, now, row, col);
             }
         }
     }
 
-    private int cropStageColumn(Plot plot, long now) {
+    private float cropGrowthProgress(Plot plot, long now) {
         if (plot.state == PlotState.READY) {
-            return CROP_READY_STAGE_COLUMN;
+            return 1f;
         }
         long elapsed = Math.max(0L, now - plot.plantedAtMs);
-        long stageDuration = Math.max(1L, GROW_TIME_MS / CROP_GROWING_STAGE_COUNT);
-        return Math.min(CROP_GROWING_STAGE_COUNT - 1, (int) (elapsed / stageDuration));
+        return clamp(elapsed / (float) GROW_TIME_MS, 0f, 1f);
+    }
+
+    private void drawGrowingCropSprite(Canvas canvas, int cropRow, float progress, float centerX,
+            float baseY, float baseSize, long now, int row, int col) {
+        float eased = smoothStep(progress);
+        float stageFloat = eased * CROP_READY_STAGE_COLUMN;
+        int stage = Math.min(CROP_READY_STAGE_COLUMN, (int) stageFloat);
+        int nextStage = Math.min(CROP_READY_STAGE_COLUMN, stage + 1);
+        float blend = clamp(stageFloat - stage, 0f, 1f);
+        float scale = 0.42f + 0.58f * eased;
+        float sway = progress >= 1f ? 0f : (float) Math.sin(now / 420.0 + row * 0.9 + col * 1.3) * TILE * 0.018f * progress;
+        float size = baseSize * scale;
+
+        drawCropFrame(canvas, cropRow, stage, centerX + sway, baseY, size, (int) (255f * (1f - blend * 0.55f)));
+        if (nextStage != stage && blend > 0.03f) {
+            float nextSize = baseSize * (scale + 0.08f * smoothStep(blend));
+            drawCropFrame(canvas, cropRow, nextStage, centerX + sway, baseY, nextSize, (int) (255f * smoothStep(blend)));
+        }
+    }
+
+    private void drawCropFrame(Canvas canvas, int cropRow, int stage, float centerX, float baseY, float size, int alpha) {
+        int cell = 16;
+        src.set(stage * cell, cropRow * cell, stage * cell + cell, cropRow * cell + cell);
+        dst.set(centerX - size * 0.5f, baseY - size, centerX + size * 0.5f, baseY);
+        pixelPaint.setAlpha(clampInt(alpha, 0, 255));
+        canvas.drawBitmap(cropSheet, src, dst, pixelPaint);
+        pixelPaint.setAlpha(255);
     }
 
     private void drawHarvestEffects(Canvas canvas, long now) {
@@ -602,13 +675,21 @@ final class FarmGameView extends CanvasGameView {
         float cx = plot.x + plot.w / 2f - cameraX;
         float cy = plot.y + plot.h / 2f - cameraY;
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.argb(185, 20, 16, 12));
-        canvas.drawRoundRect(cx - 25, cy - 22, cx + 25, cy + 22, 8, 8, paint);
-        paint.setColor(Color.rgb(255, 207, 71));
-        canvas.drawRoundRect(cx - 14, cy - 2, cx + 14, cy + 18, 4, 4, paint);
+        paint.setColor(Color.argb(84, 0, 0, 0));
+        canvas.drawOval(cx - 26f, cy + 15f, cx + 26f, cy + 26f, paint);
+        paint.setColor(Color.rgb(118, 71, 26));
+        canvas.drawRoundRect(cx - 25f, cy - 22f, cx + 25f, cy + 22f, 7f, 7f, paint);
+        paint.setColor(Color.rgb(77, 45, 16));
+        canvas.drawRoundRect(cx - 20f, cy - 17f, cx + 20f, cy + 17f, 5f, 5f, paint);
+        paint.setColor(Color.rgb(255, 214, 74));
+        canvas.drawRoundRect(cx - 13f, cy - 2f, cx + 13f, cy + 14f, 3f, 3f, paint);
+        paint.setColor(Color.rgb(255, 230, 112));
+        canvas.drawRect(cx - 9f, cy - 1f, cx + 9f, cy + 3f, paint);
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(5f);
-        canvas.drawArc(cx - 12, cy - 20, cx + 12, cy + 8, 180, -180, false, paint);
+        paint.setStrokeWidth(4f);
+        paint.setColor(Color.rgb(255, 214, 74));
+        canvas.drawArc(cx - 12f, cy - 16f, cx + 12f, cy + 8f, 180f, -180f, false, paint);
+        paint.setStyle(Paint.Style.FILL);
     }
 
     private void drawDecorations(Canvas canvas) {
@@ -1745,24 +1826,14 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void drawAudioSettingsPanel(Canvas canvas, RectF panel, float bodyLeft, float bodyTop) {
-        RectF card = audioSettingsCardBounds();
-
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.argb(112, 0, 0, 0));
-        canvas.drawRoundRect(card.left + 7f, card.top + 8f, card.right + 7f, card.bottom + 8f, 20, 20, paint);
-        paint.setColor(Color.rgb(150, 75, 22));
-        canvas.drawRoundRect(card, 20, 20, paint);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(5f);
-        paint.setColor(Color.rgb(88, 43, 12));
-        canvas.drawRoundRect(card, 20, 20, paint);
+        RectF content = audioSettingsCardBounds();
 
         paint.setStyle(Paint.Style.FILL);
         paint.setTypeface(android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD));
         paint.setFakeBoldText(true);
-        paint.setTextSize(fitTextSize("SETTINGS", 36f, card.width() - 160f));
+        paint.setTextSize(fitTextSize("SETTINGS", 39f, content.width() - 118f));
         paint.setColor(Color.rgb(255, 224, 21));
-        canvas.drawText("SETTINGS", card.left + 38f, card.top + 58f, paint);
+        canvas.drawText("SETTINGS", content.left, content.top + 58f, paint);
 
         drawAudioSettingsCloseButton(canvas);
 
@@ -1770,12 +1841,11 @@ final class FarmGameView extends CanvasGameView {
         paint.setFakeBoldText(false);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(96, 43, 11));
-        canvas.drawRect(card.left + 38f, card.top + 88f, card.right - 38f, card.top + 93f, paint);
+        canvas.drawRect(content.left, content.top + 88f, content.right, content.top + 93f, paint);
 
         drawVolumeSlider(canvas, "MASTER VOLUME", masterVolume, 0);
         drawVolumeSlider(canvas, "MUSIC VOLUME", musicVolume, 1);
         drawVolumeSlider(canvas, "SFX VOLUME", sfxVolume, 2);
-        drawAudioLogoutButton(canvas);
     }
 
     private void drawVolumeSlider(Canvas canvas, String label, float value, int index) {
@@ -1813,35 +1883,16 @@ final class FarmGameView extends CanvasGameView {
         RectF close = audioSettingsCloseButtonBounds();
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(112, 52, 14));
-        canvas.drawRoundRect(close, 7, 7, paint);
-        paint.setStrokeWidth(4f);
+        canvas.drawRoundRect(close, 10, 10, paint);
         paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(4f);
+        paint.setColor(Color.rgb(183, 100, 35));
+        canvas.drawRoundRect(close, 10, 10, paint);
+        paint.setStrokeWidth(4f);
         paint.setColor(Color.rgb(255, 235, 196));
-        canvas.drawLine(close.left + 10f, close.top + 10f, close.right - 10f, close.bottom - 10f, paint);
-        canvas.drawLine(close.right - 10f, close.top + 10f, close.left + 10f, close.bottom - 10f, paint);
+        canvas.drawLine(close.left + 15f, close.top + 15f, close.right - 15f, close.bottom - 15f, paint);
+        canvas.drawLine(close.right - 15f, close.top + 15f, close.left + 15f, close.bottom - 15f, paint);
         paint.setStyle(Paint.Style.FILL);
-    }
-
-    private void drawAudioLogoutButton(Canvas canvas) {
-        RectF button = audioLogoutButtonBounds();
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.argb(88, 0, 0, 0));
-        canvas.drawRoundRect(button.left + 4f, button.top + 5f, button.right + 4f, button.bottom + 5f, 11, 11, paint);
-        paint.setColor(Color.rgb(177, 0, 5));
-        canvas.drawRoundRect(button, 11, 11, paint);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(4f);
-        paint.setColor(Color.rgb(111, 0, 5));
-        canvas.drawRoundRect(button, 11, 11, paint);
-
-        paint.setStyle(Paint.Style.FILL);
-        paint.setTypeface(android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD));
-        paint.setFakeBoldText(true);
-        paint.setColor(Color.WHITE);
-        paint.setTextSize(fitTextSize("LOGOUT", 29f, button.width() - 56f));
-        drawCenteredText(canvas, "LOGOUT", button.centerX(), button.centerY() + 10f);
-        paint.setTypeface(null);
-        paint.setFakeBoldText(false);
     }
 
     private void drawAudioSettingRow(Canvas canvas, RectF row, RectF toggle, String label,
@@ -2282,28 +2333,21 @@ final class FarmGameView extends CanvasGameView {
         float bodyTop = panel.top + 118f;
         float bodyRight = panel.right - 4f;
         float bodyBottom = panel.bottom - 4f;
-        float maxW = bodyRight - bodyLeft - 54f;
-        float maxH = bodyBottom - bodyTop - 28f;
-        float cardW = Math.max(520f, Math.min(760f, maxW));
-        float cardH = Math.max(388f, Math.min(462f, maxH));
-        float left = bodyLeft + (bodyRight - bodyLeft - cardW) * 0.5f;
-        float top = bodyTop + (bodyBottom - bodyTop - cardH) * 0.5f;
-        return new RectF(left, top, left + cardW, top + cardH);
+        return new RectF(bodyLeft + 58f, bodyTop + 34f, bodyRight - 58f, bodyBottom - 42f);
     }
 
     private RectF audioSettingsCloseButtonBounds() {
-        RectF card = audioSettingsCardBounds();
-        float size = 36f;
-        return new RectF(card.right - 78f, card.top + 28f, card.right - 78f + size, card.top + 28f + size);
+        RectF content = audioSettingsCardBounds();
+        float size = 54f;
+        return new RectF(content.right - size - 2f, content.top + 12f, content.right - 2f, content.top + 12f + size);
     }
 
     private RectF audioSliderBounds(int index) {
-        RectF card = audioSettingsCardBounds();
-        RectF logout = audioLogoutButtonBounds();
-        float left = card.left + 38f;
-        float right = card.right - 38f;
-        float firstCenter = card.top + Math.max(142f, Math.min(158f, card.height() * 0.35f));
-        float lastCenter = Math.max(firstCenter + 156f, logout.top - 24f);
+        RectF content = audioSettingsCardBounds();
+        float left = content.left;
+        float right = content.right;
+        float firstCenter = content.top + Math.max(140f, Math.min(162f, content.height() * 0.35f));
+        float lastCenter = Math.max(firstCenter + 172f, content.bottom - 48f);
         float centerY = firstCenter + index * ((lastCenter - firstCenter) * 0.5f);
         return new RectF(left, centerY - 6f, right, centerY + 6f);
     }
@@ -2311,12 +2355,6 @@ final class FarmGameView extends CanvasGameView {
     private RectF audioSliderTouchBounds(int index) {
         RectF slider = audioSliderBounds(index);
         return new RectF(slider.left - 14f, slider.top - 34f, slider.right + 14f, slider.bottom + 26f);
-    }
-
-    private RectF audioLogoutButtonBounds() {
-        RectF card = audioSettingsCardBounds();
-        float height = Math.max(54f, Math.min(70f, card.height() * 0.17f));
-        return new RectF(card.left + 38f, card.bottom - height - 30f, card.right - 38f, card.bottom - 30f);
     }
 
     private RectF audioBgmRowBounds() {
@@ -3564,11 +3602,6 @@ final class FarmGameView extends CanvasGameView {
                 activeAudioSliderPointerId = pointerId;
                 updateAudioVolumeFromX(sliderIndex, x);
                 playClickSound();
-                return true;
-            }
-            if (audioLogoutButtonBounds().contains(x, y)) {
-                playClickSound();
-                logoutWallet();
                 return true;
             }
         }
@@ -5087,6 +5120,11 @@ final class FarmGameView extends CanvasGameView {
 
     private static float clamp(float value, float min, float max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private static float smoothStep(float value) {
+        float t = clamp(value, 0f, 1f);
+        return t * t * (3f - 2f * t);
     }
 
     private static boolean isValidAddress(String address) {
