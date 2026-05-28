@@ -686,25 +686,26 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void drawShopPenNatureDecorations(Canvas canvas) {
-        drawOutdoorTile(canvas, 0, 8, 16.18f * TILE, 18.70f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 1, 8, 16.66f * TILE, 18.86f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 4, 8, 18.34f * TILE, 20.46f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 5, 8, 18.84f * TILE, 20.38f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 0, 2, 20.06f * TILE, 18.62f * TILE, TILE * 0.62f);
-        drawOutdoorTile(canvas, 2, 3, 20.88f * TILE, 19.02f * TILE, TILE * 0.54f);
-        drawOutdoorTile(canvas, 0, 10, 17.16f * TILE, 22.12f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 1, 10, 17.64f * TILE, 22.08f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 5, 1, 20.76f * TILE, 22.02f * TILE, TILE * 0.60f);
-        drawOutdoorTile(canvas, 6, 1, 21.36f * TILE, 22.00f * TILE, TILE * 0.60f);
+        // Keep this cluster in the open grass strip above the shop fence.
+        drawOutdoorTile(canvas, 0, 8, 15.18f * TILE, 17.42f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 1, 8, 15.66f * TILE, 17.58f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 4, 8, 17.46f * TILE, 18.12f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 5, 8, 17.96f * TILE, 18.04f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 0, 2, 19.14f * TILE, 17.28f * TILE, TILE * 0.62f);
+        drawOutdoorTile(canvas, 2, 3, 19.96f * TILE, 17.74f * TILE, TILE * 0.54f);
+        drawOutdoorTile(canvas, 0, 10, 20.94f * TILE, 18.18f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 1, 10, 21.42f * TILE, 18.14f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 5, 1, 22.66f * TILE, 17.34f * TILE, TILE * 0.60f);
+        drawOutdoorTile(canvas, 6, 1, 23.26f * TILE, 17.34f * TILE, TILE * 0.60f);
 
-        drawOutdoorTile(canvas, 1, 2, 22.05f * TILE, 18.22f * TILE, TILE * 0.52f);
-        drawOutdoorTile(canvas, 2, 3, 23.98f * TILE, 18.58f * TILE, TILE * 0.56f);
-        drawOutdoorTile(canvas, 0, 2, 22.18f * TILE, 19.86f * TILE, TILE * 0.70f);
-        drawOutdoorTile(canvas, 1, 3, 23.78f * TILE, 20.20f * TILE, TILE * 0.52f);
-        drawOutdoorTile(canvas, 1, 2, 22.38f * TILE, 21.26f * TILE, TILE * 0.54f);
-        drawOutdoorTile(canvas, 2, 3, 23.88f * TILE, 21.58f * TILE, TILE * 0.54f);
-        drawOutdoorTile(canvas, 0, 11, 22.42f * TILE, 22.84f * TILE, TILE * 0.46f);
-        drawOutdoorTile(canvas, 2, 10, 23.72f * TILE, 22.90f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 1, 2, 14.62f * TILE, 18.16f * TILE, TILE * 0.52f);
+        drawOutdoorTile(canvas, 2, 3, 16.52f * TILE, 18.36f * TILE, TILE * 0.56f);
+        drawOutdoorTile(canvas, 0, 2, 18.48f * TILE, 18.18f * TILE, TILE * 0.70f);
+        drawOutdoorTile(canvas, 1, 3, 20.22f * TILE, 18.36f * TILE, TILE * 0.52f);
+        drawOutdoorTile(canvas, 1, 2, 22.08f * TILE, 18.18f * TILE, TILE * 0.54f);
+        drawOutdoorTile(canvas, 2, 3, 24.02f * TILE, 17.82f * TILE, TILE * 0.54f);
+        drawOutdoorTile(canvas, 0, 11, 23.76f * TILE, 18.42f * TILE, TILE * 0.46f);
+        drawOutdoorTile(canvas, 2, 10, 24.24f * TILE, 18.34f * TILE, TILE * 0.48f);
     }
 
     private void drawOpenMeadowDecorations(Canvas canvas, long now) {
