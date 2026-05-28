@@ -675,6 +675,18 @@ final class FarmGameView extends CanvasGameView {
         drawOutdoorTile(canvas, 0, 11, 12.82f * TILE, 24.58f * TILE, TILE * 0.52f);
         drawOutdoorTile(canvas, 1, 11, 13.74f * TILE, 24.42f * TILE, TILE * 0.52f);
 
+        drawOutdoorTile(canvas, 0, 8, 16.42f * TILE, 25.66f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 1, 8, 16.90f * TILE, 25.76f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 2, 0, 18.04f * TILE, 26.82f * TILE, TILE * 0.42f);
+        drawOutdoorTile(canvas, 0, 2, 19.56f * TILE, 26.12f * TILE, TILE * 0.62f);
+        drawOutdoorTile(canvas, 1, 2, 20.34f * TILE, 26.46f * TILE, TILE * 0.50f);
+        drawOutdoorTile(canvas, 5, 8, 21.68f * TILE, 27.74f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 6, 8, 22.16f * TILE, 27.84f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 0, 10, 17.74f * TILE, 29.38f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 1, 10, 18.22f * TILE, 29.32f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 0, 11, 20.82f * TILE, 30.22f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 2, 10, 22.88f * TILE, 29.92f * TILE, TILE * 0.46f);
+
         drawSpriteWithShadowWorld(canvas, chicken, chickenFrame, 16, 16, 4,
                 10.86f * TILE, 24.54f * TILE, TILE * 0.50f, TILE * 0.50f);
         drawSpriteWithShadowWorld(canvas, babyChicken, babyFrame, 16, 16, 4,
@@ -766,17 +778,27 @@ final class FarmGameView extends CanvasGameView {
         drawOutdoorTile(canvas, 0, 2, 34.10f * TILE, 31.08f * TILE, TILE * 0.64f);
         drawOutdoorTile(canvas, 2, 3, 35.00f * TILE, 31.30f * TILE, TILE * 0.58f);
 
-        drawOutdoorTile(canvas, 0, 8, 33.48f * TILE, 19.10f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 1, 8, 33.96f * TILE, 19.22f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 2, 0, 35.20f * TILE, 19.78f * TILE, TILE * 0.42f);
-        drawOutdoorTile(canvas, 0, 2, 36.36f * TILE, 20.42f * TILE, TILE * 0.58f);
-        drawOutdoorTile(canvas, 1, 2, 37.14f * TILE, 20.74f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 0, 10, 34.40f * TILE, 22.34f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 1, 10, 34.88f * TILE, 22.28f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 5, 8, 36.70f * TILE, 23.46f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 6, 8, 37.18f * TILE, 23.56f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 2, 3, 38.18f * TILE, 22.36f * TILE, TILE * 0.54f);
-        drawOutdoorTile(canvas, 0, 11, 38.52f * TILE, 24.24f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 0, 8, 29.28f * TILE, 18.82f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 1, 8, 29.82f * TILE, 18.98f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 2, 0, 31.24f * TILE, 19.76f * TILE, TILE * 0.42f);
+        drawOutdoorTile(canvas, 0, 2, 32.58f * TILE, 19.26f * TILE, TILE * 0.58f);
+        drawOutdoorTile(canvas, 1, 2, 33.10f * TILE, 20.02f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 0, 10, 30.42f * TILE, 22.08f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 1, 10, 30.90f * TILE, 22.02f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 5, 8, 32.06f * TILE, 23.24f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 6, 8, 32.54f * TILE, 23.34f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 2, 3, 31.38f * TILE, 24.22f * TILE, TILE * 0.54f);
+        drawOutdoorTile(canvas, 0, 11, 33.00f * TILE, 24.56f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 4, 8, 31.74f * TILE, 18.58f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 5, 8, 32.22f * TILE, 18.52f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 0, 1, 30.18f * TILE, 20.64f * TILE, TILE * 0.50f);
+        drawOutdoorTile(canvas, 1, 1, 31.06f * TILE, 21.12f * TILE, TILE * 0.44f);
+        drawOutdoorTile(canvas, 2, 8, 32.42f * TILE, 21.42f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 3, 8, 32.90f * TILE, 21.54f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 0, 9, 29.64f * TILE, 23.46f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 1, 9, 30.12f * TILE, 23.38f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 5, 1, 33.08f * TILE, 22.72f * TILE, TILE * 0.56f);
+        drawOutdoorTile(canvas, 6, 1, 33.44f * TILE, 23.06f * TILE, TILE * 0.46f);
 
         drawOutdoorTile(canvas, 0, 10, 29.22f * TILE, 32.70f * TILE, TILE * 0.48f);
         drawOutdoorTile(canvas, 1, 10, 29.68f * TILE, 32.66f * TILE, TILE * 0.48f);
