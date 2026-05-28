@@ -27,7 +27,7 @@ final class ChainAction {
             return "Claim panen " + amount;
         }
         if ("SELL_CROP".equals(type)) {
-            return "Jual panen " + amount;
+            return "Swap panen " + amount;
         }
         if ("BUY_SEED".equals(type)) {
             return "Beli bibit " + amount;
