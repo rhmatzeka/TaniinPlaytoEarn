@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/game-actions",
+      "destination": "/api/game-actions"
+    },
+    {
+      "source": "/health",
+      "destination": "/api/health"
+    }
+  ]
+}
