@@ -501,17 +501,13 @@ final class FarmGameView extends CanvasGameView {
             boolean selected = i == selectedPlot;
             if (tmxMap == null) {
                 paint.setStyle(Paint.Style.FILL);
-                paint.setColor(Color.rgb(232, 148, 69));
+                paint.setColor(plot.owned ? Color.rgb(232, 148, 69) : Color.rgb(88, 64, 40));
                 drawWorldRoundRect(canvas, plot.x, plot.y, plot.w, plot.h, 8);
-            } else if (!plot.owned) {
-                drawUnownedPlotSurface(canvas, plot);
             }
 
             paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(selected ? 5f : 2.5f);
-            paint.setColor(selected
-                    ? Color.rgb(255, 230, 82)
-                    : Color.argb(plot.owned ? 75 : 140, 31, 111, 62));
+            paint.setStrokeWidth(selected ? 5f : 2f);
+            paint.setColor(selected ? Color.rgb(255, 230, 82) : Color.argb(tmxMap == null ? 255 : 75, 31, 111, 62));
             drawWorldRoundRect(canvas, plot.x, plot.y, plot.w, plot.h, 8);
 
             paint.setStrokeWidth(1f);
@@ -533,47 +529,6 @@ final class FarmGameView extends CanvasGameView {
                 drawLock(canvas, plot);
             }
         }
-    }
-
-    private void drawUnownedPlotSurface(Canvas canvas, Plot plot) {
-        float edge = TILE * 0.16f;
-        float topEdge = TILE * 0.13f;
-        float bottomEdge = TILE * 0.14f;
-        float soilX = plot.x + edge;
-        float soilY = plot.y + topEdge;
-        float soilW = plot.w - edge * 2f;
-        float soilH = plot.h - topEdge - bottomEdge;
-
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.argb(210, 101, 185, 74));
-        drawWorldRoundRect(canvas, plot.x + 4f, plot.y + 3f, plot.w - 8f, plot.h - 6f, 10f);
-        paint.setColor(Color.rgb(235, 154, 71));
-        drawWorldRoundRect(canvas, soilX, soilY, soilW, soilH, 16f);
-        paint.setColor(Color.argb(45, 255, 191, 92));
-        drawWorldRoundRect(canvas, soilX + 10f, soilY + 9f, soilW - 20f, soilH - 18f, 12f);
-
-        drawPlotGrassPixels(canvas, plot, soilX, soilY, soilW, soilH);
-    }
-
-    private void drawPlotGrassPixels(Canvas canvas, Plot plot, float soilX, float soilY, float soilW, float soilH) {
-        paint.setStyle(Paint.Style.FILL);
-        float step = TILE * 0.24f;
-        float blade = Math.max(8f, TILE * 0.07f);
-        paint.setColor(Color.rgb(38, 134, 66));
-        for (float x = soilX - blade; x <= soilX + soilW; x += step) {
-            drawWorldRect(canvas, x, soilY - blade * 0.7f, blade, blade * 1.35f);
-            drawWorldRect(canvas, x + step * 0.42f, soilY + soilH - blade * 0.65f, blade, blade * 1.5f);
-        }
-        paint.setColor(Color.rgb(28, 107, 58));
-        for (float y = soilY + step * 0.4f; y <= soilY + soilH - step * 0.2f; y += step) {
-            drawWorldRect(canvas, soilX - blade * 0.75f, y, blade, blade * 1.45f);
-            drawWorldRect(canvas, soilX + soilW - blade * 0.25f, y + step * 0.18f, blade, blade * 1.45f);
-        }
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(3.5f);
-        paint.setColor(Color.argb(72, 55, 139, 63));
-        drawWorldRoundRect(canvas, plot.x + 5f, plot.y + 4f, plot.w - 10f, plot.h - 8f, 10f);
-        paint.setStyle(Paint.Style.FILL);
     }
 
     private void drawCrops(Canvas canvas, Plot plot, long now) {
