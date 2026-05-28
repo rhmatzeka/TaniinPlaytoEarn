@@ -608,7 +608,8 @@ final class FarmGameView extends CanvasGameView {
             drawSellHouseSign(canvas);
             return;
         }
-        drawOpenGrassDecorations(canvas);
+        drawFieldEdgeNatureDecorations(canvas);
+        drawShopPenNatureDecorations(canvas);
         drawSpriteWithShadowWorld(canvas, chicken, 0, 16, 16, 4, 22.35f * TILE, 17.45f * TILE, TILE * 0.50f, TILE * 0.50f);
         drawSpriteWithShadowWorld(canvas, chicken, 1, 16, 16, 4, 23.35f * TILE, 18.20f * TILE, TILE * 0.50f, TILE * 0.50f);
         drawSpriteWithShadowWorld(canvas, cow, 0, 32, 32, 4, 22.85f * TILE, 20.00f * TILE, TILE, TILE);
@@ -616,36 +617,44 @@ final class FarmGameView extends CanvasGameView {
         drawSpriteWithShadowWorld(canvas, babyChicken, 1, 16, 16, 4, 22.45f * TILE, 22.00f * TILE, TILE * 0.38f, TILE * 0.38f);
         drawSpriteWithShadowWorld(canvas, chicken, 4, 16, 16, 4, 22.95f * TILE, 22.75f * TILE, TILE * 0.50f, TILE * 0.50f);
         drawSpriteWithShadowWorld(canvas, babyChicken, 0, 16, 16, 4, 23.80f * TILE, 22.55f * TILE, TILE * 0.38f, TILE * 0.38f);
-        drawSpriteWithShadowWorld(canvas, chest, 0, 32, 16, 1, 23.85f * TILE, 23.15f * TILE, TILE * 0.75f, TILE * 0.38f);
     }
 
-    private void drawOpenGrassDecorations(Canvas canvas) {
+    private void drawFieldEdgeNatureDecorations(Canvas canvas) {
         long now = System.currentTimeMillis();
         int chickenFrame = (int) ((now / 440L) % 4L);
         int babyFrame = (int) ((now / 520L) % 4L);
 
-        drawDecorTile(canvas, 0, 0, 9.55f * TILE, 23.95f * TILE, TILE * 0.34f);
-        drawDecorTile(canvas, 1, 0, 14.60f * TILE, 24.82f * TILE, TILE * 0.34f);
-        drawDecorTile(canvas, 2, 0, 16.28f * TILE, 27.50f * TILE, TILE * 0.34f);
-        drawDecorTile(canvas, 1, 1, 12.15f * TILE, 24.20f * TILE, TILE * 0.58f);
-        drawDecorTile(canvas, 2, 1, 16.95f * TILE, 26.55f * TILE, TILE * 0.50f);
-        drawDecorTile(canvas, 0, 2, 14.18f * TILE, 26.24f * TILE, TILE * 0.48f);
-        drawDecorTile(canvas, 3, 4, 13.20f * TILE, 27.32f * TILE, TILE * 0.42f);
-        drawDecorTile(canvas, 0, 6, 10.90f * TILE, 25.12f * TILE, TILE * 0.42f);
-        drawDecorTile(canvas, 2, 6, 15.86f * TILE, 25.82f * TILE, TILE * 0.42f);
-        drawDecorTile(canvas, 4, 7, 16.62f * TILE, 27.15f * TILE, TILE * 0.42f);
+        drawOutdoorTile(canvas, 0, 2, 10.10f * TILE, 23.38f * TILE, TILE * 0.72f);
+        drawOutdoorTile(canvas, 1, 2, 11.22f * TILE, 24.08f * TILE, TILE * 0.56f);
+        drawOutdoorTile(canvas, 2, 3, 13.10f * TILE, 23.76f * TILE, TILE * 0.56f);
+        drawOutdoorTile(canvas, 1, 2, 14.35f * TILE, 23.18f * TILE, TILE * 0.50f);
+        drawOutdoorTile(canvas, 2, 3, 16.18f * TILE, 23.86f * TILE, TILE * 0.54f);
+        drawOutdoorTile(canvas, 0, 8, 12.12f * TILE, 22.70f * TILE, TILE * 0.48f);
+        drawOutdoorTile(canvas, 0, 11, 15.42f * TILE, 24.38f * TILE, TILE * 0.52f);
+        drawOutdoorTile(canvas, 1, 11, 17.02f * TILE, 24.26f * TILE, TILE * 0.52f);
 
         drawSpriteWithShadowWorld(canvas, chicken, chickenFrame, 16, 16, 4,
-                11.38f * TILE, 25.88f * TILE, TILE * 0.50f, TILE * 0.50f);
+                10.86f * TILE, 24.54f * TILE, TILE * 0.50f, TILE * 0.50f);
         drawSpriteWithShadowWorld(canvas, babyChicken, babyFrame, 16, 16, 4,
-                12.34f * TILE, 26.42f * TILE, TILE * 0.37f, TILE * 0.37f);
+                11.62f * TILE, 24.92f * TILE, TILE * 0.37f, TILE * 0.37f);
         drawSpriteWithShadowWorld(canvas, chicken, (chickenFrame + 2) % 4, 16, 16, 4,
-                15.48f * TILE, 27.02f * TILE, TILE * 0.48f, TILE * 0.48f);
+                14.52f * TILE, 24.64f * TILE, TILE * 0.48f, TILE * 0.48f);
         drawSpriteWithShadowWorld(canvas, babyChicken, (babyFrame + 1) % 4, 16, 16, 4,
-                16.18f * TILE, 27.44f * TILE, TILE * 0.35f, TILE * 0.35f);
+                15.18f * TILE, 24.96f * TILE, TILE * 0.35f, TILE * 0.35f);
     }
 
-    private void drawDecorTile(Canvas canvas, int col, int row, float worldX, float worldY, float size) {
+    private void drawShopPenNatureDecorations(Canvas canvas) {
+        drawOutdoorTile(canvas, 1, 2, 21.20f * TILE, 18.18f * TILE, TILE * 0.52f);
+        drawOutdoorTile(canvas, 2, 3, 24.70f * TILE, 18.52f * TILE, TILE * 0.56f);
+        drawOutdoorTile(canvas, 0, 2, 21.18f * TILE, 19.90f * TILE, TILE * 0.70f);
+        drawOutdoorTile(canvas, 1, 3, 24.72f * TILE, 20.18f * TILE, TILE * 0.52f);
+        drawOutdoorTile(canvas, 1, 2, 21.74f * TILE, 21.28f * TILE, TILE * 0.54f);
+        drawOutdoorTile(canvas, 2, 3, 24.76f * TILE, 21.62f * TILE, TILE * 0.54f);
+        drawOutdoorTile(canvas, 0, 11, 21.84f * TILE, 23.15f * TILE, TILE * 0.46f);
+        drawOutdoorTile(canvas, 2, 10, 24.72f * TILE, 23.12f * TILE, TILE * 0.48f);
+    }
+
+    private void drawOutdoorTile(Canvas canvas, int col, int row, float worldX, float worldY, float size) {
         if (outdoorDecorSheet == null) {
             return;
         }
