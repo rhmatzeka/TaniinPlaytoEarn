@@ -79,7 +79,7 @@ async function submitGameAction(body) {
   const service = await getGameService();
   const walletAddress = normalizeAddress(body.wallet, "wallet");
   const type = String(body.type || "").trim().toUpperCase();
-  const plotId = toPositiveInt(body.plotId || 0, "plotId", { allowZero: type === "SELL_CROP" });
+  const plotId = toPositiveInt(body.plotId || 0, "plotId", { allowZero: type === "SELL_CROP" || type === "SWAP_CROP" });
   const amount = toPositiveInt(body.amount || 1, "amount");
   const tokenUri = landTokenUri(walletAddress, plotId);
   const txHashes = [];
@@ -112,7 +112,8 @@ async function submitGameAction(body) {
       txHashes.push(await sendTransaction("mint seed", items.mint(walletAddress, SEED_ITEM_ID, BigInt(amount))));
       break;
     }
-    case "SELL_CROP": {
+    case "SELL_CROP":
+    case "SWAP_CROP": {
       txHashes.push(await sendTransaction("crop reward", coin.mint(walletAddress, toTani(BigInt(amount) * BigInt(CROP_REWARD)))));
       break;
     }

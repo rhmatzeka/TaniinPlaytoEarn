@@ -64,14 +64,21 @@ final class FarmGameView extends CanvasGameView {
     private static final float SHOP_NPC_Y_TILE = 25.88f;
     private static final float SHOP_NPC_SIZE = TILE * 1.16f;
     private static final float SHOP_NPC_FOOT_ANCHOR = 25f / 32f;
-    private static final float SELL_HOUSE_LEFT_TILE = 8.2f;
-    private static final float SELL_HOUSE_RIGHT_TILE = 14.0f;
-    private static final float SELL_HOUSE_TOP_TILE = 8.4f;
-    private static final float SELL_HOUSE_BOTTOM_TILE = 16.5f;
-    private static final float SELL_SIGN_X_TILE = 10.85f;
-    private static final float SELL_SIGN_Y_TILE = 13.15f;
+    private static final float SELL_HOUSE_LEFT_TILE = 27.0f;
+    private static final float SELL_HOUSE_RIGHT_TILE = 35.4f;
+    private static final float SELL_HOUSE_TOP_TILE = 8.7f;
+    private static final float SELL_HOUSE_BOTTOM_TILE = 17.1f;
+    private static final float SELL_SIGN_X_TILE = 31.0f;
+    private static final float SELL_SIGN_Y_TILE = 13.35f;
+    private static final float SWAP_HOUSE_LEFT_TILE = 8.2f;
+    private static final float SWAP_HOUSE_RIGHT_TILE = 14.0f;
+    private static final float SWAP_HOUSE_TOP_TILE = 8.4f;
+    private static final float SWAP_HOUSE_BOTTOM_TILE = 16.5f;
+    private static final float SWAP_SIGN_X_TILE = 10.85f;
+    private static final float SWAP_SIGN_Y_TILE = 13.15f;
     private static final int LAND_BUY_PRICE = 250;
     private static final int LAND_SELL_PRICE = 175;
+    private static final int HARVEST_SELL_PRICE = 35;
     private static final int HARVEST_SWAP_RATE = 35;
     private static final int SEED_BUNDLE_AMOUNT = 3;
     private static final int MAX_SHOP_BUNDLE_QUANTITY = 9;
@@ -705,6 +712,7 @@ final class FarmGameView extends CanvasGameView {
         if (foreground) {
             drawShopHouseSign(canvas);
             drawSellHouseSign(canvas);
+            drawSwapHouseSign(canvas);
             return;
         }
         drawFieldEdgeAnimals(canvas, now);
@@ -1031,8 +1039,39 @@ final class FarmGameView extends CanvasGameView {
         }
 
         drawSignPosts(canvas, sign, 22f);
+        drawWoodSignBoard(canvas, sign, "JUAL PANEN", 28f, true);
+        drawSellSignBadge(canvas, sign);
+    }
+
+    private void drawSwapHouseSign(Canvas canvas) {
+        RectF sign = swapSignBounds();
+        if (isOffscreen(sign)) {
+            return;
+        }
+
+        drawSignPosts(canvas, sign, 22f);
         drawWoodSignBoard(canvas, sign, "SWAP TANI", 31f, true);
         drawSwapSignBadge(canvas, sign);
+    }
+
+    private void drawSellSignBadge(Canvas canvas, RectF sign) {
+        float cx = sign.right - 8f;
+        float cy = sign.top - 6f;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.argb(115, 0, 0, 0));
+        canvas.drawCircle(cx + 3f, cy + 4f, 21f, paint);
+        paint.setColor(Color.rgb(255, 216, 76));
+        canvas.drawCircle(cx, cy, 20f, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(4f);
+        paint.setColor(Color.rgb(115, 69, 20));
+        canvas.drawCircle(cx, cy, 13f, paint);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(115, 69, 20));
+        paint.setTextSize(21f);
+        paint.setFakeBoldText(true);
+        drawCenteredText(canvas, "$", cx, cy + 7f);
+        paint.setFakeBoldText(false);
     }
 
     private void drawSwapSignBadge(Canvas canvas, RectF sign) {
@@ -1294,6 +1333,18 @@ final class FarmGameView extends CanvasGameView {
                 centerY + height * 0.5f);
     }
 
+    private RectF swapSignBounds() {
+        float centerX = SWAP_SIGN_X_TILE * TILE - cameraX;
+        float centerY = SWAP_SIGN_Y_TILE * TILE - cameraY;
+        float width = 230f;
+        float height = 64f;
+        return new RectF(
+                centerX - width * 0.5f,
+                centerY - height * 0.5f,
+                centerX + width * 0.5f,
+                centerY + height * 0.5f);
+    }
+
     private RectF shopSignTapBounds() {
         RectF bounds = new RectF(shopSignBounds());
         bounds.inset(-24f, -22f);
@@ -1318,6 +1369,12 @@ final class FarmGameView extends CanvasGameView {
 
     private RectF sellSignTapBounds() {
         RectF bounds = new RectF(sellSignBounds());
+        bounds.inset(-26f, -24f);
+        return bounds;
+    }
+
+    private RectF swapSignTapBounds() {
+        RectF bounds = new RectF(swapSignBounds());
         bounds.inset(-26f, -24f);
         return bounds;
     }
@@ -2855,6 +2912,10 @@ final class FarmGameView extends CanvasGameView {
                 return "";
             case SELL_HARVEST:
                 return harvests > 0
+                        ? "A: jual " + harvests + " panen jadi coin wallet."
+                        : "Rumah jual: belum ada hasil panen.";
+            case SWAP_TOKEN:
+                return harvests > 0
                         ? "A: swap " + harvests + " panen ke TANI Sepolia."
                         : "Rumah swap: belum ada hasil panen.";
             case BUY_LAND:
@@ -2882,6 +2943,9 @@ final class FarmGameView extends CanvasGameView {
         if (isNearSellHouse()) {
             return InteractionKind.SELL_HARVEST;
         }
+        if (isNearSwapHouse()) {
+            return InteractionKind.SWAP_TOKEN;
+        }
         return InteractionKind.NONE;
     }
 
@@ -2903,7 +2967,7 @@ final class FarmGameView extends CanvasGameView {
 
     private void drawShopPanel(Canvas canvas) {
         float w = 360;
-        float h = 156;
+        float h = 186;
         float x = (getWidth() - w) / 2f;
         float y = 84;
         paint.setStyle(Paint.Style.FILL);
@@ -2917,13 +2981,16 @@ final class FarmGameView extends CanvasGameView {
         paint.setColor(Color.WHITE);
         String shopLine = "SHOP: pilih benih, bayar pakai coin wallet";
         String landLine = "Lahan: beli " + LAND_BUY_PRICE + ", jual kosong +" + LAND_SELL_PRICE + " coin";
-        String harvestLine = "Rumah Swap: panen -> TANI Sepolia (1 = " + HARVEST_SWAP_RATE + ")";
+        String harvestLine = "Rumah Jual: panen -> coin wallet (1 = " + HARVEST_SELL_PRICE + ")";
+        String swapLine = "Rumah Swap: panen -> TANI Sepolia (1 = " + HARVEST_SWAP_RATE + ")";
         paint.setTextSize(fitTextSize(shopLine, 19f, w - 44f));
         canvas.drawText(shopLine, x + 22, y + 78, paint);
         paint.setTextSize(fitTextSize(landLine, 19f, w - 44f));
         canvas.drawText(landLine, x + 22, y + 108, paint);
         paint.setTextSize(fitTextSize(harvestLine, 19f, w - 44f));
         canvas.drawText(harvestLine, x + 22, y + 138, paint);
+        paint.setTextSize(fitTextSize(swapLine, 19f, w - 44f));
+        canvas.drawText(swapLine, x + 22, y + 168, paint);
     }
 
     private void drawChainPanel(Canvas canvas, long now) {
@@ -3416,6 +3483,11 @@ final class FarmGameView extends CanvasGameView {
                 openInteractionDialog(InteractionKind.SELL_HARVEST);
                 return true;
             }
+            if (isNearSwapHouse() && swapSignTapBounds().contains(x, y)) {
+                playClickSound();
+                openInteractionDialog(InteractionKind.SWAP_TOKEN);
+                return true;
+            }
             if (isInsideJoystickArea(x, y)) {
                 joystickActive = true;
                 joystickPointerId = pointerId;
@@ -3511,6 +3583,16 @@ final class FarmGameView extends CanvasGameView {
             if (isNearShop()) {
                 playClickSound();
                 openInteractionDialog(InteractionKind.SHOP);
+                return true;
+            }
+            if (isNearSellHouse()) {
+                playClickSound();
+                openInteractionDialog(InteractionKind.SELL_HARVEST);
+                return true;
+            }
+            if (isNearSwapHouse()) {
+                playClickSound();
+                openInteractionDialog(InteractionKind.SWAP_TOKEN);
                 return true;
             }
         }
@@ -3906,6 +3988,11 @@ final class FarmGameView extends CanvasGameView {
         }
         if (activeInteractionKind == InteractionKind.SELL_HARVEST) {
             interactionDialogOpen = false;
+            sellHarvestToWallet();
+            return;
+        }
+        if (activeInteractionKind == InteractionKind.SWAP_TOKEN) {
+            interactionDialogOpen = false;
             swapHarvestToSepolia();
             return;
         }
@@ -4045,6 +4132,8 @@ final class FarmGameView extends CanvasGameView {
             case SHOP:
                 return "Ucup";
             case SELL_HARVEST:
+                return "Jual Panen";
+            case SWAP_TOKEN:
                 return "Swap Token";
             case BUY_LAND:
                 return "Lahan";
@@ -4066,6 +4155,13 @@ final class FarmGameView extends CanvasGameView {
             case SHOP:
                 return "Pilih benih yang mau dibeli memakai coin wallet.";
             case SELL_HARVEST:
+                if (walletAddress.isEmpty()) {
+                    return "Connect wallet dulu sebelum jual hasil panen.";
+                }
+                return harvests > 0
+                        ? "Jual " + harvests + " hasil panen? Coin akan masuk ke wallet."
+                        : "Belum ada hasil panen untuk dijual.";
+            case SWAP_TOKEN:
                 if (walletAddress.isEmpty()) {
                     return "Connect wallet dulu supaya swap masuk ke TANI Sepolia.";
                 }
@@ -4100,6 +4196,11 @@ final class FarmGameView extends CanvasGameView {
                 if (walletAddress.isEmpty()) {
                     return "Connect wallet";
                 }
+                return harvests > 0 ? "Ya, jual panen" : "Oke";
+            case SWAP_TOKEN:
+                if (walletAddress.isEmpty()) {
+                    return "Connect wallet";
+                }
                 return harvests > 0 ? "Swap ke Sepolia" : "Oke";
             case BUY_LAND:
                 return "Ya, beli lahan";
@@ -4123,6 +4224,7 @@ final class FarmGameView extends CanvasGameView {
             case SELL_LAND:
             case HARVEST:
             case SELL_HARVEST:
+            case SWAP_TOKEN:
                 return "Batal";
             default:
                 return "Tidak apa-apa";
@@ -4290,7 +4392,11 @@ final class FarmGameView extends CanvasGameView {
             openInteractionDialog(InteractionKind.SELL_HARVEST);
             return;
         }
-        showErrorMessage("Dekati lahan, shop, atau rumah swap dulu.");
+        if (isNearSwapHouse()) {
+            openInteractionDialog(InteractionKind.SWAP_TOKEN);
+            return;
+        }
+        showErrorMessage("Dekati lahan, shop, rumah jual, atau rumah swap dulu.");
     }
 
     private void showShopNpcBubble() {
@@ -4415,6 +4521,28 @@ final class FarmGameView extends CanvasGameView {
         showSuccessPopup("Berhasil membeli " + totalSeeds + " benih " + SEED_NAMES[seedIndex] + ".");
     }
 
+    private void sellHarvestToWallet() {
+        if (walletAddress.isEmpty()) {
+            showErrorMessage("Connect wallet dulu sebelum jual panen.");
+            performWallet();
+            return;
+        }
+        if (harvests <= 0) {
+            showErrorMessage("Belum ada hasil panen untuk dijual.");
+            return;
+        }
+        int soldHarvests = harvests;
+        int earnedCoins = soldHarvests * HARVEST_SELL_PRICE;
+        harvests = 0;
+        coins += earnedCoins;
+        queueChainAction(new ChainAction("SELL_CROP", 0, soldHarvests));
+        saveGameState();
+        showSuccessPopup(String.format(Locale.US,
+                "Terjual %d panen. Coin wallet +%d.",
+                soldHarvests,
+                earnedCoins));
+    }
+
     private void swapHarvestToSepolia() {
         if (walletAddress.isEmpty()) {
             showErrorMessage("Connect wallet dulu sebelum swap ke Sepolia.");
@@ -4429,7 +4557,7 @@ final class FarmGameView extends CanvasGameView {
         int earnedCoins = soldHarvests * HARVEST_SWAP_RATE;
         harvests = 0;
         coins += earnedCoins;
-        queueChainAction(new ChainAction("SELL_CROP", 0, soldHarvests));
+        queueChainAction(new ChainAction("SWAP_CROP", 0, soldHarvests));
         saveGameState();
         showSuccessPopup(String.format(Locale.US,
                 "Swap %d panen. TANI Sepolia +%d.",
@@ -4955,6 +5083,13 @@ final class FarmGameView extends CanvasGameView {
                 && playerY < SELL_HOUSE_BOTTOM_TILE * TILE;
     }
 
+    private boolean isNearSwapHouse() {
+        return playerX > SWAP_HOUSE_LEFT_TILE * TILE
+                && playerX < SWAP_HOUSE_RIGHT_TILE * TILE
+                && playerY > SWAP_HOUSE_TOP_TILE * TILE
+                && playerY < SWAP_HOUSE_BOTTOM_TILE * TILE;
+    }
+
     private void drawGrassTexture(Canvas canvas) {
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.argb(90, 79, 156, 72));
@@ -5257,6 +5392,7 @@ enum InteractionKind {
     NONE,
     SHOP,
     SELL_HARVEST,
+    SWAP_TOKEN,
     BUY_LAND,
     PLANT,
     SELL_LAND,
