@@ -79,7 +79,7 @@ final class FarmGameView extends CanvasGameView {
     private static final int LAND_BUY_PRICE = 250;
     private static final int LAND_SELL_PRICE = 175;
     private static final int HARVEST_SELL_PRICE = 35;
-    private static final int HARVEST_SWAP_RATE = 35;
+    private static final int COIN_SWAP_RATE = 1;
     private static final int SEED_BUNDLE_AMOUNT = 3;
     private static final int MAX_SHOP_BUNDLE_QUANTITY = 9;
     private static final int LAND_STATE_VERSION = 2;
@@ -2915,9 +2915,9 @@ final class FarmGameView extends CanvasGameView {
                         ? "A: jual " + harvests + " panen jadi coin wallet."
                         : "Rumah jual: belum ada hasil panen.";
             case SWAP_TOKEN:
-                return harvests > 0
-                        ? "A: swap " + harvests + " panen ke TANI Sepolia."
-                        : "Rumah swap: belum ada hasil panen.";
+                return coins > 0
+                        ? "A: swap " + coins + " coin ke TANI Sepolia."
+                        : "Rumah swap: coin belum ada.";
             case BUY_LAND:
                 return "A: beli lahan " + LAND_BUY_PRICE + " coin.";
             case PLANT:
@@ -2982,7 +2982,7 @@ final class FarmGameView extends CanvasGameView {
         String shopLine = "SHOP: pilih benih, bayar pakai coin wallet";
         String landLine = "Lahan: beli " + LAND_BUY_PRICE + ", jual kosong +" + LAND_SELL_PRICE + " coin";
         String harvestLine = "Rumah Jual: panen -> coin wallet (1 = " + HARVEST_SELL_PRICE + ")";
-        String swapLine = "Rumah Swap: panen -> TANI Sepolia (1 = " + HARVEST_SWAP_RATE + ")";
+        String swapLine = "Rumah Swap: coin -> TANI Sepolia (1 = " + COIN_SWAP_RATE + ")";
         paint.setTextSize(fitTextSize(shopLine, 19f, w - 44f));
         canvas.drawText(shopLine, x + 22, y + 78, paint);
         paint.setTextSize(fitTextSize(landLine, 19f, w - 44f));
@@ -3993,7 +3993,7 @@ final class FarmGameView extends CanvasGameView {
         }
         if (activeInteractionKind == InteractionKind.SWAP_TOKEN) {
             interactionDialogOpen = false;
-            swapHarvestToSepolia();
+            swapCoinsToSepolia();
             return;
         }
         if (activeInteractionKind == InteractionKind.SELL_LAND) {
@@ -4163,11 +4163,11 @@ final class FarmGameView extends CanvasGameView {
                         : "Belum ada hasil panen untuk dijual.";
             case SWAP_TOKEN:
                 if (walletAddress.isEmpty()) {
-                    return "Connect wallet dulu supaya swap masuk ke TANI Sepolia.";
+                    return "Connect wallet dulu supaya coin bisa masuk ke TANI Sepolia.";
                 }
-                return harvests > 0
-                        ? "Swap " + harvests + " panen -> " + (harvests * HARVEST_SWAP_RATE) + " TANI Sepolia."
-                        : "Belum ada hasil panen untuk diswap.";
+                return coins > 0
+                        ? "Swap " + coins + " coin -> " + (coins * COIN_SWAP_RATE) + " TANI Sepolia."
+                        : "Coin belum ada untuk diswap.";
             case BUY_LAND:
                 return "Lahan ini bisa dibeli seharga " + LAND_BUY_PRICE + " coin.";
             case PLANT:
@@ -4201,7 +4201,7 @@ final class FarmGameView extends CanvasGameView {
                 if (walletAddress.isEmpty()) {
                     return "Connect wallet";
                 }
-                return harvests > 0 ? "Swap ke Sepolia" : "Oke";
+                return coins > 0 ? "Swap ke Sepolia" : "Oke";
             case BUY_LAND:
                 return "Ya, beli lahan";
             case PLANT:
@@ -4543,26 +4543,30 @@ final class FarmGameView extends CanvasGameView {
                 earnedCoins));
     }
 
-    private void swapHarvestToSepolia() {
+    private void swapCoinsToSepolia() {
         if (walletAddress.isEmpty()) {
             showErrorMessage("Connect wallet dulu sebelum swap ke Sepolia.");
             performWallet();
             return;
         }
-        if (harvests <= 0) {
-            showErrorMessage("Belum ada hasil panen untuk diswap.");
+        if (!blockchainClient.hasGameApi()) {
+            showErrorMessage("Signer backend Vercel belum diset, swap belum bisa on-chain.");
             return;
         }
-        int soldHarvests = harvests;
-        int earnedCoins = soldHarvests * HARVEST_SWAP_RATE;
-        harvests = 0;
-        coins += earnedCoins;
-        queueChainAction(new ChainAction("SWAP_CROP", 0, soldHarvests));
+        if (coins <= 0) {
+            showErrorMessage("Coin belum ada untuk diswap.");
+            return;
+        }
+        int swappedCoins = coins;
+        int mintedTani = swappedCoins * COIN_SWAP_RATE;
+        coins = 0;
+        coinBalanceOnChain = false;
+        queueChainAction(new ChainAction("SWAP_COIN", 0, swappedCoins));
         saveGameState();
         showSuccessPopup(String.format(Locale.US,
-                "Swap %d panen. TANI Sepolia +%d.",
-                soldHarvests,
-                earnedCoins));
+                "Swap %d coin. TANI Sepolia +%d.",
+                swappedCoins,
+                mintedTani));
     }
 
     private void performWallet() {
@@ -4786,6 +4790,9 @@ final class FarmGameView extends CanvasGameView {
                     String status = BlockchainClient.isValidTransactionHash(result.txHash) ? "on-chain" : "dikirim";
                     updateChainHistory(historyEntry, status, result.txHash);
                     chainStatus = result.message;
+                    if (actionUpdatesCoinBalance(action)) {
+                        postDelayed(() -> refreshWalletState(true), 9000L);
+                    }
                 } else {
                     updateChainHistory(historyEntry, "belum sync", "");
                     chainStatus = syncedLocalChainStatus(action, result.message);
@@ -4798,6 +4805,13 @@ final class FarmGameView extends CanvasGameView {
             chainPanelUntilMs = System.currentTimeMillis() + 3600L;
             invalidate();
         }
+    }
+
+    private boolean actionUpdatesCoinBalance(ChainAction action) {
+        return "SELL_LAND".equals(action.type)
+                || "SELL_CROP".equals(action.type)
+                || "SWAP_CROP".equals(action.type)
+                || "SWAP_COIN".equals(action.type);
     }
 
     private String initialChainHistoryStatus() {

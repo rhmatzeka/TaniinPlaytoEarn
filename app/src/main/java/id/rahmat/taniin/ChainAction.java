@@ -32,6 +32,9 @@ final class ChainAction {
         if ("SWAP_CROP".equals(type)) {
             return "Swap panen " + amount;
         }
+        if ("SWAP_COIN".equals(type)) {
+            return "Swap coin " + amount;
+        }
         if ("BUY_SEED".equals(type)) {
             return "Beli bibit " + amount;
         }

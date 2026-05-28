@@ -5,6 +5,7 @@ const SEED_ITEM_ID = 1n;
 const CROP_ITEM_ID = 2n;
 const LAND_SELL_REWARD = 175;
 const CROP_REWARD = 35;
+const COIN_SWAP_RATE = 1;
 
 const coinAbi = [
   "function mint(address to, uint256 amount) external",
@@ -79,7 +80,9 @@ async function submitGameAction(body) {
   const service = await getGameService();
   const walletAddress = normalizeAddress(body.wallet, "wallet");
   const type = String(body.type || "").trim().toUpperCase();
-  const plotId = toPositiveInt(body.plotId || 0, "plotId", { allowZero: type === "SELL_CROP" || type === "SWAP_CROP" });
+  const plotId = toPositiveInt(body.plotId || 0, "plotId", {
+    allowZero: type === "SELL_CROP" || type === "SWAP_CROP" || type === "SWAP_COIN"
+  });
   const amount = toPositiveInt(body.amount || 1, "amount");
   const tokenUri = landTokenUri(walletAddress, plotId);
   const txHashes = [];
@@ -115,6 +118,10 @@ async function submitGameAction(body) {
     case "SELL_CROP":
     case "SWAP_CROP": {
       txHashes.push(await sendTransaction("crop reward", coin.mint(walletAddress, toTani(BigInt(amount) * BigInt(CROP_REWARD)))));
+      break;
+    }
+    case "SWAP_COIN": {
+      txHashes.push(await sendTransaction("coin swap", coin.mint(walletAddress, toTani(BigInt(amount) * BigInt(COIN_SWAP_RATE)))));
       break;
     }
     default:
