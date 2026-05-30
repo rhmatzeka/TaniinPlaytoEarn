@@ -3103,9 +3103,13 @@ final class FarmGameView extends CanvasGameView {
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(255, 240, 212));
         String body = interactionBody(now);
-        paint.setTextSize(fitTextSize(body, 28f, textBox.width() - 56f));
+        paint.setTextSize(fitTextSize(body, activeInteractionKind == InteractionKind.SWAP_TOKEN ? 27f : 28f, textBox.width() - 56f));
         paint.setFakeBoldText(false);
-        canvas.drawText(body, textBox.left + 28f, textBox.top + 60f, paint);
+        if (activeInteractionKind == InteractionKind.SWAP_TOKEN) {
+            drawCenteredText(canvas, body, textBox.centerX(), textBox.centerY() + 10f);
+        } else {
+            canvas.drawText(body, textBox.left + 28f, textBox.top + 60f, paint);
+        }
 
         if (activeInteractionKind == InteractionKind.PLANT) {
             drawPlantSeedSelector(canvas);
@@ -3363,28 +3367,58 @@ final class FarmGameView extends CanvasGameView {
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.argb(120, 0, 0, 0));
         canvas.drawCircle(button.centerX() + 4f, button.centerY() + 5f, button.width() * 0.5f, paint);
-        paint.setColor(Color.rgb(203, 255, 42));
+        paint.setColor(Color.rgb(244, 188, 48));
         canvas.drawCircle(button.centerX(), button.centerY(), button.width() * 0.5f, paint);
+        paint.setColor(Color.argb(70, 255, 244, 170));
+        canvas.drawCircle(button.centerX() - 8f, button.centerY() - 9f, button.width() * 0.22f, paint);
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(4f);
-        paint.setColor(Color.rgb(38, 51, 18));
+        paint.setStrokeWidth(5f);
+        paint.setColor(Color.rgb(82, 43, 15));
         canvas.drawCircle(button.centerX(), button.centerY(), button.width() * 0.5f - 2f, paint);
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(30, 36, 17));
-        paint.setTextSize(30f);
-        paint.setFakeBoldText(true);
+        paint.setStrokeWidth(2f);
+        paint.setColor(Color.rgb(255, 224, 91));
+        canvas.drawCircle(button.centerX(), button.centerY(), button.width() * 0.5f - 8f, paint);
         float spin = clamp((now - swapSwitchAnimStartMs) / 260f, 0f, 1f);
         canvas.save();
         canvas.rotate(spin * 180f, button.centerX(), button.centerY());
-        drawCenteredText(canvas, "<->", button.centerX(), button.centerY() + 10f);
+        drawSwapSwitchGlyph(canvas, button.centerX(), button.centerY(), button.width() * 0.42f);
         canvas.restore();
-        paint.setFakeBoldText(false);
+    }
 
+    private void drawSwapSwitchGlyph(Canvas canvas, float cx, float cy, float size) {
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(4.5f);
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setStrokeJoin(Paint.Join.ROUND);
+        paint.setColor(Color.rgb(61, 35, 15));
+
+        float left = cx - size * 0.62f;
+        float right = cx + size * 0.62f;
+        float upper = cy - size * 0.38f;
+        float lower = cy + size * 0.38f;
+
+        Path top = new Path();
+        top.moveTo(left, cy - size * 0.08f);
+        top.cubicTo(cx - size * 0.42f, upper, cx + size * 0.40f, upper, right, cy - size * 0.08f);
+        canvas.drawPath(top, paint);
+        canvas.drawLine(right, cy - size * 0.08f, right - size * 0.22f, cy - size * 0.28f, paint);
+        canvas.drawLine(right, cy - size * 0.08f, right - size * 0.08f, cy - size * 0.36f, paint);
+
+        Path bottom = new Path();
+        bottom.moveTo(right, cy + size * 0.08f);
+        bottom.cubicTo(cx + size * 0.42f, lower, cx - size * 0.40f, lower, left, cy + size * 0.08f);
+        canvas.drawPath(bottom, paint);
+        canvas.drawLine(left, cy + size * 0.08f, left + size * 0.22f, cy + size * 0.28f, paint);
+        canvas.drawLine(left, cy + size * 0.08f, left + size * 0.08f, cy + size * 0.36f, paint);
+
+        paint.setStrokeCap(Paint.Cap.BUTT);
+        paint.setStrokeJoin(Paint.Join.MITER);
+        paint.setStyle(Paint.Style.FILL);
     }
 
     private void drawSwapField(Canvas canvas, RectF bounds, boolean from) {
-        String headerLeft = from ? "From" : "To";
-        String headerRight = from ? "Jumlah input" : "Estimasi output";
+        String headerLeft = from ? "Dari" : "Ke";
+        String headerRight = from ? "Jumlah" : "Estimasi";
         int asset = from ? SWAP_ASSET_COIN : selectedSwapToAsset();
         String symbol = swapAssetSymbol(asset);
         String name = swapAssetName(asset);
@@ -3392,59 +3426,80 @@ final class FarmGameView extends CanvasGameView {
 
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.argb(95, 0, 0, 0));
-        canvas.drawRoundRect(bounds.left + 5f, bounds.top + 6f, bounds.right + 5f, bounds.bottom + 6f, 18, 18, paint);
-        paint.setColor(Color.rgb(22, 23, 27));
-        canvas.drawRoundRect(bounds, 18, 18, paint);
+        canvas.drawRoundRect(bounds.left + 5f, bounds.top + 6f, bounds.right + 5f, bounds.bottom + 6f, 16, 16, paint);
+        paint.setColor(Color.rgb(126, 61, 24));
+        canvas.drawRoundRect(bounds, 16, 16, paint);
+        paint.setColor(Color.argb(48, 255, 218, 101));
+        canvas.drawRoundRect(bounds.left + 8f, bounds.top + 7f, bounds.right - 8f, bounds.top + 30f, 12, 12, paint);
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(3f);
-        paint.setColor(Color.rgb(43, 44, 52));
-        canvas.drawRoundRect(bounds, 18, 18, paint);
+        paint.setStrokeWidth(4f);
+        paint.setColor(Color.rgb(72, 35, 11));
+        canvas.drawRoundRect(bounds, 16, 16, paint);
+        paint.setStrokeWidth(2f);
+        paint.setColor(Color.rgb(188, 101, 43));
+        canvas.drawRoundRect(bounds.left + 7f, bounds.top + 7f, bounds.right - 7f, bounds.bottom - 7f, 12, 12, paint);
 
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(159, 154, 171));
-        paint.setTextSize(17f);
+        paint.setColor(Color.rgb(255, 224, 84));
+        paint.setTextSize(18f);
         paint.setFakeBoldText(true);
-        canvas.drawText(headerLeft, bounds.left + 28f, bounds.top + 28f, paint);
-        paint.setTextSize(fitTextSize(headerRight, 16f, bounds.width() * 0.42f));
-        canvas.drawText(headerRight, bounds.right - 28f - paint.measureText(headerRight), bounds.top + 28f, paint);
+        canvas.drawText(headerLeft, bounds.left + 28f, bounds.top + 29f, paint);
+        paint.setTextSize(fitTextSize(headerRight, 16f, bounds.width() * 0.34f));
+        canvas.drawText(headerRight, bounds.right - 28f - paint.measureText(headerRight), bounds.top + 29f, paint);
         paint.setFakeBoldText(false);
 
         RectF chip = swapChipBounds(from);
-        paint.setColor(Color.rgb(31, 32, 38));
-        canvas.drawRoundRect(chip, 25, 25, paint);
+        paint.setColor(Color.rgb(84, 42, 18));
+        canvas.drawRoundRect(chip, 14, 14, paint);
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(swapAssetMenuOpen && swapAssetMenuFrom == from ? 4f : 3f);
-        paint.setColor(swapAssetMenuOpen && swapAssetMenuFrom == from ? Color.rgb(203, 255, 42) : Color.rgb(50, 51, 60));
-        canvas.drawRoundRect(chip, 25, 25, paint);
+        paint.setColor(swapAssetMenuOpen && swapAssetMenuFrom == from ? Color.rgb(255, 218, 46) : Color.rgb(106, 57, 22));
+        canvas.drawRoundRect(chip, 14, 14, paint);
 
-        drawSwapTokenIcon(canvas, chip.left + 31f, chip.centerY(), asset);
+        drawSwapTokenIcon(canvas, chip.left + 33f, chip.centerY(), asset);
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.WHITE);
-        paint.setTextSize(fitTextSize(symbol, 25f, chip.width() - 88f));
+        paint.setColor(Color.rgb(255, 240, 212));
+        paint.setTextSize(fitTextSize(symbol, 25f, chip.width() - 104f));
         paint.setFakeBoldText(true);
-        canvas.drawText(symbol, chip.left + 68f, chip.top + 38f, paint);
-        paint.setColor(Color.rgb(168, 164, 179));
-        paint.setTextSize(24f);
-        canvas.drawText("v", chip.right - 32f, chip.top + 38f, paint);
+        canvas.drawText(symbol, chip.left + 70f, chip.top + 39f, paint);
+        drawSwapChevron(canvas, chip.right - 27f, chip.centerY());
         paint.setFakeBoldText(false);
 
-        paint.setColor(Color.rgb(100, 96, 111));
-        paint.setTextSize(fitTextSize(name, 17f, bounds.width() * 0.42f));
-        canvas.drawText(name, bounds.left + 30f, bounds.bottom - 12f, paint);
+        paint.setColor(Color.rgb(245, 194, 124));
+        paint.setTextSize(fitTextSize(name, 16f, chip.width() - 102f));
+        canvas.drawText(name, chip.left + 70f, chip.bottom - 10f, paint);
 
         RectF amountBox = swapAmountBounds(from);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(from ? Color.rgb(80, 39, 18) : Color.rgb(95, 45, 18));
+        canvas.drawRoundRect(amountBox, 13, 13, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(from ? 3f : 2f);
+        paint.setColor(from ? Color.rgb(255, 200, 65) : Color.rgb(130, 70, 28));
+        canvas.drawRoundRect(amountBox, 13, 13, paint);
         if (from) {
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(2f);
-            paint.setColor(Color.rgb(53, 55, 66));
-            canvas.drawRoundRect(amountBox, 12, 12, paint);
-            paint.setStyle(Paint.Style.FILL);
+            drawSwapEditGlyph(canvas, amountBox.left + 21f, amountBox.centerY());
         }
-        paint.setColor(gameState.coins > 0 || from ? Color.rgb(232, 229, 238) : Color.rgb(112, 108, 122));
-        paint.setTextSize(fitTextSize(amount, 40f, amountBox.width() - 18f));
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(gameState.coins > 0 || from ? Color.rgb(255, 240, 212) : Color.rgb(174, 139, 101));
+        paint.setTextSize(fitTextSize(amount, 38f, amountBox.width() - (from ? 68f : 26f)));
         paint.setFakeBoldText(true);
-        canvas.drawText(amount, amountBox.right - 12f - paint.measureText(amount), bounds.centerY() + 18f, paint);
+        canvas.drawText(amount, amountBox.right - 14f - paint.measureText(amount), amountBox.centerY() + 14f, paint);
         paint.setFakeBoldText(false);
+    }
+
+    private void drawSwapEditGlyph(Canvas canvas, float cx, float cy) {
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(3f);
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setColor(Color.rgb(255, 214, 93));
+        canvas.drawLine(cx - 6f, cy + 7f, cx + 7f, cy - 6f, paint);
+        canvas.drawLine(cx - 9f, cy + 10f, cx - 3f, cy + 8f, paint);
+        paint.setStrokeWidth(2f);
+        canvas.drawLine(cx + 4f, cy - 9f, cx + 10f, cy - 3f, paint);
+        paint.setStrokeCap(Paint.Cap.BUTT);
+        paint.setStyle(Paint.Style.FILL);
     }
 
     private void drawSwapAssetDropdown(Canvas canvas) {
@@ -3454,13 +3509,16 @@ final class FarmGameView extends CanvasGameView {
 
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.argb(125, 0, 0, 0));
-        canvas.drawRoundRect(menu.left + 4f, menu.top + 5f, menu.right + 4f, menu.bottom + 5f, 16, 16, paint);
-        paint.setColor(Color.rgb(20, 21, 26));
-        canvas.drawRoundRect(menu, 16, 16, paint);
+        canvas.drawRoundRect(menu.left + 4f, menu.top + 5f, menu.right + 4f, menu.bottom + 5f, 14, 14, paint);
+        paint.setColor(Color.rgb(92, 43, 18));
+        canvas.drawRoundRect(menu, 14, 14, paint);
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(3f);
-        paint.setColor(Color.rgb(69, 72, 86));
-        canvas.drawRoundRect(menu, 16, 16, paint);
+        paint.setColor(Color.rgb(62, 31, 12));
+        canvas.drawRoundRect(menu, 14, 14, paint);
+        paint.setStrokeWidth(2f);
+        paint.setColor(Color.rgb(188, 101, 43));
+        canvas.drawRoundRect(menu.left + 6f, menu.top + 6f, menu.right - 6f, menu.bottom - 6f, 10, 10, paint);
 
         for (int i = 0; i < count; i++) {
             drawSwapAssetOption(canvas, swapAssetOptionBounds(from, i), from, i);
@@ -3473,43 +3531,110 @@ final class FarmGameView extends CanvasGameView {
         boolean enabled = !from || asset == SWAP_ASSET_COIN;
 
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(selected ? Color.rgb(38, 43, 48) : Color.rgb(20, 21, 26));
-        canvas.drawRoundRect(row, 12, 12, paint);
+        paint.setColor(selected ? Color.rgb(127, 65, 25) : Color.rgb(76, 38, 17));
+        if (!enabled) {
+            paint.setColor(Color.rgb(58, 36, 26));
+        }
+        canvas.drawRoundRect(row, 10, 10, paint);
         if (selected) {
             paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(2f);
-            paint.setColor(Color.rgb(203, 255, 42));
-            canvas.drawRoundRect(row, 12, 12, paint);
+            paint.setStrokeWidth(3f);
+            paint.setColor(Color.rgb(255, 218, 46));
+            canvas.drawRoundRect(row, 10, 10, paint);
             paint.setStyle(Paint.Style.FILL);
         }
 
-        drawSwapTokenIcon(canvas, row.left + 30f, row.centerY(), asset);
-        paint.setColor(enabled ? Color.rgb(239, 238, 247) : Color.rgb(118, 114, 126));
-        paint.setTextSize(20f);
+        drawSwapTokenIcon(canvas, row.left + 34f, row.centerY(), asset);
+        paint.setColor(enabled ? Color.rgb(255, 240, 212) : Color.rgb(154, 122, 91));
+        paint.setTextSize(21f);
         paint.setFakeBoldText(true);
-        canvas.drawText(swapAssetSymbol(asset), row.left + 66f, row.top + 29f, paint);
+        canvas.drawText(swapAssetSymbol(asset), row.left + 74f, row.top + 32f, paint);
         paint.setFakeBoldText(false);
-        paint.setColor(enabled ? Color.rgb(144, 141, 154) : Color.rgb(92, 88, 98));
-        paint.setTextSize(14f);
-        canvas.drawText(enabled ? swapAssetName(asset) : "Belum aktif", row.left + 66f, row.top + 48f, paint);
+        paint.setColor(enabled ? Color.rgb(245, 194, 124) : Color.rgb(119, 90, 66));
+        paint.setTextSize(15f);
+        canvas.drawText(enabled ? swapAssetName(asset) : "Belum aktif", row.left + 74f, row.top + 52f, paint);
     }
 
     private void drawSwapTokenIcon(Canvas canvas, float cx, float cy, int asset) {
         if (asset == SWAP_ASSET_COIN) {
-            paint.setColor(Color.rgb(244, 192, 46));
+            drawSwapCoinIcon(canvas, cx, cy);
         } else if (asset == SWAP_ASSET_ETH) {
-            paint.setColor(Color.rgb(111, 136, 244));
+            drawSwapEthIcon(canvas, cx, cy);
         } else {
-            paint.setColor(Color.rgb(50, 184, 113));
+            drawSwapTaniIcon(canvas, cx, cy);
         }
+    }
+
+    private void drawSwapChevron(Canvas canvas, float cx, float cy) {
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(3.5f);
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setStrokeJoin(Paint.Join.ROUND);
+        paint.setColor(Color.rgb(255, 218, 91));
+        canvas.drawLine(cx - 7f, cy - 4f, cx, cy + 5f, paint);
+        canvas.drawLine(cx + 7f, cy - 4f, cx, cy + 5f, paint);
+        paint.setStrokeCap(Paint.Cap.BUTT);
+        paint.setStrokeJoin(Paint.Join.MITER);
         paint.setStyle(Paint.Style.FILL);
-        canvas.drawCircle(cx, cy, 24f, paint);
+    }
+
+    private void drawSwapIconBase(Canvas canvas, float cx, float cy, int fill, int stroke) {
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(fill);
+        canvas.drawCircle(cx, cy, 20.5f, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(2.5f);
+        paint.setColor(stroke);
+        canvas.drawCircle(cx, cy, 18.4f, paint);
+        paint.setStyle(Paint.Style.FILL);
+    }
+
+    private void drawSwapCoinIcon(Canvas canvas, float cx, float cy) {
+        drawSwapIconBase(canvas, cx, cy, Color.rgb(244, 192, 46), Color.rgb(124, 84, 22));
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(2.5f);
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setColor(Color.rgb(255, 239, 151));
+        canvas.drawLine(cx - 7f, cy - 6f, cx + 7f, cy - 6f, paint);
+        canvas.drawLine(cx - 9f, cy, cx + 9f, cy, paint);
+        canvas.drawLine(cx - 5f, cy + 6f, cx + 5f, cy + 6f, paint);
+        paint.setStrokeCap(Paint.Cap.BUTT);
+        paint.setStyle(Paint.Style.FILL);
+    }
+
+    private void drawSwapEthIcon(Canvas canvas, float cx, float cy) {
+        drawSwapIconBase(canvas, cx, cy, Color.rgb(111, 136, 244), Color.rgb(58, 72, 162));
+        Path diamond = new Path();
+        diamond.moveTo(cx, cy - 14f);
+        diamond.lineTo(cx + 8f, cy - 1f);
+        diamond.lineTo(cx, cy + 5f);
+        diamond.lineTo(cx - 8f, cy - 1f);
+        diamond.close();
+        paint.setColor(Color.rgb(244, 246, 255));
+        canvas.drawPath(diamond, paint);
+        Path lower = new Path();
+        lower.moveTo(cx - 7f, cy + 4f);
+        lower.lineTo(cx, cy + 15f);
+        lower.lineTo(cx + 7f, cy + 4f);
+        lower.lineTo(cx, cy + 8f);
+        lower.close();
+        paint.setColor(Color.rgb(206, 214, 255));
+        canvas.drawPath(lower, paint);
+    }
+
+    private void drawSwapTaniIcon(Canvas canvas, float cx, float cy) {
+        drawSwapIconBase(canvas, cx, cy, Color.rgb(50, 184, 113), Color.rgb(24, 106, 65));
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(2.5f);
+        paint.setStrokeCap(Paint.Cap.ROUND);
         paint.setColor(Color.WHITE);
-        paint.setTextSize(asset == SWAP_ASSET_ETH ? 25f : 20f);
-        paint.setFakeBoldText(true);
-        String label = asset == SWAP_ASSET_COIN ? "C" : (asset == SWAP_ASSET_ETH ? "E" : "T");
-        drawCenteredText(canvas, label, cx, cy + 8f);
-        paint.setFakeBoldText(false);
+        canvas.drawLine(cx, cy + 10f, cx, cy - 4f, paint);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(226, 255, 231));
+        canvas.drawOval(cx - 12f, cy - 8f, cx + 1f, cy + 4f, paint);
+        canvas.drawOval(cx - 1f, cy - 10f, cx + 13f, cy + 3f, paint);
+        paint.setStrokeCap(Paint.Cap.BUTT);
+        paint.setStyle(Paint.Style.FILL);
     }
 
     private void drawInfoStrip(Canvas canvas, RectF bounds, String label) {
@@ -4504,7 +4629,7 @@ final class FarmGameView extends CanvasGameView {
                 }
                 int swapAmount = selectedSwapInputAmount();
                 return swapAmount > 0
-                        ? "Swap " + swapAmount + " coin -> " + selectedSwapOutputText() + "."
+                        ? swapAmount + " Game Coin siap menjadi " + selectedSwapOutputText() + "."
                         : "Coin belum ada untuk diswap.";
             case BUY_LAND:
                 return "Lahan ini bisa dibeli seharga " + LAND_BUY_PRICE + " coin.";
@@ -4585,12 +4710,14 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private RectF interactionDialogPanelBounds() {
-        float w = clamp(getWidth() * 0.58f, 720f, 900f);
+        float w = activeInteractionKind == InteractionKind.SWAP_TOKEN
+                ? clamp(getWidth() * 0.68f, 760f, 1020f)
+                : clamp(getWidth() * 0.58f, 720f, 900f);
         float h;
         if (activeInteractionKind == InteractionKind.PLANT) {
             h = clamp(getHeight() * 0.58f, 560f, 650f);
         } else if (activeInteractionKind == InteractionKind.SWAP_TOKEN) {
-            h = clamp(getHeight() * 0.58f, 560f, 650f);
+            h = clamp(getHeight() * 0.72f, 640f, 730f);
         } else {
             h = clamp(getHeight() * 0.45f, 410f, 510f);
         }
@@ -4619,46 +4746,46 @@ final class FarmGameView extends CanvasGameView {
 
     private RectF swapFromCardBounds() {
         RectF panel = interactionDialogPanelBounds();
-        return new RectF(panel.left + 58f, panel.top + 244f, panel.right - 58f, panel.top + 352f);
+        return new RectF(panel.left + 58f, panel.top + 238f, panel.right - 58f, panel.top + 368f);
     }
 
     private RectF swapToCardBounds() {
         RectF panel = interactionDialogPanelBounds();
-        return new RectF(panel.left + 58f, panel.top + 378f, panel.right - 58f, panel.top + 486f);
+        return new RectF(panel.left + 58f, panel.top + 402f, panel.right - 58f, panel.top + 532f);
     }
 
     private RectF swapSwitchButtonBounds() {
         RectF from = swapFromCardBounds();
-        float size = 58f;
+        float size = 64f;
         float left = from.centerX() - size * 0.5f;
-        float top = from.bottom - 12f;
+        float top = from.bottom - 14f;
         return new RectF(left, top, left + size, top + size);
     }
 
     private RectF swapChipBounds(boolean from) {
         RectF card = from ? swapFromCardBounds() : swapToCardBounds();
-        float width = Math.min(250f, card.width() * 0.38f);
-        return new RectF(card.left + 28f, card.top + 44f, card.left + 28f + width, card.bottom - 22f);
+        float width = clamp(card.width() * 0.42f, 270f, 330f);
+        return new RectF(card.left + 28f, card.top + 48f, card.left + 28f + width, card.bottom - 20f);
     }
 
     private RectF swapAmountBounds(boolean from) {
         RectF card = from ? swapFromCardBounds() : swapToCardBounds();
-        return new RectF(card.right - card.width() * 0.42f - 28f, card.top + 43f, card.right - 20f, card.bottom - 16f);
+        return new RectF(card.right - card.width() * 0.44f - 28f, card.top + 48f, card.right - 22f, card.bottom - 20f);
     }
 
     private RectF swapAssetMenuBounds(boolean from) {
         RectF chip = swapChipBounds(from);
         RectF card = from ? swapFromCardBounds() : swapToCardBounds();
         int rows = swapAssetOptionCount(from);
-        float width = Math.min(330f, card.right - chip.left - 28f);
+        float width = Math.min(380f, card.right - chip.left - 28f);
         float top = chip.bottom + 8f;
-        return new RectF(chip.left, top, chip.left + width, top + rows * 56f + 14f);
+        return new RectF(chip.left, top, chip.left + width, top + rows * 66f + 16f);
     }
 
     private RectF swapAssetOptionBounds(boolean from, int index) {
         RectF menu = swapAssetMenuBounds(from);
-        float top = menu.top + 8f + index * 56f;
-        return new RectF(menu.left + 8f, top, menu.right - 8f, top + 50f);
+        float top = menu.top + 9f + index * 66f;
+        return new RectF(menu.left + 9f, top, menu.right - 9f, top + 58f);
     }
 
     private RectF interactionPrimaryButtonBounds() {
@@ -4929,59 +5056,79 @@ final class FarmGameView extends CanvasGameView {
 
         LinearLayout root = new LinearLayout(context);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(context, 28), dp(context, 24), dp(context, 28), dp(context, 22));
+        root.setPadding(dp(context, 30), dp(context, 26), dp(context, 30), dp(context, 24));
         root.setBackground(roundedStrokeDrawable(
-                Color.rgb(31, 28, 34),
+                Color.rgb(116, 55, 22),
                 dp(context, 18),
-                Color.rgb(203, 255, 42),
-                dp(context, 2)));
+                Color.rgb(70, 39, 13),
+                dp(context, 4)));
 
         TextView title = new TextView(context);
         title.setText("Jumlah Swap");
-        title.setTextColor(Color.rgb(255, 239, 177));
+        title.setTextColor(Color.rgb(255, 224, 84));
         title.setTextSize(24f);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
         root.addView(title);
 
         TextView body = new TextView(context);
-        body.setText("Saldo Game Coin: " + gameState.coins);
-        body.setTextColor(Color.rgb(186, 181, 196));
+        body.setText("Saldo Game Coin: " + gameState.coins + " coin");
+        body.setTextColor(Color.rgb(255, 238, 211));
         body.setTextSize(16f);
-        body.setPadding(0, dp(context, 12), 0, dp(context, 14));
+        body.setPadding(0, dp(context, 12), 0, dp(context, 10));
         root.addView(body);
+
+        TextView route = new TextView(context);
+        route.setText("Estimasi: " + selectedSwapOutputText());
+        route.setTextColor(Color.rgb(245, 194, 124));
+        route.setTextSize(14f);
+        route.setPadding(dp(context, 16), 0, dp(context, 16), 0);
+        route.setGravity(Gravity.CENTER);
+        route.setSingleLine(true);
+        route.setBackground(roundedStrokeDrawable(
+                Color.rgb(82, 39, 17),
+                dp(context, 11),
+                Color.rgb(145, 77, 30),
+                dp(context, 2)));
+        LinearLayout.LayoutParams routeParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(context, 44));
+        routeParams.bottomMargin = dp(context, 14);
+        root.addView(route, routeParams);
 
         final EditText input = new EditText(context);
         input.setSingleLine(true);
         input.setInputType(InputType.TYPE_CLASS_NUMBER);
         input.setImeOptions(EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
         input.setText(String.valueOf(selectedSwapInputAmount()));
-        input.selectAll();
-        input.setTextColor(Color.WHITE);
-        input.setHintTextColor(Color.rgb(139, 134, 150));
+        input.setSelectAllOnFocus(false);
+        input.setTextColor(Color.rgb(255, 240, 212));
+        input.setHintTextColor(Color.rgb(190, 151, 124));
         input.setTextSize(24f);
-        input.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        input.setGravity(Gravity.CENTER);
         input.setPadding(dp(context, 16), 0, dp(context, 16), 0);
         input.setBackground(roundedStrokeDrawable(
-                Color.rgb(17, 18, 23),
+                Color.rgb(60, 32, 18),
                 dp(context, 12),
-                Color.rgb(74, 76, 90),
-                dp(context, 2)));
+                Color.rgb(255, 200, 65),
+                dp(context, 3)));
         root.addView(input, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(context, 58)));
 
         LinearLayout actions = new LinearLayout(context);
-        actions.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        actions.setGravity(Gravity.CENTER);
         actions.setPadding(0, dp(context, 22), 0, 0);
-        Button close = walletDialogButton(context, "Batal", Color.rgb(91, 35, 30), Color.WHITE);
-        Button save = walletDialogButton(context, "Pakai", Color.rgb(116, 74, 23), Color.WHITE);
+        Button close = walletDialogButton(context, "Batal", Color.rgb(100, 54, 28), Color.rgb(255, 238, 211));
+        Button save = walletDialogButton(context, "Pakai", Color.rgb(207, 119, 35), Color.WHITE);
         LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(dp(context, 118), dp(context, 48));
-        closeParams.leftMargin = dp(context, 14);
+        closeParams.rightMargin = dp(context, 12);
         actions.addView(close, closeParams);
         LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(dp(context, 126), dp(context, 48));
-        saveParams.leftMargin = dp(context, 14);
+        saveParams.leftMargin = dp(context, 12);
         actions.addView(save, saveParams);
-        root.addView(actions);
+        root.addView(actions, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
 
         close.setOnClickListener(v -> dialog.dismiss());
         save.setOnClickListener(v -> applySwapAmountInput(input, dialog));
@@ -5001,15 +5148,19 @@ final class FarmGameView extends CanvasGameView {
         if (dialogWindow != null) {
             dialogWindow.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
             WindowManager.LayoutParams params = dialogWindow.getAttributes();
-            params.dimAmount = 0.56f;
+            params.dimAmount = 0.62f;
             dialogWindow.setAttributes(params);
             dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-            dialogWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+            dialogWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
+                    | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+            int maxDialogWidth = Math.max(1, getWidth() - dp(context, 32));
+            int desiredDialogWidth = (int) clamp(getWidth() * 0.44f, 760f, 980f);
             dialogWindow.setLayout(
-                    (int) clamp(getWidth() * 0.42f, 960f, 1120f),
+                    Math.min(maxDialogWidth, desiredDialogWidth),
                     WindowManager.LayoutParams.WRAP_CONTENT);
         }
         input.requestFocus();
+        input.setSelection(input.getText().length());
     }
 
     private boolean applySwapAmountInput(EditText input, Dialog dialog) {
