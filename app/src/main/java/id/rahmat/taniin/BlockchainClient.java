@@ -262,7 +262,7 @@ final class BlockchainClient {
     }
 
     private static String formatEth(BigInteger wei) {
-        BigDecimal value = new BigDecimal(wei).divide(new BigDecimal(WEI_PER_ETH), 6, RoundingMode.DOWN);
+        BigDecimal value = new BigDecimal(wei).divide(new BigDecimal(WEI_PER_ETH), 12, RoundingMode.DOWN);
         return value.stripTrailingZeros().toPlainString();
     }
 

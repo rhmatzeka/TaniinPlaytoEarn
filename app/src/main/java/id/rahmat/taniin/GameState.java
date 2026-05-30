@@ -7,10 +7,11 @@ final class GameState {
     final List<Plot> plots = new ArrayList<>();
     final int[] seedCounts = {6, 0, 0, 0};
 
-    int coins = 500;
+    int coins;
     int selectedSeedIndex;
     int shopBundleQuantity = 1;
     int swapAmount;
+    int swapFromAsset;
     int swapTarget;
     int harvests;
     int ownedLand = 1;

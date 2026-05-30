@@ -38,6 +38,9 @@ final class ChainAction {
         if ("SWAP_COIN_ETH".equals(type)) {
             return "Swap coin ke ETH " + amount;
         }
+        if ("SWAP_ETH_COIN".equals(type)) {
+            return "Isi coin dari ETH " + amount;
+        }
         if ("BUY_SEED".equals(type)) {
             return "Beli bibit " + amount;
         }

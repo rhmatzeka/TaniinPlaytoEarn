@@ -23,6 +23,7 @@ final class GameStateStore {
         state.selectedSeedIndex = clampInt(preferences.getInt("game_selected_seed", state.selectedSeedIndex), 0, seedTypeCount - 1);
         state.shopBundleQuantity = clampInt(preferences.getInt("game_shop_quantity", state.shopBundleQuantity), 1, maxShopBundleQuantity);
         state.swapAmount = Math.max(0, preferences.getInt("game_swap_amount", state.swapAmount));
+        state.swapFromAsset = clampInt(preferences.getInt("game_swap_from_asset", state.swapFromAsset), 0, 2);
         state.swapTarget = clampInt(preferences.getInt("game_swap_target", state.swapTarget), 0, 1);
         boolean repairFreeLandState = preferences.getInt("game_land_state_version", 0) < LAND_STATE_VERSION;
 
@@ -63,6 +64,7 @@ final class GameStateStore {
                 .putInt("game_selected_seed", state.selectedSeedIndex)
                 .putInt("game_shop_quantity", state.shopBundleQuantity)
                 .putInt("game_swap_amount", state.swapAmount)
+                .putInt("game_swap_from_asset", state.swapFromAsset)
                 .putInt("game_swap_target", state.swapTarget);
         for (int i = 0; i < state.seedCounts.length; i++) {
             editor.putInt("game_seed_" + i, state.seedCounts[i]);

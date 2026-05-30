@@ -119,6 +119,7 @@ final class FarmGameView extends CanvasGameView {
     private static final float DEFAULT_MUSIC_VOLUME = 0.70f;
     private static final float DEFAULT_SFX_VOLUME = 0.90f;
     private static final String PREF_CHAIN_HISTORY = "game_chain_history";
+    private static final String PREF_COIN_AUTOFILL_MIGRATION = "game_coin_wallet_autofill_migrated";
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint pixelPaint = new Paint();
@@ -177,7 +178,8 @@ final class FarmGameView extends CanvasGameView {
     private String walletAddress = "";
     private String chainStatus = "Mode lokal. Sepolia belum dicek.";
     private String walletNativeBalance = "";
-    private boolean coinBalanceOnChain;
+    private int walletTaniBalance;
+    private boolean walletTaniBalanceAvailable;
     private boolean checkingChain;
     private String mapStatus = "";
 
@@ -1544,8 +1546,7 @@ final class FarmGameView extends CanvasGameView {
         paint.setColor(Color.rgb(255, 226, 88));
         paint.setTextSize(21f);
         paint.setFakeBoldText(true);
-        String coinLabel = coinBalanceOnChain ? "Wallet Coin " : "Coin ";
-        canvas.drawText(coinLabel + gameState.coins, left + 16f, top + 34f, paint);
+        canvas.drawText("Coin " + gameState.coins, left + 16f, top + 34f, paint);
         paint.setColor(Color.WHITE);
         canvas.drawText("Bibit " + totalSeeds(), left + 122f, top + 34f, paint);
         canvas.drawText("Panen " + gameState.harvests, left + 220f, top + 34f, paint);
@@ -1565,7 +1566,7 @@ final class FarmGameView extends CanvasGameView {
         paint.setTextSize(18f);
         paint.setFakeBoldText(true);
         paint.setColor(Color.rgb(152, 239, 176));
-        canvas.drawText(coinBalanceOnChain ? "Sepolia TANI" : "Sepolia", left + 16, 47, paint);
+        canvas.drawText(walletTaniBalanceAvailable ? "Sepolia TANI" : "Sepolia", left + 16, 47, paint);
         paint.setColor(Color.WHITE);
         String wallet = walletAddress.isEmpty() ? "wallet belum connect" : shortAddress(walletAddress);
         canvas.drawText(wallet, left + 132, 47, paint);
@@ -2251,7 +2252,7 @@ final class FarmGameView extends CanvasGameView {
             }
         }
 
-        drawInventoryRow(canvas, x, y + 45f, Color.rgb(255, 209, 84), coinBalanceOnChain ? "Wallet coin" : "Coin lokal", gameState.coins);
+        drawInventoryRow(canvas, x, y + 45f, Color.rgb(255, 209, 84), "Game Coin", gameState.coins);
         drawInventoryRow(canvas, x, y + 90f, Color.rgb(116, 209, 85), "Bibit tanaman", totalSeeds());
         drawInventoryRow(canvas, x, y + 135f, Color.rgb(235, 150, 63), "Hasil panen", gameState.harvests);
         drawInventoryRow(canvas, x, y + 180f, Color.rgb(123, 188, 91), "Lahan dimiliki", gameState.ownedLand);
@@ -2928,9 +2929,15 @@ final class FarmGameView extends CanvasGameView {
                 return "";
             case SELL_HARVEST:
                 return gameState.harvests > 0
-                        ? "A: jual " + gameState.harvests + " panen jadi coin wallet."
+                        ? "A: jual " + gameState.harvests + " panen jadi Game Coin."
                         : "Rumah jual: belum ada hasil panen.";
             case SWAP_TOKEN:
+                if (selectedSwapFromAsset() == SWAP_ASSET_ETH) {
+                    int maxCoins = maxEthFundingCoins();
+                    return maxCoins > 0
+                            ? "A: isi Game Coin dari Sepolia ETH. Maks " + maxCoins + " coin."
+                            : "Rumah swap: sync saldo ETH Sepolia dulu.";
+                }
                 return gameState.coins > 0
                         ? "A: pilih output, lalu swap " + gameState.coins + " coin ke Sepolia."
                         : "Rumah swap: coin belum ada.";
@@ -2983,10 +2990,10 @@ final class FarmGameView extends CanvasGameView {
         canvas.drawText("Toko Aset", x + 22, y + 38, paint);
         paint.setFakeBoldText(false);
         paint.setColor(Color.WHITE);
-        String shopLine = "SHOP: pilih benih, bayar pakai coin wallet";
+        String shopLine = "SHOP: pilih benih, bayar pakai Game Coin";
         String landLine = "Lahan: beli " + LAND_BUY_PRICE + ", jual kosong +" + LAND_SELL_PRICE + " coin";
-        String harvestLine = "Rumah Jual: panen -> coin wallet (1 = " + HARVEST_SELL_PRICE + ")";
-        String swapLine = "Rumah Swap: coin -> TANI Sepolia (1 = " + COIN_SWAP_RATE + ")";
+        String harvestLine = "Rumah Jual: panen -> Game Coin (1 = " + HARVEST_SELL_PRICE + ")";
+        String swapLine = "Rumah Swap: ETH Sepolia -> Game Coin, atau coin -> Sepolia";
         paint.setTextSize(fitTextSize(shopLine, 19f, w - 44f));
         canvas.drawText(shopLine, x + 22, y + 78, paint);
         paint.setTextSize(fitTextSize(landLine, 19f, w - 44f));
@@ -3016,9 +3023,9 @@ final class FarmGameView extends CanvasGameView {
         canvas.drawText(chainStatus, x + 22, y + 72, paint);
         paint.setTextSize(18f);
         canvas.drawText("Wallet: " + (walletAddress.isEmpty() ? "belum diset" : shortAddress(walletAddress)), x + 22, y + 102, paint);
-        String balanceLine = (coinBalanceOnChain ? "TANI on-chain " : "Coin lokal ")
-                + gameState.coins
-                + (walletNativeBalance.isEmpty() ? "" : " | Sepolia ETH " + compactEth(walletNativeBalance));
+        String balanceLine = "Game Coin " + gameState.coins
+                + (walletNativeBalance.isEmpty() ? "" : " | Sepolia ETH " + compactEth(walletNativeBalance))
+                + (walletTaniBalanceAvailable ? " | TANI " + walletTaniBalance : "");
         canvas.drawText(balanceLine, x + 22, y + 132, paint);
         paint.setTextSize(fitTextSize(chainModeText(), 17f, w - 44f));
         canvas.drawText(chainModeText(), x + 22, y + 162, paint);
@@ -3051,7 +3058,7 @@ final class FarmGameView extends CanvasGameView {
             return "Mode sinkron: game tersimpan lokal, signer mencoba kirim on-chain.";
         }
         if (blockchainClient.hasCoinContract()) {
-            return "Saldo TANI on-chain aktif; aksi game tersimpan lokal sampai signer diset.";
+            return "Saldo wallet terbaca via RPC; aksi game tersimpan lokal sampai signer diset.";
         }
         if (blockchainClient.hasGameApi()) {
             return "Signer diset; contract TANI belum diset, coin masih lokal.";
@@ -3210,10 +3217,9 @@ final class FarmGameView extends CanvasGameView {
                 gameState.shopBundleQuantity,
                 SEED_NAMES[seedIndex]);
         String line2 = String.format(Locale.US,
-                "Total %d benih - %d Coin. %s kamu %d.",
+                "Total %d benih - %d Coin. Game Coin kamu %d.",
                 selectedSeedTotalAmount(),
                 selectedSeedTotalPrice(),
-                coinBalanceOnChain ? "Wallet coin" : "Coin",
                 gameState.coins);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(255, 240, 212));
@@ -3250,9 +3256,13 @@ final class FarmGameView extends CanvasGameView {
         canvas.drawRoundRect(bounds, 12, 12, paint);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(textColor);
-        paint.setTextSize(fitTextSize(label, 23f, bounds.width() - 24f));
+        float preferredTextSize = activeInteractionKind == InteractionKind.SWAP_TOKEN ? 29f : 23f;
+        float horizontalPadding = activeInteractionKind == InteractionKind.SWAP_TOKEN ? 42f : 24f;
+        paint.setTextSize(fitTextSize(label, preferredTextSize, bounds.width() - horizontalPadding));
         paint.setFakeBoldText(true);
-        drawCenteredText(canvas, label, bounds.centerX(), bounds.top + bounds.height() * 0.62f);
+        Paint.FontMetrics metrics = paint.getFontMetrics();
+        float baseline = bounds.centerY() - (metrics.ascent + metrics.descent) * 0.5f;
+        drawCenteredText(canvas, label, bounds.centerX(), baseline);
         paint.setFakeBoldText(false);
     }
 
@@ -3270,7 +3280,7 @@ final class FarmGameView extends CanvasGameView {
         String selected = SEED_NAMES[gameState.selectedSeedIndex];
         String summary = String.format(Locale.US,
                 "%s: %d | %s | Paket x%d = %d benih | Total %d Coin",
-                coinBalanceOnChain ? "Wallet Coin" : "Coin",
+                "Game Coin",
                 gameState.coins,
                 selected,
                 gameState.shopBundleQuantity,
@@ -3419,10 +3429,10 @@ final class FarmGameView extends CanvasGameView {
     private void drawSwapField(Canvas canvas, RectF bounds, boolean from) {
         String headerLeft = from ? "Dari" : "Ke";
         String headerRight = from ? "Jumlah" : "Estimasi";
-        int asset = from ? SWAP_ASSET_COIN : selectedSwapToAsset();
+        int asset = from ? selectedSwapFromAsset() : selectedSwapToAsset();
         String symbol = swapAssetSymbol(asset);
         String name = swapAssetName(asset);
-        String amount = from ? String.valueOf(selectedSwapInputAmount()) : selectedSwapOutputAmount();
+        String amount = from ? selectedSwapInputAmountText() : selectedSwapOutputAmount();
 
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.argb(95, 0, 0, 0));
@@ -3484,7 +3494,7 @@ final class FarmGameView extends CanvasGameView {
         }
 
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(gameState.coins > 0 || from ? Color.rgb(255, 240, 212) : Color.rgb(174, 139, 101));
+        paint.setColor(selectedSwapInputAmount() > 0 || from ? Color.rgb(255, 240, 212) : Color.rgb(174, 139, 101));
         paint.setTextSize(fitTextSize(amount, 38f, amountBox.width() - (from ? 68f : 26f)));
         paint.setFakeBoldText(true);
         canvas.drawText(amount, amountBox.right - 14f - paint.measureText(amount), amountBox.centerY() + 14f, paint);
@@ -3529,8 +3539,8 @@ final class FarmGameView extends CanvasGameView {
 
     private void drawSwapAssetOption(Canvas canvas, RectF row, boolean from, int index) {
         int asset = swapAssetOptionAsset(from, index);
-        boolean selected = from ? asset == SWAP_ASSET_COIN : asset == selectedSwapToAsset();
-        boolean enabled = !from || asset == SWAP_ASSET_COIN;
+        boolean selected = from ? asset == selectedSwapFromAsset() : asset == selectedSwapToAsset();
+        boolean enabled = isSwapAssetOptionEnabled(from, asset);
 
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(selected ? Color.rgb(127, 65, 25) : Color.rgb(76, 38, 17));
@@ -4141,7 +4151,8 @@ final class FarmGameView extends CanvasGameView {
     private void logoutWallet() {
         walletAddress = "";
         walletNativeBalance = "";
-        coinBalanceOnChain = false;
+        walletTaniBalance = 0;
+        walletTaniBalanceAvailable = false;
         preferences.edit().remove("wallet_address").apply();
         chainStatus = "Wallet logout. Mode lokal aktif.";
         chainPanelUntilMs = System.currentTimeMillis() + 3600L;
@@ -4317,13 +4328,14 @@ final class FarmGameView extends CanvasGameView {
             if (swapAssetOptionBounds(from, i).contains(x, y)) {
                 playClickSound();
                 int asset = swapAssetOptionAsset(from, i);
+                if (!isSwapAssetOptionEnabled(from, asset)) {
+                    showMessage(swapAssetSymbol(asset) + " input belum aktif.");
+                    invalidate();
+                    return true;
+                }
                 swapAssetMenuOpen = false;
                 if (from) {
-                    if (asset != SWAP_ASSET_COIN) {
-                        showMessage("Input swap saat ini memakai Game Coin.");
-                    } else {
-                        showMessage("Input swap: Game Coin");
-                    }
+                    selectSwapInputAsset(asset);
                 } else {
                     selectSwapOutputAsset(asset);
                 }
@@ -4343,11 +4355,22 @@ final class FarmGameView extends CanvasGameView {
 
     private void selectSwapTarget(int target) {
         gameState.swapTarget = target == SWAP_TARGET_ETH ? SWAP_TARGET_ETH : SWAP_TARGET_TANI;
+        gameState.swapFromAsset = SWAP_ASSET_COIN;
         saveGameState();
         showMessage("Output swap: " + swapTargetLabel());
     }
 
+    private void selectSwapInputAsset(int asset) {
+        gameState.swapFromAsset = asset == SWAP_ASSET_ETH ? SWAP_ASSET_ETH : SWAP_ASSET_COIN;
+        ensureSwapAmountWithinBalance();
+        showMessage("Input swap: " + swapAssetName(selectedSwapFromAsset()));
+    }
+
     private void selectSwapOutputAsset(int asset) {
+        if (selectedSwapFromAsset() == SWAP_ASSET_ETH && asset == SWAP_ASSET_COIN) {
+            showMessage("Output swap: Game Coin");
+            return;
+        }
         if (asset == SWAP_ASSET_ETH) {
             selectSwapTarget(SWAP_TARGET_ETH);
             return;
@@ -4363,6 +4386,10 @@ final class FarmGameView extends CanvasGameView {
 
     private void toggleSwapTarget() {
         swapSwitchAnimStartMs = System.currentTimeMillis();
+        if (selectedSwapFromAsset() == SWAP_ASSET_ETH) {
+            selectSwapInputAsset(SWAP_ASSET_COIN);
+            return;
+        }
         selectSwapTarget(gameState.swapTarget == SWAP_TARGET_ETH ? SWAP_TARGET_TANI : SWAP_TARGET_ETH);
     }
 
@@ -4371,29 +4398,51 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private String selectedSwapOutputText() {
+        if (selectedSwapFromAsset() == SWAP_ASSET_ETH) {
+            return selectedSwapInputAmount() + " Game Coin";
+        }
         return selectedSwapOutputAmount() + " " + swapTargetLabel() + " Sepolia";
     }
 
+    private String selectedSwapInputAmountText() {
+        if (selectedSwapFromAsset() == SWAP_ASSET_ETH) {
+            return estimatedEthSwapAmount(selectedSwapInputAmount());
+        }
+        return String.valueOf(selectedSwapInputAmount());
+    }
+
     private int selectedSwapInputAmount() {
-        if (gameState.coins <= 0) {
+        int maxAmount = maxSwapCoinAmount();
+        if (maxAmount <= 0) {
             return 0;
         }
         if (gameState.swapAmount <= 0) {
-            return gameState.coins;
+            return maxAmount;
         }
-        return clampInt(gameState.swapAmount, 1, gameState.coins);
+        return clampInt(gameState.swapAmount, 1, maxAmount);
     }
 
     private void ensureSwapAmountWithinBalance() {
-        if (gameState.coins <= 0) {
+        int maxAmount = maxSwapCoinAmount();
+        if (maxAmount <= 0) {
             gameState.swapAmount = 0;
-        } else if (gameState.swapAmount <= 0 || gameState.swapAmount > gameState.coins) {
-            gameState.swapAmount = gameState.coins;
+        } else if (gameState.swapAmount <= 0 || gameState.swapAmount > maxAmount) {
+            gameState.swapAmount = maxAmount;
         }
         saveGameState();
     }
 
+    private int maxSwapCoinAmount() {
+        if (selectedSwapFromAsset() == SWAP_ASSET_ETH) {
+            return maxEthFundingCoins();
+        }
+        return Math.max(0, gameState.coins);
+    }
+
     private String selectedSwapOutputAmount() {
+        if (selectedSwapFromAsset() == SWAP_ASSET_ETH) {
+            return String.valueOf(selectedSwapInputAmount());
+        }
         return swapOutputAmount(selectedSwapInputAmount());
     }
 
@@ -4405,11 +4454,21 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private String swapOutputName() {
+        if (selectedSwapFromAsset() == SWAP_ASSET_ETH) {
+            return "Game Coin";
+        }
         return gameState.swapTarget == SWAP_TARGET_ETH ? "Sepolia ETH" : "TANI Sepolia";
     }
 
     private int selectedSwapToAsset() {
+        if (selectedSwapFromAsset() == SWAP_ASSET_ETH) {
+            return SWAP_ASSET_COIN;
+        }
         return gameState.swapTarget == SWAP_TARGET_ETH ? SWAP_ASSET_ETH : SWAP_ASSET_TANI;
+    }
+
+    private int selectedSwapFromAsset() {
+        return gameState.swapFromAsset == SWAP_ASSET_ETH ? SWAP_ASSET_ETH : SWAP_ASSET_COIN;
     }
 
     private String swapAssetSymbol(int asset) {
@@ -4433,10 +4492,16 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private int swapAssetOptionCount(boolean from) {
+        if (!from && selectedSwapFromAsset() == SWAP_ASSET_ETH) {
+            return 1;
+        }
         return from ? 3 : 2;
     }
 
     private int swapAssetOptionAsset(boolean from, int index) {
+        if (!from && selectedSwapFromAsset() == SWAP_ASSET_ETH) {
+            return SWAP_ASSET_COIN;
+        }
         if (from) {
             if (index == 1) {
                 return SWAP_ASSET_TANI;
@@ -4447,6 +4512,13 @@ final class FarmGameView extends CanvasGameView {
             return SWAP_ASSET_COIN;
         }
         return index == 1 ? SWAP_ASSET_ETH : SWAP_ASSET_TANI;
+    }
+
+    private boolean isSwapAssetOptionEnabled(boolean from, int asset) {
+        if (!from) {
+            return true;
+        }
+        return asset == SWAP_ASSET_COIN || asset == SWAP_ASSET_ETH;
     }
 
     private void activateInteractionPrimary() {
@@ -4462,7 +4534,7 @@ final class FarmGameView extends CanvasGameView {
         }
         if (activeInteractionKind == InteractionKind.SWAP_TOKEN) {
             interactionDialogOpen = false;
-            swapCoinsToSepolia();
+            performSwapToken();
             return;
         }
         if (activeInteractionKind == InteractionKind.SELL_LAND) {
@@ -4596,6 +4668,9 @@ final class FarmGameView extends CanvasGameView {
         menuOpen = false;
         swapAssetMenuOpen = false;
         if (kind == InteractionKind.SWAP_TOKEN) {
+            if (!walletAddress.isEmpty() && walletNativeBalance.isEmpty() && !checkingChain) {
+                refreshWalletState(true);
+            }
             ensureSwapAmountWithinBalance();
         }
     }
@@ -4626,7 +4701,7 @@ final class FarmGameView extends CanvasGameView {
     private String interactionBody(long now) {
         switch (activeInteractionKind) {
             case SHOP:
-                return "Pilih benih yang mau dibeli memakai coin wallet.";
+                return "Pilih benih yang mau dibeli memakai Game Coin.";
             case SELL_HARVEST:
                 if (walletAddress.isEmpty()) {
                     return "Connect wallet dulu sebelum jual hasil panen.";
@@ -4636,9 +4711,17 @@ final class FarmGameView extends CanvasGameView {
                         : "Belum ada hasil panen untuk dijual.";
             case SWAP_TOKEN:
                 if (walletAddress.isEmpty()) {
-                    return "Connect wallet dulu supaya coin bisa diswap ke Sepolia.";
+                    return "Connect wallet dulu supaya saldo Sepolia bisa dicek.";
                 }
                 int swapAmount = selectedSwapInputAmount();
+                if (selectedSwapFromAsset() == SWAP_ASSET_ETH) {
+                    if (walletNativeBalance.isEmpty()) {
+                        return "Sync wallet dulu supaya saldo ETH Sepolia terbaca.";
+                    }
+                    return swapAmount > 0
+                            ? selectedSwapInputAmountText() + " ETH Sepolia siap menjadi " + selectedSwapOutputText() + "."
+                            : "Saldo ETH Sepolia belum cukup untuk isi Game Coin.";
+                }
                 return swapAmount > 0
                         ? swapAmount + " Game Coin siap menjadi " + selectedSwapOutputText() + "."
                         : "Coin belum ada untuk diswap.";
@@ -4674,6 +4757,9 @@ final class FarmGameView extends CanvasGameView {
             case SWAP_TOKEN:
                 if (walletAddress.isEmpty()) {
                     return "Connect wallet";
+                }
+                if (selectedSwapFromAsset() == SWAP_ASSET_ETH) {
+                    return selectedSwapInputAmount() > 0 ? "Isi Game Coin" : "Sync wallet";
                 }
                 return selectedSwapInputAmount() > 0 ? "Swap ke " + swapTargetLabel() : "Oke";
             case BUY_LAND:
@@ -4801,7 +4887,19 @@ final class FarmGameView extends CanvasGameView {
 
     private RectF interactionPrimaryButtonBounds() {
         RectF panel = interactionDialogPanelBounds();
-        float height = activeInteractionKind == InteractionKind.SWAP_TOKEN ? 70f : 78f;
+        if (activeInteractionKind == InteractionKind.SWAP_TOKEN) {
+            float height = 86f;
+            float primaryWidth = clamp(panel.width() * 0.43f, 400f, 470f);
+            float secondaryWidth = clamp(panel.width() * 0.28f, 260f, 320f);
+            float gap = 30f;
+            float totalWidth = primaryWidth + secondaryWidth + gap;
+            float left = panel.centerX() - totalWidth * 0.5f;
+            float top = panel.bottom - 112f;
+            top = Math.max(top, swapToCardBounds().bottom + 18f);
+            top = Math.min(top, panel.bottom - height - 10f);
+            return new RectF(left, top, left + primaryWidth, top + height);
+        }
+        float height = 78f;
         if (activeInteractionKind == InteractionKind.PLANT) {
             float gap = 18f;
             float width = Math.min(340f, panel.width() * 0.36f);
@@ -4836,6 +4934,12 @@ final class FarmGameView extends CanvasGameView {
             return new RectF(sell.right + gap, sell.top, sell.right + gap + width, sell.bottom);
         }
         RectF primary = interactionPrimaryButtonBounds();
+        if (activeInteractionKind == InteractionKind.SWAP_TOKEN) {
+            RectF panel = interactionDialogPanelBounds();
+            float gap = 30f;
+            float width = clamp(panel.width() * 0.28f, 260f, 320f);
+            return new RectF(primary.right + gap, primary.top, primary.right + gap + width, primary.bottom);
+        }
         float gap = 24f;
         return new RectF(primary.right + gap, primary.top, primary.right + gap + primary.width() * 0.66f, primary.bottom);
     }
@@ -4975,15 +5079,10 @@ final class FarmGameView extends CanvasGameView {
 
     private void buySeedsFromShop(int seedIndex) {
         gameState.selectedSeedIndex = seedIndex;
-        if (blockchainClient.hasCoinContract()) {
+        if (blockchainClient.hasGameApi()) {
             if (walletAddress.isEmpty()) {
-                showErrorMessage("Connect wallet dulu supaya coin shop pakai wallet.");
+                showErrorMessage("Connect wallet dulu supaya pembelian bisa dicatat on-chain.");
                 performWallet();
-                return;
-            }
-            if (!coinBalanceOnChain && !checkingChain) {
-                refreshWalletState(true);
-                showErrorMessage("Sync saldo wallet dulu.");
                 return;
             }
         }
@@ -5019,6 +5118,46 @@ final class FarmGameView extends CanvasGameView {
                 earnedCoins));
     }
 
+    private void performSwapToken() {
+        if (selectedSwapFromAsset() == SWAP_ASSET_ETH) {
+            swapSepoliaEthToGameCoins();
+            return;
+        }
+        swapCoinsToSepolia();
+    }
+
+    private void swapSepoliaEthToGameCoins() {
+        if (walletAddress.isEmpty()) {
+            showErrorMessage("Connect wallet dulu sebelum isi Game Coin dari Sepolia.");
+            performWallet();
+            return;
+        }
+        if (walletNativeBalance.isEmpty()) {
+            refreshWalletState(true);
+            showErrorMessage("Sync saldo ETH Sepolia dulu.");
+            return;
+        }
+        int fundedCoins = selectedSwapInputAmount();
+        if (fundedCoins <= 0) {
+            showErrorMessage("Saldo ETH Sepolia belum cukup untuk isi Game Coin.");
+            return;
+        }
+        gameState.coins += fundedCoins;
+        gameState.swapFromAsset = SWAP_ASSET_COIN;
+        gameState.swapAmount = gameState.coins;
+        recordLocalEthFunding(fundedCoins);
+        saveGameState();
+
+        ChainAction action = new ChainAction("SWAP_ETH_COIN", 0, fundedCoins);
+        addChainHistory(action, "lokal tersimpan");
+        chainStatus = "Game Coin diisi dari saldo ETH Sepolia via RPC. Transaksi debit ETH butuh WalletConnect di versi produksi.";
+        chainPanelUntilMs = System.currentTimeMillis() + 5200L;
+        showSuccessPopup(String.format(Locale.US,
+                "Game Coin +%d dari %s ETH Sepolia.",
+                fundedCoins,
+                estimatedEthSwapAmount(fundedCoins)));
+    }
+
     private void swapCoinsToSepolia() {
         if (walletAddress.isEmpty()) {
             showErrorMessage("Connect wallet dulu sebelum swap ke Sepolia.");
@@ -5043,7 +5182,6 @@ final class FarmGameView extends CanvasGameView {
         if (gameState.swapAmount > gameState.coins) {
             gameState.swapAmount = gameState.coins;
         }
-        coinBalanceOnChain = false;
         queueChainAction(new ChainAction(swapToEth ? "SWAP_COIN_ETH" : "SWAP_COIN", 0, swappedCoins));
         saveGameState();
         String output = swapOutputAmount(swappedCoins) + " " + (swapToEth ? "ETH" : "TANI");
@@ -5053,8 +5191,24 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void openSwapAmountDialog() {
-        if (gameState.coins <= 0) {
+        if (selectedSwapFromAsset() == SWAP_ASSET_COIN && gameState.coins <= 0) {
             showErrorMessage("Coin belum ada untuk diswap.");
+            return;
+        }
+        if (selectedSwapFromAsset() == SWAP_ASSET_ETH && walletAddress.isEmpty()) {
+            showErrorMessage("Connect wallet dulu sebelum isi Game Coin dari Sepolia.");
+            performWallet();
+            return;
+        }
+        if (selectedSwapFromAsset() == SWAP_ASSET_ETH && walletNativeBalance.isEmpty()) {
+            refreshWalletState(true);
+            showErrorMessage("Sync saldo ETH Sepolia dulu.");
+            return;
+        }
+        if (maxSwapCoinAmount() <= 0) {
+            showErrorMessage(selectedSwapFromAsset() == SWAP_ASSET_ETH
+                    ? "Saldo ETH Sepolia belum cukup."
+                    : "Coin belum ada untuk diswap.");
             return;
         }
         Context context = getContext();
@@ -5082,14 +5236,19 @@ final class FarmGameView extends CanvasGameView {
         root.addView(title);
 
         TextView body = new TextView(context);
-        body.setText("Saldo Game Coin: " + gameState.coins + " coin");
+        String balanceText = selectedSwapFromAsset() == SWAP_ASSET_ETH
+                ? "Saldo ETH Sepolia: " + compactEth(walletNativeBalance) + " ETH"
+                : "Saldo Game Coin: " + gameState.coins + " coin";
+        body.setText(balanceText);
         body.setTextColor(Color.rgb(255, 238, 211));
         body.setTextSize(16f);
         body.setPadding(0, dp(context, 12), 0, dp(context, 10));
         root.addView(body);
 
         TextView route = new TextView(context);
-        route.setText("Estimasi: " + selectedSwapOutputText());
+        route.setText(selectedSwapFromAsset() == SWAP_ASSET_ETH
+                ? "Isi Game Coin: " + selectedSwapOutputText()
+                : "Estimasi: " + selectedSwapOutputText());
         route.setTextColor(Color.rgb(245, 194, 124));
         route.setTextSize(14f);
         route.setPadding(dp(context, 16), 0, dp(context, 16), 0);
@@ -5113,6 +5272,7 @@ final class FarmGameView extends CanvasGameView {
         input.setText(String.valueOf(selectedSwapInputAmount()));
         input.setSelectAllOnFocus(false);
         input.setTextColor(Color.rgb(255, 240, 212));
+        input.setHint("Jumlah Game Coin");
         input.setHintTextColor(Color.rgb(190, 151, 124));
         input.setTextSize(24f);
         input.setGravity(Gravity.CENTER);
@@ -5187,7 +5347,7 @@ final class FarmGameView extends CanvasGameView {
             showErrorMessage("Jumlah swap tidak valid.");
             return true;
         }
-        gameState.swapAmount = clampInt(amount, 1, gameState.coins);
+        gameState.swapAmount = clampInt(amount, 1, maxSwapCoinAmount());
         saveGameState();
         showMessage("Jumlah swap: " + gameState.swapAmount + " coin");
         dialog.dismiss();
@@ -5392,11 +5552,12 @@ final class FarmGameView extends CanvasGameView {
                 playErrorSound();
             }
             if (state.success && state.coinBalanceAvailable) {
-                gameState.coins = state.coinBalance;
-                coinBalanceOnChain = true;
-                saveGameState();
+                walletTaniBalance = state.coinBalance;
+                walletTaniBalanceAvailable = true;
+                repairLegacyWalletAutofill(walletTaniBalance);
             } else if (state.success) {
-                coinBalanceOnChain = false;
+                walletTaniBalance = 0;
+                walletTaniBalanceAvailable = false;
             }
             if (revealPanel) {
                 chainPanelUntilMs = System.currentTimeMillis() + 5200L;
@@ -5439,6 +5600,18 @@ final class FarmGameView extends CanvasGameView {
                 || "SWAP_CROP".equals(action.type)
                 || "SWAP_COIN".equals(action.type)
                 || "SWAP_COIN_ETH".equals(action.type);
+    }
+
+    private void repairLegacyWalletAutofill(int walletCoinBalance) {
+        if (preferences.getBoolean(PREF_COIN_AUTOFILL_MIGRATION, false)) {
+            return;
+        }
+        if (walletCoinBalance > 0 && gameState.coins == walletCoinBalance) {
+            gameState.coins = 0;
+            gameState.swapAmount = 0;
+            saveGameState();
+        }
+        preferences.edit().putBoolean(PREF_COIN_AUTOFILL_MIGRATION, true).apply();
     }
 
     private String initialChainHistoryStatus() {
@@ -5944,6 +6117,59 @@ final class FarmGameView extends CanvasGameView {
         BigDecimal wei = ethWeiPerCoin.multiply(BigDecimal.valueOf(coinAmount));
         BigDecimal eth = wei.divide(WEI_PER_ETH, 12, RoundingMode.DOWN).stripTrailingZeros();
         return eth.compareTo(BigDecimal.ZERO) == 0 ? "0" : eth.toPlainString();
+    }
+
+    private int maxEthFundingCoins() {
+        BigDecimal availableWei = walletNativeWeiValue().subtract(locallyFundedEthWei());
+        if (availableWei.compareTo(BigDecimal.ZERO) <= 0) {
+            return 0;
+        }
+        BigDecimal coinAmount = availableWei.divide(ethWeiPerCoin, 0, RoundingMode.DOWN);
+        BigDecimal maxInt = BigDecimal.valueOf(Integer.MAX_VALUE);
+        if (coinAmount.compareTo(maxInt) > 0) {
+            return Integer.MAX_VALUE;
+        }
+        return Math.max(0, coinAmount.intValue());
+    }
+
+    private void recordLocalEthFunding(int coinAmount) {
+        if (coinAmount <= 0 || walletAddress.isEmpty()) {
+            return;
+        }
+        BigDecimal usedWei = locallyFundedEthWei().add(ethWeiPerCoin.multiply(BigDecimal.valueOf(coinAmount)));
+        preferences.edit().putString(localEthFundingPreferenceKey(), usedWei.setScale(0, RoundingMode.DOWN).toPlainString()).apply();
+    }
+
+    private BigDecimal locallyFundedEthWei() {
+        if (walletAddress.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        String raw = preferences.getString(localEthFundingPreferenceKey(), "0");
+        try {
+            BigDecimal value = new BigDecimal(raw == null ? "0" : raw.trim());
+            return value.compareTo(BigDecimal.ZERO) > 0 ? value : BigDecimal.ZERO;
+        } catch (NumberFormatException exception) {
+            return BigDecimal.ZERO;
+        }
+    }
+
+    private String localEthFundingPreferenceKey() {
+        return "game_eth_funded_wei_" + walletAddress.toLowerCase(Locale.US);
+    }
+
+    private BigDecimal walletNativeWeiValue() {
+        return walletNativeEthValue().multiply(WEI_PER_ETH).setScale(0, RoundingMode.DOWN);
+    }
+
+    private BigDecimal walletNativeEthValue() {
+        if (walletNativeBalance == null || walletNativeBalance.trim().isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        try {
+            return new BigDecimal(walletNativeBalance.trim());
+        } catch (NumberFormatException exception) {
+            return BigDecimal.ZERO;
+        }
     }
 
     private static boolean isValidAddress(String address) {
