@@ -6,10 +6,11 @@ const CROP_ITEM_ID = 2n;
 const LAND_SELL_REWARD = 175;
 const CROP_REWARD = 35;
 const COIN_SWAP_RATE = 1;
+const DEFAULT_ETH_WEI_PER_COIN = "10000000000";
+const DEFAULT_MAX_ETH_PAYOUT_WEI = "10000000000000000";
 
 const coinAbi = [
-  "function mint(address to, uint256 amount) external",
-  "function gameSpend(address from, uint256 amount) external"
+  "function mint(address to, uint256 amount) external"
 ];
 
 const landAbi = [
@@ -81,7 +82,7 @@ async function submitGameAction(body) {
   const walletAddress = normalizeAddress(body.wallet, "wallet");
   const type = String(body.type || "").trim().toUpperCase();
   const plotId = toPositiveInt(body.plotId || 0, "plotId", {
-    allowZero: type === "SELL_CROP" || type === "SWAP_CROP" || type === "SWAP_COIN"
+    allowZero: type === "SELL_CROP" || type === "SWAP_CROP" || type === "SWAP_COIN" || type === "SWAP_COIN_ETH"
   });
   const amount = toPositiveInt(body.amount || 1, "amount");
   const tokenUri = landTokenUri(walletAddress, plotId);
@@ -124,6 +125,14 @@ async function submitGameAction(body) {
       txHashes.push(await sendTransaction("coin swap", coin.mint(walletAddress, toTani(BigInt(amount) * BigInt(COIN_SWAP_RATE)))));
       break;
     }
+    case "SWAP_COIN_ETH": {
+      const payoutWei = ethPayoutWei(amount);
+      txHashes.push(await sendTransaction("ETH swap payout", service.signer.sendTransaction({
+        to: walletAddress,
+        value: payoutWei
+      })));
+      break;
+    }
     default:
       throw httpError(400, `Tipe aksi tidak dikenal: ${type || "kosong"}.`);
   }
@@ -161,6 +170,27 @@ function landTokenUri(walletAddress, plotId) {
 
 function toTani(amount) {
   return ethers.parseUnits(String(amount), 18);
+}
+
+function ethPayoutWei(amount) {
+  const weiPerCoin = envBigInt("TANIIN_ETH_WEI_PER_COIN", DEFAULT_ETH_WEI_PER_COIN);
+  const maxPayoutWei = envBigInt("TANIIN_MAX_ETH_PAYOUT_WEI", DEFAULT_MAX_ETH_PAYOUT_WEI);
+  const payoutWei = BigInt(amount) * weiPerCoin;
+  if (payoutWei <= 0n) {
+    throw httpError(400, "Nominal swap ETH tidak valid.");
+  }
+  if (payoutWei > maxPayoutWei) {
+    throw httpError(400, "Nominal swap ETH melebihi batas payout signer.");
+  }
+  return payoutWei;
+}
+
+function envBigInt(name, fallback) {
+  const raw = String(process.env[name] || fallback).trim();
+  if (!/^\d+$/.test(raw)) {
+    throw new Error(`${name} harus berupa bilangan wei.`);
+  }
+  return BigInt(raw);
 }
 
 function toPositiveInt(value, name, options = {}) {

@@ -32,6 +32,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.InputStream;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -80,9 +82,12 @@ final class FarmGameView extends CanvasGameView {
     private static final int LAND_SELL_PRICE = 175;
     private static final int HARVEST_SELL_PRICE = 35;
     private static final int COIN_SWAP_RATE = 1;
+    private static final int SWAP_TARGET_TANI = 0;
+    private static final int SWAP_TARGET_ETH = 1;
+    private static final String DEFAULT_ETH_WEI_PER_COIN = "10000000000";
+    private static final BigDecimal WEI_PER_ETH = new BigDecimal("1000000000000000000");
     private static final int SEED_BUNDLE_AMOUNT = 3;
     private static final int MAX_SHOP_BUNDLE_QUANTITY = 9;
-    private static final int LAND_STATE_VERSION = 2;
     private static final long HARVEST_EFFECT_MS = 1450L;
     private static final long SHOP_NPC_BUBBLE_MS = 4200L;
     private static final String[] SEED_NAMES = {"Kentang", "Bawang", "Stroberi", "Bit"};
@@ -115,14 +120,23 @@ final class FarmGameView extends CanvasGameView {
     private final Paint pixelPaint = new Paint();
     private final Rect src = new Rect();
     private final RectF dst = new RectF();
-    private final List<Plot> plots = new ArrayList<>();
+    private final GameState gameState = new GameState();
+    private final FarmingSystem farmingSystem = new FarmingSystem(
+            LAND_BUY_PRICE,
+            LAND_SELL_PRICE,
+            GROW_TIME_MS,
+            SEED_HARVEST_YIELDS,
+            SEED_NAMES);
+    private final ShopSystem shopSystem = new ShopSystem(SEED_BUNDLE_AMOUNT, SEED_PRICES, SEED_NAMES);
     private final List<RectF> collisionRects = new ArrayList<>();
     private final List<ChainAction> pendingChainActions = new ArrayList<>();
     private final List<ChainHistoryEntry> chainHistory = new ArrayList<>();
     private final List<HarvestEffect> harvestEffects = new ArrayList<>();
     private final BlockchainClient blockchainClient = new BlockchainClient();
+    private final BigDecimal ethWeiPerCoin = resolveEthWeiPerCoin();
     private final GameAudio gameAudio;
     private final SharedPreferences preferences;
+    private final GameStateStore gameStateStore;
     private TmxMap tmxMap;
 
     private final Bitmap idleSheet;
@@ -163,12 +177,6 @@ final class FarmGameView extends CanvasGameView {
     private boolean checkingChain;
     private String mapStatus = "";
 
-    private int coins = 500;
-    private final int[] seedCounts = {6, 0, 0, 0};
-    private int selectedSeedIndex;
-    private int shopBundleQuantity = 1;
-    private int harvests = 0;
-    private int ownedLand = 1;
     private int selectedPlot = -1;
     private int activeInteractionPlot = -1;
     private boolean moving;
@@ -204,6 +212,7 @@ final class FarmGameView extends CanvasGameView {
         pixelPaint.setFilterBitmap(false);
         gameAudio = new GameAudio(context);
         preferences = context.getSharedPreferences("taniin_chain", Context.MODE_PRIVATE);
+        gameStateStore = new GameStateStore(preferences, SEED_NAMES.length, MAX_SHOP_BUNDLE_QUANTITY, GROW_TIME_MS);
         walletAddress = resolveInitialWalletAddress();
         loadAudioSettings();
         idleSheet = decodePixelResource(R.drawable.idle);
@@ -321,7 +330,7 @@ final class FarmGameView extends CanvasGameView {
         for (int i = 0; i < farmColumns.length; i++) {
             Plot plot = new Plot(farmColumns[i] * TILE, farmY * TILE, 2 * TILE, 4 * TILE);
             plot.owned = i == 0;
-            plots.add(plot);
+            gameState.plots.add(plot);
         }
     }
 
@@ -395,7 +404,7 @@ final class FarmGameView extends CanvasGameView {
         }
 
         selectedPlot = findNearbyPlot();
-        for (Plot plot : plots) {
+        for (Plot plot : gameState.plots) {
             if (plot.state == PlotState.GROWING && now - plot.plantedAtMs >= GROW_TIME_MS) {
                 plot.state = PlotState.READY;
             }
@@ -505,8 +514,8 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void drawPlots(Canvas canvas, long now) {
-        for (int i = 0; i < plots.size(); i++) {
-            Plot plot = plots.get(i);
+        for (int i = 0; i < gameState.plots.size(); i++) {
+            Plot plot = gameState.plots.get(i);
             boolean selected = i == selectedPlot;
             if (tmxMap == null) {
                 paint.setStyle(Paint.Style.FILL);
@@ -1199,11 +1208,11 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void drawPlotActionSigns(Canvas canvas, long now) {
-        for (int i = 0; i < plots.size(); i++) {
+        for (int i = 0; i < gameState.plots.size(); i++) {
             if (i != selectedPlot) {
                 continue;
             }
-            Plot plot = plots.get(i);
+            Plot plot = gameState.plots.get(i);
             InteractionKind kind = plotInteractionKind(plot, now);
             RectF sign = plotActionSignBounds(plot);
             keepPlotSignOnScreen(sign);
@@ -1529,10 +1538,10 @@ final class FarmGameView extends CanvasGameView {
         paint.setTextSize(21f);
         paint.setFakeBoldText(true);
         String coinLabel = coinBalanceOnChain ? "Wallet Coin " : "Coin ";
-        canvas.drawText(coinLabel + coins, left + 16f, top + 34f, paint);
+        canvas.drawText(coinLabel + gameState.coins, left + 16f, top + 34f, paint);
         paint.setColor(Color.WHITE);
         canvas.drawText("Bibit " + totalSeeds(), left + 122f, top + 34f, paint);
-        canvas.drawText("Panen " + harvests, left + 220f, top + 34f, paint);
+        canvas.drawText("Panen " + gameState.harvests, left + 220f, top + 34f, paint);
         paint.setFakeBoldText(false);
     }
 
@@ -1623,14 +1632,14 @@ final class FarmGameView extends CanvasGameView {
         paint.setColor(Color.rgb(240, 222, 179));
         paint.setTextSize(26f);
         paint.setFakeBoldText(true);
-        canvas.drawText(String.valueOf(coins), barLeft + 76f, top + 48f, paint);
+        canvas.drawText(String.valueOf(gameState.coins), barLeft + 76f, top + 48f, paint);
 
         paint.setColor(Color.rgb(76, 42, 12));
         canvas.drawRect(barLeft + topMenuBarWidth() * 0.52f, top + 13f, barLeft + topMenuBarWidth() * 0.52f + 4f, bottom - 13f, paint);
 
         drawHarvestHudIcon(canvas, barLeft + topMenuBarWidth() * 0.67f, top + buttonSize * 0.5f);
         paint.setColor(Color.rgb(240, 222, 179));
-        canvas.drawText(String.valueOf(harvests), barLeft + topMenuBarWidth() * 0.67f + 39f, top + 48f, paint);
+        canvas.drawText(String.valueOf(gameState.harvests), barLeft + topMenuBarWidth() * 0.67f + 39f, top + 48f, paint);
         paint.setFakeBoldText(false);
 
         paint.setStyle(Paint.Style.FILL);
@@ -1745,7 +1754,7 @@ final class FarmGameView extends CanvasGameView {
                     SEED_ICON_COLORS[i],
                     i == 1 ? "Benih Daun" : "Benih",
                     SEED_NAMES[i],
-                    seedCounts[i]);
+                    gameState.seedCounts[i]);
         }
     }
 
@@ -2227,7 +2236,7 @@ final class FarmGameView extends CanvasGameView {
 
         int growing = 0;
         int ready = 0;
-        for (Plot plot : plots) {
+        for (Plot plot : gameState.plots) {
             if (plot.state == PlotState.GROWING) {
                 growing++;
             } else if (plot.state == PlotState.READY) {
@@ -2235,10 +2244,10 @@ final class FarmGameView extends CanvasGameView {
             }
         }
 
-        drawInventoryRow(canvas, x, y + 45f, Color.rgb(255, 209, 84), coinBalanceOnChain ? "Wallet coin" : "Coin lokal", coins);
+        drawInventoryRow(canvas, x, y + 45f, Color.rgb(255, 209, 84), coinBalanceOnChain ? "Wallet coin" : "Coin lokal", gameState.coins);
         drawInventoryRow(canvas, x, y + 90f, Color.rgb(116, 209, 85), "Bibit tanaman", totalSeeds());
-        drawInventoryRow(canvas, x, y + 135f, Color.rgb(235, 150, 63), "Hasil panen", harvests);
-        drawInventoryRow(canvas, x, y + 180f, Color.rgb(123, 188, 91), "Lahan dimiliki", ownedLand);
+        drawInventoryRow(canvas, x, y + 135f, Color.rgb(235, 150, 63), "Hasil panen", gameState.harvests);
+        drawInventoryRow(canvas, x, y + 180f, Color.rgb(123, 188, 91), "Lahan dimiliki", gameState.ownedLand);
         drawInventoryRow(canvas, x, y + 225f, Color.rgb(96, 176, 220), "Tanaman tumbuh", growing);
         drawInventoryRow(canvas, x, y + 270f, Color.rgb(255, 230, 92), "Siap panen", ready);
     }
@@ -2911,12 +2920,12 @@ final class FarmGameView extends CanvasGameView {
             case SHOP:
                 return "";
             case SELL_HARVEST:
-                return harvests > 0
-                        ? "A: jual " + harvests + " panen jadi coin wallet."
+                return gameState.harvests > 0
+                        ? "A: jual " + gameState.harvests + " panen jadi coin wallet."
                         : "Rumah jual: belum ada hasil panen.";
             case SWAP_TOKEN:
-                return coins > 0
-                        ? "A: swap " + coins + " coin ke TANI Sepolia."
+                return gameState.coins > 0
+                        ? "A: pilih output, lalu swap " + gameState.coins + " coin ke Sepolia."
                         : "Rumah swap: coin belum ada.";
             case BUY_LAND:
                 return "A: beli lahan " + LAND_BUY_PRICE + " coin.";
@@ -2935,7 +2944,7 @@ final class FarmGameView extends CanvasGameView {
 
     private InteractionKind currentInteractionKind(long now) {
         if (selectedPlot >= 0) {
-            return plotInteractionKind(plots.get(selectedPlot), now);
+            return plotInteractionKind(gameState.plots.get(selectedPlot), now);
         }
         if (isNearShop()) {
             return InteractionKind.SHOP;
@@ -2950,19 +2959,7 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private InteractionKind plotInteractionKind(Plot plot, long now) {
-        if (!plot.owned) {
-            return InteractionKind.BUY_LAND;
-        }
-        if (plot.state == PlotState.EMPTY) {
-            return InteractionKind.PLANT;
-        }
-        if (plot.state == PlotState.GROWING) {
-            if (now - plot.plantedAtMs >= GROW_TIME_MS) {
-                return InteractionKind.HARVEST;
-            }
-            return InteractionKind.WAIT_CROP;
-        }
-        return InteractionKind.HARVEST;
+        return farmingSystem.interactionKind(plot, now);
     }
 
     private void drawShopPanel(Canvas canvas) {
@@ -3013,7 +3010,7 @@ final class FarmGameView extends CanvasGameView {
         paint.setTextSize(18f);
         canvas.drawText("Wallet: " + (walletAddress.isEmpty() ? "belum diset" : shortAddress(walletAddress)), x + 22, y + 102, paint);
         String balanceLine = (coinBalanceOnChain ? "TANI on-chain " : "Coin lokal ")
-                + coins
+                + gameState.coins
                 + (walletNativeBalance.isEmpty() ? "" : " | Sepolia ETH " + compactEth(walletNativeBalance));
         canvas.drawText(balanceLine, x + 22, y + 132, paint);
         paint.setTextSize(fitTextSize(chainModeText(), 17f, w - 44f));
@@ -3087,7 +3084,7 @@ final class FarmGameView extends CanvasGameView {
         paint.setColor(Color.rgb(89, 42, 13));
         canvas.drawRect(panel.left + 58f, panel.top + 112f, panel.right - 58f, panel.top + 117f, paint);
 
-        RectF textBox = new RectF(panel.left + 58f, panel.top + 178f, panel.right - 58f, panel.top + 276f);
+        RectF textBox = interactionBodyBoxBounds();
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(142, 65, 27));
         canvas.drawRoundRect(textBox, 14, 14, paint);
@@ -3107,6 +3104,9 @@ final class FarmGameView extends CanvasGameView {
             drawPlantSeedSelector(canvas);
             drawDialogButton(canvas, interactionSellLandButtonBounds(), "Jual lahan",
                     Color.rgb(114, 71, 24), Color.rgb(255, 178, 63), Color.rgb(255, 237, 205));
+        }
+        if (activeInteractionKind == InteractionKind.SWAP_TOKEN) {
+            drawSwapRouteCard(canvas);
         }
 
         drawDialogButton(canvas, interactionPrimaryButtonBounds(), interactionPrimaryText(),
@@ -3193,14 +3193,14 @@ final class FarmGameView extends CanvasGameView {
 
         String line1 = String.format(Locale.US,
                 "Beli %d paket %s?",
-                shopBundleQuantity,
+                gameState.shopBundleQuantity,
                 SEED_NAMES[seedIndex]);
         String line2 = String.format(Locale.US,
                 "Total %d benih - %d Coin. %s kamu %d.",
                 selectedSeedTotalAmount(),
                 selectedSeedTotalPrice(),
                 coinBalanceOnChain ? "Wallet coin" : "Coin",
-                coins);
+                gameState.coins);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(255, 240, 212));
         paint.setTextSize(fitTextSize(line1, 27f, detail.width() - 56f));
@@ -3253,13 +3253,13 @@ final class FarmGameView extends CanvasGameView {
         paint.setColor(Color.rgb(95, 43, 12));
         canvas.drawRoundRect(bounds, 12, 12, paint);
 
-        String selected = SEED_NAMES[selectedSeedIndex];
+        String selected = SEED_NAMES[gameState.selectedSeedIndex];
         String summary = String.format(Locale.US,
                 "%s: %d | %s | Paket x%d = %d benih | Total %d Coin",
                 coinBalanceOnChain ? "Wallet Coin" : "Coin",
-                coins,
+                gameState.coins,
                 selected,
-                shopBundleQuantity,
+                gameState.shopBundleQuantity,
                 selectedSeedTotalAmount(),
                 selectedSeedTotalPrice());
         paint.setStyle(Paint.Style.FILL);
@@ -3302,7 +3302,7 @@ final class FarmGameView extends CanvasGameView {
         paint.setColor(Color.rgb(255, 238, 211));
         paint.setTextSize(22f);
         paint.setFakeBoldText(true);
-        drawCenteredText(canvas, "x" + shopBundleQuantity, bounds.centerX(), bounds.top + 34f);
+        drawCenteredText(canvas, "x" + gameState.shopBundleQuantity, bounds.centerX(), bounds.top + 34f);
         paint.setFakeBoldText(false);
     }
 
@@ -3321,8 +3321,8 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void drawPlantSeedOption(Canvas canvas, RectF bounds, int seedIndex) {
-        boolean selected = seedIndex == selectedSeedIndex;
-        boolean available = seedCounts[seedIndex] > 0;
+        boolean selected = seedIndex == gameState.selectedSeedIndex;
+        boolean available = gameState.seedCounts[seedIndex] > 0;
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(selected ? Color.rgb(167, 88, 30) : Color.rgb(121, 58, 23));
         canvas.drawRoundRect(bounds, 11, 11, paint);
@@ -3342,7 +3342,103 @@ final class FarmGameView extends CanvasGameView {
         canvas.drawText(SEED_NAMES[seedIndex], bounds.left + 68f, bounds.top + 34f, paint);
         paint.setTextSize(18f);
         paint.setFakeBoldText(false);
-        canvas.drawText("Stok x" + seedCounts[seedIndex], bounds.left + 68f, bounds.top + 62f, paint);
+        canvas.drawText("Stok x" + gameState.seedCounts[seedIndex], bounds.left + 68f, bounds.top + 62f, paint);
+    }
+
+    private void drawSwapRouteCard(Canvas canvas) {
+        drawSwapField(canvas, swapFromCardBounds(), true);
+        drawSwapField(canvas, swapToCardBounds(), false);
+
+        RectF button = swapSwitchButtonBounds();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.argb(120, 0, 0, 0));
+        canvas.drawCircle(button.centerX() + 4f, button.centerY() + 5f, button.width() * 0.5f, paint);
+        paint.setColor(Color.rgb(203, 255, 42));
+        canvas.drawCircle(button.centerX(), button.centerY(), button.width() * 0.5f, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(4f);
+        paint.setColor(Color.rgb(38, 51, 18));
+        canvas.drawCircle(button.centerX(), button.centerY(), button.width() * 0.5f - 2f, paint);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(30, 36, 17));
+        paint.setTextSize(30f);
+        paint.setFakeBoldText(true);
+        drawCenteredText(canvas, "<->", button.centerX(), button.centerY() + 10f);
+        paint.setFakeBoldText(false);
+    }
+
+    private void drawSwapField(Canvas canvas, RectF bounds, boolean from) {
+        String headerLeft = from ? "From" : "To";
+        String headerRight = from ? "Jumlah input" : "Estimasi output";
+        String symbol = from ? "COIN" : swapTargetLabel();
+        String name = from ? "Game Coin" : swapOutputName();
+        String amount = from ? String.valueOf(gameState.coins) : selectedSwapOutputAmount();
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.argb(95, 0, 0, 0));
+        canvas.drawRoundRect(bounds.left + 5f, bounds.top + 6f, bounds.right + 5f, bounds.bottom + 6f, 18, 18, paint);
+        paint.setColor(Color.rgb(22, 23, 27));
+        canvas.drawRoundRect(bounds, 18, 18, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(3f);
+        paint.setColor(Color.rgb(43, 44, 52));
+        canvas.drawRoundRect(bounds, 18, 18, paint);
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(159, 154, 171));
+        paint.setTextSize(17f);
+        paint.setFakeBoldText(true);
+        canvas.drawText(headerLeft, bounds.left + 28f, bounds.top + 28f, paint);
+        paint.setTextSize(fitTextSize(headerRight, 16f, bounds.width() * 0.42f));
+        canvas.drawText(headerRight, bounds.right - 28f - paint.measureText(headerRight), bounds.top + 28f, paint);
+        paint.setFakeBoldText(false);
+
+        RectF chip = new RectF(bounds.left + 28f, bounds.top + 44f, bounds.left + Math.min(250f, bounds.width() * 0.38f), bounds.bottom - 22f);
+        paint.setColor(Color.rgb(31, 32, 38));
+        canvas.drawRoundRect(chip, 25, 25, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(3f);
+        paint.setColor(Color.rgb(50, 51, 60));
+        canvas.drawRoundRect(chip, 25, 25, paint);
+
+        drawSwapTokenIcon(canvas, chip.left + 31f, chip.centerY(), from ? SWAP_TARGET_TANI : gameState.swapTarget, from);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.WHITE);
+        paint.setTextSize(fitTextSize(symbol, 25f, chip.width() - 88f));
+        paint.setFakeBoldText(true);
+        canvas.drawText(symbol, chip.left + 68f, chip.top + 38f, paint);
+        paint.setColor(Color.rgb(168, 164, 179));
+        paint.setTextSize(24f);
+        canvas.drawText("v", chip.right - 32f, chip.top + 38f, paint);
+        paint.setFakeBoldText(false);
+
+        paint.setColor(Color.rgb(100, 96, 111));
+        paint.setTextSize(fitTextSize(name, 17f, bounds.width() * 0.42f));
+        canvas.drawText(name, bounds.left + 30f, bounds.bottom - 12f, paint);
+
+        paint.setColor(gameState.coins > 0 || from ? Color.rgb(232, 229, 238) : Color.rgb(112, 108, 122));
+        paint.setTextSize(fitTextSize(amount, 40f, bounds.width() * 0.42f));
+        paint.setFakeBoldText(true);
+        canvas.drawText(amount, bounds.right - 28f - paint.measureText(amount), bounds.centerY() + 18f, paint);
+        paint.setFakeBoldText(false);
+    }
+
+    private void drawSwapTokenIcon(Canvas canvas, float cx, float cy, int target, boolean coin) {
+        if (coin) {
+            paint.setColor(Color.rgb(244, 192, 46));
+        } else if (target == SWAP_TARGET_ETH) {
+            paint.setColor(Color.rgb(111, 136, 244));
+        } else {
+            paint.setColor(Color.rgb(50, 184, 113));
+        }
+        paint.setStyle(Paint.Style.FILL);
+        canvas.drawCircle(cx, cy, 24f, paint);
+        paint.setColor(Color.WHITE);
+        paint.setTextSize(target == SWAP_TARGET_ETH && !coin ? 25f : 20f);
+        paint.setFakeBoldText(true);
+        String label = coin ? "C" : (target == SWAP_TARGET_ETH ? "E" : "T");
+        drawCenteredText(canvas, label, cx, cy + 8f);
+        paint.setFakeBoldText(false);
     }
 
     private void drawInfoStrip(Canvas canvas, RectF bounds, String label) {
@@ -3362,8 +3458,8 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void drawShopCard(Canvas canvas, RectF card, int seedIndex) {
-        boolean selected = seedIndex == selectedSeedIndex;
-        boolean canBuy = coins >= totalPriceForSeed(seedIndex);
+        boolean selected = seedIndex == gameState.selectedSeedIndex;
+        boolean canBuy = gameState.coins >= totalPriceForSeed(seedIndex);
         int cardFill = selected ? Color.rgb(176, 86, 28) : Color.rgb(141, 65, 27);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(cardFill);
@@ -3382,7 +3478,7 @@ final class FarmGameView extends CanvasGameView {
         canvas.drawText(SEED_SHOP_NAMES[seedIndex], card.left + 118f, card.top + card.height() * 0.34f, paint);
         paint.setTextSize(19f);
         paint.setFakeBoldText(false);
-        canvas.drawText("Isi " + SEED_BUNDLE_AMOUNT + " - Stok x" + seedCounts[seedIndex],
+        canvas.drawText("Isi " + SEED_BUNDLE_AMOUNT + " - Stok x" + gameState.seedCounts[seedIndex],
                 card.left + 118f,
                 card.top + card.height() * 0.55f,
                 paint);
@@ -3395,9 +3491,9 @@ final class FarmGameView extends CanvasGameView {
         paint.setColor(canBuy ? Color.rgb(107, 56, 17) : Color.rgb(111, 52, 22));
         canvas.drawRoundRect(button, 9, 9, paint);
         paint.setColor(canBuy ? Color.rgb(255, 238, 211) : Color.rgb(171, 103, 57));
-        paint.setTextSize(fitTextSize(canBuy ? "Beli x" + shopBundleQuantity : "Kurang", 20f, button.width() - 18f));
+        paint.setTextSize(fitTextSize(canBuy ? "Beli x" + gameState.shopBundleQuantity : "Kurang", 20f, button.width() - 18f));
         paint.setFakeBoldText(true);
-        drawCenteredText(canvas, canBuy ? "Beli x" + shopBundleQuantity : "Kurang", button.centerX(), button.top + 33f);
+        drawCenteredText(canvas, canBuy ? "Beli x" + gameState.shopBundleQuantity : "Kurang", button.centerX(), button.top + 33f);
         paint.setFakeBoldText(false);
     }
 
@@ -3470,7 +3566,7 @@ final class FarmGameView extends CanvasGameView {
             if (tappedPlot >= 0) {
                 playClickSound();
                 selectedPlot = tappedPlot;
-                openInteractionDialog(plotInteractionKind(plots.get(tappedPlot), System.currentTimeMillis()));
+                openInteractionDialog(plotInteractionKind(gameState.plots.get(tappedPlot), System.currentTimeMillis()));
                 return true;
             }
             if (isNearShop() && shopSignTapBounds().contains(x, y)) {
@@ -3641,6 +3737,14 @@ final class FarmGameView extends CanvasGameView {
                 return true;
             }
         }
+        if (activeInteractionKind == InteractionKind.SWAP_TOKEN) {
+            if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_DPAD_DOWN
+                    || keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                playClickSound();
+                toggleSwapTarget();
+                return true;
+            }
+        }
         if (isPrimaryKey(keyCode)) {
             playClickSound();
             activateInteractionPrimary();
@@ -3657,14 +3761,14 @@ final class FarmGameView extends CanvasGameView {
     private boolean handleShopCatalogKey(int keyCode) {
         if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
             playClickSound();
-            selectedSeedIndex = (selectedSeedIndex + 1) % SEED_NAMES.length;
-            showMessage("Benih dipilih: " + SEED_NAMES[selectedSeedIndex]);
+            gameState.selectedSeedIndex = (gameState.selectedSeedIndex + 1) % SEED_NAMES.length;
+            showMessage("Benih dipilih: " + SEED_NAMES[gameState.selectedSeedIndex]);
             return true;
         }
         if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
             playClickSound();
-            selectedSeedIndex = (selectedSeedIndex + SEED_NAMES.length - 1) % SEED_NAMES.length;
-            showMessage("Benih dipilih: " + SEED_NAMES[selectedSeedIndex]);
+            gameState.selectedSeedIndex = (gameState.selectedSeedIndex + SEED_NAMES.length - 1) % SEED_NAMES.length;
+            showMessage("Benih dipilih: " + SEED_NAMES[gameState.selectedSeedIndex]);
             return true;
         }
         if (keyCode == KeyEvent.KEYCODE_DPAD_UP
@@ -3684,7 +3788,7 @@ final class FarmGameView extends CanvasGameView {
         }
         if (isPrimaryKey(keyCode)) {
             playClickSound();
-            openShopPurchaseConfirm(selectedSeedIndex);
+            openShopPurchaseConfirm(gameState.selectedSeedIndex);
             return true;
         }
         if (isBackKey(keyCode)) {
@@ -3951,14 +4055,21 @@ final class FarmGameView extends CanvasGameView {
             for (int i = 0; i < SEED_NAMES.length; i++) {
                 if (plantSeedOptionBounds(i).contains(x, y)) {
                     playClickSound();
-                    selectedSeedIndex = i;
-                    showMessage("Benih dipilih: " + SEED_NAMES[selectedSeedIndex]);
+                    gameState.selectedSeedIndex = i;
+                    showMessage("Benih dipilih: " + SEED_NAMES[gameState.selectedSeedIndex]);
                     return true;
                 }
             }
             if (interactionSellLandButtonBounds().contains(x, y)) {
                 playClickSound();
                 activeInteractionKind = InteractionKind.SELL_LAND;
+                return true;
+            }
+        }
+        if (activeInteractionKind == InteractionKind.SWAP_TOKEN) {
+            if (swapToCardBounds().contains(x, y) || swapSwitchButtonBounds().contains(x, y)) {
+                playClickSound();
+                toggleSwapTarget();
                 return true;
             }
         }
@@ -3976,8 +4087,41 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void selectNextSeed(int direction) {
-        selectedSeedIndex = (selectedSeedIndex + direction + SEED_NAMES.length) % SEED_NAMES.length;
-        showMessage("Benih dipilih: " + SEED_NAMES[selectedSeedIndex]);
+        gameState.selectedSeedIndex = (gameState.selectedSeedIndex + direction + SEED_NAMES.length) % SEED_NAMES.length;
+        showMessage("Benih dipilih: " + SEED_NAMES[gameState.selectedSeedIndex]);
+    }
+
+    private void selectSwapTarget(int target) {
+        gameState.swapTarget = target == SWAP_TARGET_ETH ? SWAP_TARGET_ETH : SWAP_TARGET_TANI;
+        saveGameState();
+        showMessage("Output swap: " + swapTargetLabel());
+    }
+
+    private void toggleSwapTarget() {
+        selectSwapTarget(gameState.swapTarget == SWAP_TARGET_ETH ? SWAP_TARGET_TANI : SWAP_TARGET_ETH);
+    }
+
+    private String swapTargetLabel() {
+        return gameState.swapTarget == SWAP_TARGET_ETH ? "ETH" : "TANI";
+    }
+
+    private String selectedSwapOutputText() {
+        return selectedSwapOutputAmount() + " " + swapTargetLabel() + " Sepolia";
+    }
+
+    private String selectedSwapOutputAmount() {
+        return swapOutputAmount(gameState.coins);
+    }
+
+    private String swapOutputAmount(int coinAmount) {
+        if (gameState.swapTarget == SWAP_TARGET_ETH) {
+            return estimatedEthSwapAmount(coinAmount);
+        }
+        return String.valueOf(coinAmount * COIN_SWAP_RATE);
+    }
+
+    private String swapOutputName() {
+        return gameState.swapTarget == SWAP_TARGET_ETH ? "Sepolia ETH" : "TANI Sepolia";
     }
 
     private void activateInteractionPrimary() {
@@ -4007,7 +4151,7 @@ final class FarmGameView extends CanvasGameView {
             interactionDialogOpen = false;
             return;
         }
-        if (activeInteractionKind == InteractionKind.PLANT && seedCounts[selectedSeedIndex] <= 0) {
+        if (activeInteractionKind == InteractionKind.PLANT && gameState.seedCounts[gameState.selectedSeedIndex] <= 0) {
             interactionDialogOpen = false;
             shopCatalogOpen = true;
             return;
@@ -4041,8 +4185,8 @@ final class FarmGameView extends CanvasGameView {
             }
             if (shopCardBounds(i).contains(x, y)) {
                 playClickSound();
-                selectedSeedIndex = i;
-                showMessage("Benih dipilih: " + SEED_NAMES[selectedSeedIndex]);
+                gameState.selectedSeedIndex = i;
+                showMessage("Benih dipilih: " + SEED_NAMES[gameState.selectedSeedIndex]);
                 return true;
             }
         }
@@ -4064,7 +4208,7 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void openShopPurchaseConfirm(int seedIndex) {
-        selectedSeedIndex = seedIndex;
+        gameState.selectedSeedIndex = seedIndex;
         shopPurchaseSeedIndex = seedIndex;
         shopPurchaseConfirmOpen = true;
     }
@@ -4077,14 +4221,14 @@ final class FarmGameView extends CanvasGameView {
 
     private int validShopPurchaseSeedIndex() {
         if (shopPurchaseSeedIndex < 0 || shopPurchaseSeedIndex >= SEED_NAMES.length) {
-            return selectedSeedIndex;
+            return gameState.selectedSeedIndex;
         }
         return shopPurchaseSeedIndex;
     }
 
     private void adjustShopBundleQuantity(int delta) {
-        shopBundleQuantity = (int) clamp(shopBundleQuantity + delta, 1, MAX_SHOP_BUNDLE_QUANTITY);
-        showMessage("Jumlah paket: x" + shopBundleQuantity + " (" + selectedSeedTotalAmount() + " benih)");
+        gameState.shopBundleQuantity = (int) clamp(gameState.shopBundleQuantity + delta, 1, MAX_SHOP_BUNDLE_QUANTITY);
+        showMessage("Jumlah paket: x" + gameState.shopBundleQuantity + " (" + selectedSeedTotalAmount() + " benih)");
     }
 
     private void updateJoystick(float x, float y) {
@@ -4158,21 +4302,21 @@ final class FarmGameView extends CanvasGameView {
                 if (walletAddress.isEmpty()) {
                     return "Connect wallet dulu sebelum jual hasil panen.";
                 }
-                return harvests > 0
-                        ? "Jual " + harvests + " hasil panen? Coin akan masuk ke wallet."
+                return gameState.harvests > 0
+                        ? "Jual " + gameState.harvests + " hasil panen? Coin akan masuk ke wallet."
                         : "Belum ada hasil panen untuk dijual.";
             case SWAP_TOKEN:
                 if (walletAddress.isEmpty()) {
-                    return "Connect wallet dulu supaya coin bisa masuk ke TANI Sepolia.";
+                    return "Connect wallet dulu supaya coin bisa diswap ke Sepolia.";
                 }
-                return coins > 0
-                        ? "Swap " + coins + " coin -> " + (coins * COIN_SWAP_RATE) + " TANI Sepolia."
+                return gameState.coins > 0
+                        ? "Swap " + gameState.coins + " coin -> " + selectedSwapOutputText() + "."
                         : "Coin belum ada untuk diswap.";
             case BUY_LAND:
                 return "Lahan ini bisa dibeli seharga " + LAND_BUY_PRICE + " coin.";
             case PLANT:
-                return seedCounts[selectedSeedIndex] > 0
-                        ? "Tanam " + SEED_NAMES[selectedSeedIndex] + " atau jual lahan kosong +" + LAND_SELL_PRICE + " coin."
+                return gameState.seedCounts[gameState.selectedSeedIndex] > 0
+                        ? "Tanam " + SEED_NAMES[gameState.selectedSeedIndex] + " atau jual lahan kosong +" + LAND_SELL_PRICE + " coin."
                         : "Benih habis. Buka toko atau jual lahan kosong +" + LAND_SELL_PRICE + " coin.";
             case SELL_LAND:
                 if (!canSellActiveLand()) {
@@ -4196,16 +4340,16 @@ final class FarmGameView extends CanvasGameView {
                 if (walletAddress.isEmpty()) {
                     return "Connect wallet";
                 }
-                return harvests > 0 ? "Ya, jual panen" : "Oke";
+                return gameState.harvests > 0 ? "Ya, jual panen" : "Oke";
             case SWAP_TOKEN:
                 if (walletAddress.isEmpty()) {
                     return "Connect wallet";
                 }
-                return coins > 0 ? "Swap ke Sepolia" : "Oke";
+                return gameState.coins > 0 ? "Swap ke " + swapTargetLabel() : "Oke";
             case BUY_LAND:
                 return "Ya, beli lahan";
             case PLANT:
-                return seedCounts[selectedSeedIndex] > 0 ? "Ya, tanam " + SEED_NAMES[selectedSeedIndex] : "Buka toko";
+                return gameState.seedCounts[gameState.selectedSeedIndex] > 0 ? "Ya, tanam " + SEED_NAMES[gameState.selectedSeedIndex] : "Buka toko";
             case SELL_LAND:
                 return canSellActiveLand() ? "Ya, jual lahan" : "Oke";
             case WAIT_CROP:
@@ -4232,10 +4376,10 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private int activeCropRemainingSeconds(long now) {
-        if (activeInteractionPlot < 0 || activeInteractionPlot >= plots.size()) {
+        if (activeInteractionPlot < 0 || activeInteractionPlot >= gameState.plots.size()) {
             return 0;
         }
-        Plot plot = plots.get(activeInteractionPlot);
+        Plot plot = gameState.plots.get(activeInteractionPlot);
         return Math.max(0, (int) ((GROW_TIME_MS - (now - plot.plantedAtMs)) / 1000L));
     }
 
@@ -4248,12 +4392,25 @@ final class FarmGameView extends CanvasGameView {
 
     private RectF interactionDialogPanelBounds() {
         float w = clamp(getWidth() * 0.58f, 720f, 900f);
-        float h = activeInteractionKind == InteractionKind.PLANT
-                ? clamp(getHeight() * 0.58f, 560f, 650f)
-                : clamp(getHeight() * 0.45f, 410f, 510f);
+        float h;
+        if (activeInteractionKind == InteractionKind.PLANT) {
+            h = clamp(getHeight() * 0.58f, 560f, 650f);
+        } else if (activeInteractionKind == InteractionKind.SWAP_TOKEN) {
+            h = clamp(getHeight() * 0.58f, 560f, 650f);
+        } else {
+            h = clamp(getHeight() * 0.45f, 410f, 510f);
+        }
         float left = (getWidth() - w) * 0.5f;
         float top = (getHeight() - h) * 0.5f;
         return new RectF(left, top, left + w, top + h);
+    }
+
+    private RectF interactionBodyBoxBounds() {
+        RectF panel = interactionDialogPanelBounds();
+        if (activeInteractionKind == InteractionKind.SWAP_TOKEN) {
+            return new RectF(panel.left + 58f, panel.top + 142f, panel.right - 58f, panel.top + 214f);
+        }
+        return new RectF(panel.left + 58f, panel.top + 178f, panel.right - 58f, panel.top + 276f);
     }
 
     private RectF plantSeedOptionBounds(int index) {
@@ -4266,9 +4423,27 @@ final class FarmGameView extends CanvasGameView {
         return new RectF(left + index * (width + gap), top, left + index * (width + gap) + width, top + 78f);
     }
 
+    private RectF swapFromCardBounds() {
+        RectF panel = interactionDialogPanelBounds();
+        return new RectF(panel.left + 58f, panel.top + 244f, panel.right - 58f, panel.top + 352f);
+    }
+
+    private RectF swapToCardBounds() {
+        RectF panel = interactionDialogPanelBounds();
+        return new RectF(panel.left + 58f, panel.top + 378f, panel.right - 58f, panel.top + 486f);
+    }
+
+    private RectF swapSwitchButtonBounds() {
+        RectF from = swapFromCardBounds();
+        float size = 58f;
+        float left = from.centerX() - size * 0.5f;
+        float top = from.bottom - 12f;
+        return new RectF(left, top, left + size, top + size);
+    }
+
     private RectF interactionPrimaryButtonBounds() {
         RectF panel = interactionDialogPanelBounds();
-        float height = 78f;
+        float height = activeInteractionKind == InteractionKind.SWAP_TOKEN ? 70f : 78f;
         if (activeInteractionKind == InteractionKind.PLANT) {
             float gap = 18f;
             float width = Math.min(340f, panel.width() * 0.36f);
@@ -4282,7 +4457,7 @@ final class FarmGameView extends CanvasGameView {
         float width = Math.min(380f, panel.width() * 0.43f);
         float gap = 24f;
         float left = panel.centerX() - width - gap * 0.5f;
-        float top = panel.bottom - 126f;
+        float top = panel.bottom - (activeInteractionKind == InteractionKind.SWAP_TOKEN ? 96f : 126f);
         return new RectF(left, top, left + width, top + height);
     }
 
@@ -4381,7 +4556,7 @@ final class FarmGameView extends CanvasGameView {
 
     private void performAction() {
         if (selectedPlot >= 0) {
-            openInteractionDialog(plotInteractionKind(plots.get(selectedPlot), System.currentTimeMillis()));
+            openInteractionDialog(plotInteractionKind(gameState.plots.get(selectedPlot), System.currentTimeMillis()));
             return;
         }
         if (isNearShop()) {
@@ -4406,86 +4581,32 @@ final class FarmGameView extends CanvasGameView {
 
     private void performPlotAction(int plotIndex) {
         long now = System.currentTimeMillis();
-        if (plotIndex < 0 || plotIndex >= plots.size()) {
-            showErrorMessage("Dekati lahan dulu.");
+        FarmingResult result = farmingSystem.performPlotAction(gameState, plotIndex, now);
+        if (!result.success) {
+            showErrorMessage(result.message);
             return;
         }
-        Plot plot = plots.get(plotIndex);
-        if (!plot.owned) {
-            if (coins < LAND_BUY_PRICE) {
-                showErrorMessage("Coin belum cukup untuk beli tanah.");
-                return;
-            }
-            coins -= LAND_BUY_PRICE;
-            plot.owned = true;
-            ownedLand = calculateOwnedLand();
-            queueChainAction(new ChainAction("BUY_LAND", plotIndex + 1, 1));
-            saveGameState();
-            showSuccessPopup("Tanah berhasil dibeli.");
-            return;
+        if (result.harvestEffect) {
+            startHarvestEffect(result.harvestPlot, result.harvestSeedIndex, result.harvestAmount, result.harvestAtMs);
         }
-        if (plot.state == PlotState.EMPTY) {
-            if (seedCounts[selectedSeedIndex] <= 0) {
-                showErrorMessage("Benih " + SEED_NAMES[selectedSeedIndex] + " habis. Pilih benih lain di toko.");
-                return;
-            }
-            seedCounts[selectedSeedIndex]--;
-            plot.seedIndex = selectedSeedIndex;
-            plot.state = PlotState.GROWING;
-            plot.plantedAtMs = now;
-            queueChainAction(new ChainAction("PLANT", plotIndex + 1, selectedSeedIndex + 1));
-            saveGameState();
-            showSuccessPopup("Benih " + SEED_NAMES[selectedSeedIndex] + " berhasil ditanam.");
-            return;
-        }
-        if (plot.state == PlotState.GROWING) {
-            showErrorMessage("Tanaman belum siap panen.");
-            return;
-        }
-        int harvestedSeedIndex = plot.seedIndex;
-        int harvestAmount = SEED_HARVEST_YIELDS[harvestedSeedIndex];
-        startHarvestEffect(plot, harvestedSeedIndex, harvestAmount, now);
-        plot.state = PlotState.EMPTY;
-        harvests += harvestAmount;
-        queueChainAction(new ChainAction("HARVEST", plotIndex + 1, harvestAmount));
+        queueChainAction(result.chainAction);
         saveGameState();
-        showSuccessPopup("Panen " + SEED_NAMES[harvestedSeedIndex] + " +" + harvestAmount + " masuk inventory.");
+        showSuccessPopup(result.message);
     }
 
     private void sellLand(int plotIndex) {
-        if (plotIndex < 0 || plotIndex >= plots.size()) {
-            showErrorMessage("Dekati lahan dulu.");
+        FarmingResult result = farmingSystem.sellLand(gameState, plotIndex);
+        if (!result.success) {
+            showErrorMessage(result.message);
             return;
         }
-        Plot plot = plots.get(plotIndex);
-        if (!plot.owned) {
-            showErrorMessage("Lahan ini belum dimiliki.");
-            return;
-        }
-        if (plot.state != PlotState.EMPTY) {
-            showErrorMessage("Kosongkan lahan sebelum dijual.");
-            return;
-        }
-        if (actualOwnedLandCount() <= 1) {
-            showErrorMessage("Minimal satu lahan harus tetap dimiliki.");
-            return;
-        }
-        plot.owned = false;
-        plot.seedIndex = 0;
-        plot.plantedAtMs = 0L;
-        ownedLand = calculateOwnedLand();
-        coins += LAND_SELL_PRICE;
-        queueChainAction(new ChainAction("SELL_LAND", plotIndex + 1, LAND_SELL_PRICE));
+        queueChainAction(result.chainAction);
         saveGameState();
-        showSuccessPopup("Lahan terjual. Coin +" + LAND_SELL_PRICE + ".");
+        showSuccessPopup(result.message);
     }
 
     private boolean canSellActiveLand() {
-        if (activeInteractionPlot < 0 || activeInteractionPlot >= plots.size()) {
-            return false;
-        }
-        Plot plot = plots.get(activeInteractionPlot);
-        return plot.owned && plot.state == PlotState.EMPTY && actualOwnedLandCount() > 1;
+        return farmingSystem.canSellLand(gameState, activeInteractionPlot);
     }
 
     private void startHarvestEffect(Plot plot, int seedIndex, int amount, long now) {
@@ -4495,7 +4616,7 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void buySeedsFromShop(int seedIndex) {
-        selectedSeedIndex = seedIndex;
+        gameState.selectedSeedIndex = seedIndex;
         if (blockchainClient.hasCoinContract()) {
             if (walletAddress.isEmpty()) {
                 showErrorMessage("Connect wallet dulu supaya coin shop pakai wallet.");
@@ -4508,17 +4629,14 @@ final class FarmGameView extends CanvasGameView {
                 return;
             }
         }
-        int price = totalPriceForSeed(seedIndex);
-        if (coins < price) {
-            showErrorMessage("Coin belum cukup untuk beli " + shopBundleQuantity + " paket " + SEED_NAMES[seedIndex] + ".");
+        ShopPurchaseResult result = shopSystem.buySeeds(gameState, seedIndex);
+        if (!result.success) {
+            showErrorMessage(result.message);
             return;
         }
-        coins -= price;
-        int totalSeeds = totalSeedAmountForQuantity(shopBundleQuantity);
-        seedCounts[seedIndex] += totalSeeds;
-        queueChainAction(new ChainAction("BUY_SEED", seedIndex + 1, totalSeeds));
+        queueChainAction(result.chainAction);
         saveGameState();
-        showSuccessPopup("Berhasil membeli " + totalSeeds + " benih " + SEED_NAMES[seedIndex] + ".");
+        showSuccessPopup(result.message);
     }
 
     private void sellHarvestToWallet() {
@@ -4527,14 +4645,14 @@ final class FarmGameView extends CanvasGameView {
             performWallet();
             return;
         }
-        if (harvests <= 0) {
+        if (gameState.harvests <= 0) {
             showErrorMessage("Belum ada hasil panen untuk dijual.");
             return;
         }
-        int soldHarvests = harvests;
+        int soldHarvests = gameState.harvests;
         int earnedCoins = soldHarvests * HARVEST_SELL_PRICE;
-        harvests = 0;
-        coins += earnedCoins;
+        gameState.harvests = 0;
+        gameState.coins += earnedCoins;
         queueChainAction(new ChainAction("SELL_CROP", 0, soldHarvests));
         saveGameState();
         showSuccessPopup(String.format(Locale.US,
@@ -4553,20 +4671,20 @@ final class FarmGameView extends CanvasGameView {
             showErrorMessage("Signer backend Vercel belum diset, swap belum bisa on-chain.");
             return;
         }
-        if (coins <= 0) {
+        if (gameState.coins <= 0) {
             showErrorMessage("Coin belum ada untuk diswap.");
             return;
         }
-        int swappedCoins = coins;
-        int mintedTani = swappedCoins * COIN_SWAP_RATE;
-        coins = 0;
+        int swappedCoins = gameState.coins;
+        boolean swapToEth = gameState.swapTarget == SWAP_TARGET_ETH;
+        gameState.coins = 0;
         coinBalanceOnChain = false;
-        queueChainAction(new ChainAction("SWAP_COIN", 0, swappedCoins));
+        queueChainAction(new ChainAction(swapToEth ? "SWAP_COIN_ETH" : "SWAP_COIN", 0, swappedCoins));
         saveGameState();
-        showSuccessPopup(String.format(Locale.US,
-                "Swap %d coin. TANI Sepolia +%d.",
+        String output = swapOutputAmount(swappedCoins) + " " + (swapToEth ? "ETH" : "TANI");
+        showSuccessPopup(String.format(Locale.US, "Swap %d coin. Sepolia +%s.",
                 swappedCoins,
-                mintedTani));
+                output));
     }
 
     private void performWallet() {
@@ -4766,7 +4884,7 @@ final class FarmGameView extends CanvasGameView {
                 playErrorSound();
             }
             if (state.success && state.coinBalanceAvailable) {
-                coins = state.coinBalance;
+                gameState.coins = state.coinBalance;
                 coinBalanceOnChain = true;
                 saveGameState();
             } else if (state.success) {
@@ -4811,7 +4929,8 @@ final class FarmGameView extends CanvasGameView {
         return "SELL_LAND".equals(action.type)
                 || "SELL_CROP".equals(action.type)
                 || "SWAP_CROP".equals(action.type)
-                || "SWAP_COIN".equals(action.type);
+                || "SWAP_COIN".equals(action.type)
+                || "SWAP_COIN_ETH".equals(action.type);
     }
 
     private String initialChainHistoryStatus() {
@@ -4878,37 +4997,7 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void loadGameState() {
-        coins = preferences.getInt("game_coins", coins);
-        harvests = preferences.getInt("game_harvests", harvests);
-        selectedSeedIndex = clampInt(preferences.getInt("game_selected_seed", selectedSeedIndex), 0, SEED_NAMES.length - 1);
-        shopBundleQuantity = clampInt(preferences.getInt("game_shop_quantity", shopBundleQuantity), 1, MAX_SHOP_BUNDLE_QUANTITY);
-        boolean repairFreeLandState = preferences.getInt("game_land_state_version", 0) < LAND_STATE_VERSION;
-        for (int i = 0; i < seedCounts.length; i++) {
-            seedCounts[i] = Math.max(0, preferences.getInt("game_seed_" + i, seedCounts[i]));
-        }
-
-        long now = System.currentTimeMillis();
-        for (int i = 0; i < plots.size(); i++) {
-            Plot plot = plots.get(i);
-            if (repairFreeLandState) {
-                plot.owned = i == 0;
-                plot.seedIndex = 0;
-                plot.state = PlotState.EMPTY;
-                plot.plantedAtMs = 0L;
-            } else {
-                plot.owned = preferences.getBoolean("game_plot_" + i + "_owned", plot.owned);
-                plot.seedIndex = clampInt(preferences.getInt("game_plot_" + i + "_seed", plot.seedIndex), 0, SEED_NAMES.length - 1);
-                plot.state = plotStateFromOrdinal(preferences.getInt("game_plot_" + i + "_state", plot.state.ordinal()));
-                plot.plantedAtMs = preferences.getLong("game_plot_" + i + "_planted_at", plot.plantedAtMs);
-            }
-            if (plot.state == PlotState.GROWING && now - plot.plantedAtMs >= GROW_TIME_MS) {
-                plot.state = PlotState.READY;
-            }
-        }
-        ownedLand = calculateOwnedLand();
-        if (repairFreeLandState) {
-            saveGameState();
-        }
+        gameStateStore.load(gameState);
     }
 
     private void loadChainHistory() {
@@ -4947,74 +5036,27 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void saveGameState() {
-        SharedPreferences.Editor editor = preferences.edit()
-                .putInt("game_coins", coins)
-                .putInt("game_harvests", harvests)
-                .putInt("game_owned_land", ownedLand)
-                .putInt("game_land_state_version", LAND_STATE_VERSION)
-                .putInt("game_selected_seed", selectedSeedIndex)
-                .putInt("game_shop_quantity", shopBundleQuantity);
-        for (int i = 0; i < seedCounts.length; i++) {
-            editor.putInt("game_seed_" + i, seedCounts[i]);
-        }
-        for (int i = 0; i < plots.size(); i++) {
-            Plot plot = plots.get(i);
-            editor.putBoolean("game_plot_" + i + "_owned", plot.owned)
-                    .putInt("game_plot_" + i + "_seed", plot.seedIndex)
-                    .putInt("game_plot_" + i + "_state", plot.state.ordinal())
-                    .putLong("game_plot_" + i + "_planted_at", plot.plantedAtMs);
-        }
-        editor.apply();
-    }
-
-    private int calculateOwnedLand() {
-        return Math.max(1, actualOwnedLandCount());
-    }
-
-    private int actualOwnedLandCount() {
-        int total = 0;
-        for (Plot plot : plots) {
-            if (plot.owned) {
-                total++;
-            }
-        }
-        return total;
-    }
-
-    private static PlotState plotStateFromOrdinal(int ordinal) {
-        PlotState[] states = PlotState.values();
-        if (ordinal < 0 || ordinal >= states.length) {
-            return PlotState.EMPTY;
-        }
-        return states[ordinal];
-    }
-
-    private static int clampInt(int value, int min, int max) {
-        return Math.max(min, Math.min(max, value));
+        gameStateStore.save(gameState);
     }
 
     private int totalSeeds() {
-        int total = 0;
-        for (int count : seedCounts) {
-            total += count;
-        }
-        return total;
+        return gameState.totalSeeds();
     }
 
     private int selectedSeedTotalPrice() {
-        return totalPriceForSeed(selectedSeedIndex);
+        return totalPriceForSeed(gameState.selectedSeedIndex);
     }
 
     private int selectedSeedTotalAmount() {
-        return totalSeedAmountForQuantity(shopBundleQuantity);
+        return totalSeedAmountForQuantity(gameState.shopBundleQuantity);
     }
 
     private int totalPriceForSeed(int seedIndex) {
-        return SEED_PRICES[seedIndex] * shopBundleQuantity;
+        return shopSystem.totalPriceForSeed(gameState, seedIndex);
     }
 
     private int totalSeedAmountForQuantity(int quantity) {
-        return SEED_BUNDLE_AMOUNT * quantity;
+        return shopSystem.totalSeedAmountForQuantity(quantity);
     }
 
     private void showMessage(String text) {
@@ -5058,8 +5100,8 @@ final class FarmGameView extends CanvasGameView {
     private int findNearbyPlot() {
         int closest = -1;
         float closestDistance = Float.MAX_VALUE;
-        for (int i = 0; i < plots.size(); i++) {
-            Plot plot = plots.get(i);
+        for (int i = 0; i < gameState.plots.size(); i++) {
+            Plot plot = gameState.plots.get(i);
             RectF area = new RectF(plot.x - TILE, plot.y - TILE, plot.x + plot.w + TILE, plot.y + plot.h + TILE);
             if (area.contains(playerX, playerY)) {
                 float dx = playerX - (plot.x + plot.w * 0.5f);
@@ -5075,8 +5117,8 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private int findTappedPlotSign(float x, float y) {
-        for (int i = 0; i < plots.size(); i++) {
-            if (i == selectedPlot && plotActionSignTapBounds(plots.get(i)).contains(x, y)) {
+        for (int i = 0; i < gameState.plots.size(); i++) {
+            if (i == selectedPlot && plotActionSignTapBounds(gameState.plots.get(i)).contains(x, y)) {
                 return i;
             }
         }
@@ -5366,9 +5408,34 @@ final class FarmGameView extends CanvasGameView {
         return Math.max(min, Math.min(max, value));
     }
 
+    private static int clampInt(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
     private static float smoothStep(float value) {
         float t = clamp(value, 0f, 1f);
         return t * t * (3f - 2f * t);
+    }
+
+    private static BigDecimal resolveEthWeiPerCoin() {
+        String configured = BuildConfig.TANIIN_ETH_WEI_PER_COIN == null
+                ? DEFAULT_ETH_WEI_PER_COIN
+                : BuildConfig.TANIIN_ETH_WEI_PER_COIN.trim();
+        try {
+            BigDecimal value = new BigDecimal(configured);
+            return value.compareTo(BigDecimal.ZERO) > 0 ? value : new BigDecimal(DEFAULT_ETH_WEI_PER_COIN);
+        } catch (NumberFormatException exception) {
+            return new BigDecimal(DEFAULT_ETH_WEI_PER_COIN);
+        }
+    }
+
+    private String estimatedEthSwapAmount(int coinAmount) {
+        if (coinAmount <= 0) {
+            return "0";
+        }
+        BigDecimal wei = ethWeiPerCoin.multiply(BigDecimal.valueOf(coinAmount));
+        BigDecimal eth = wei.divide(WEI_PER_ETH, 12, RoundingMode.DOWN).stripTrailingZeros();
+        return eth.compareTo(BigDecimal.ZERO) == 0 ? "0" : eth.toPlainString();
     }
 
     private static boolean isValidAddress(String address) {
