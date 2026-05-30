@@ -22,6 +22,7 @@ import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.Window;
 import android.view.WindowManager;
+import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -84,6 +85,9 @@ final class FarmGameView extends CanvasGameView {
     private static final int COIN_SWAP_RATE = 1;
     private static final int SWAP_TARGET_TANI = 0;
     private static final int SWAP_TARGET_ETH = 1;
+    private static final int SWAP_ASSET_COIN = 0;
+    private static final int SWAP_ASSET_TANI = 1;
+    private static final int SWAP_ASSET_ETH = 2;
     private static final String DEFAULT_ETH_WEI_PER_COIN = "10000000000";
     private static final BigDecimal WEI_PER_ETH = new BigDecimal("1000000000000000000");
     private static final int SEED_BUNDLE_AMOUNT = 3;
@@ -185,6 +189,8 @@ final class FarmGameView extends CanvasGameView {
     private boolean shopCatalogOpen;
     private boolean shopPurchaseConfirmOpen;
     private boolean chainHistoryOpen;
+    private boolean swapAssetMenuOpen;
+    private boolean swapAssetMenuFrom;
     private boolean audioBgmEnabled = true;
     private boolean audioSfxEnabled = true;
     private float masterVolume = DEFAULT_MASTER_VOLUME;
@@ -200,6 +206,7 @@ final class FarmGameView extends CanvasGameView {
     private int walkFrame;
     private long walkTickMs;
     private long lastPlayerMoveMs;
+    private long swapSwitchAnimStartMs;
     private int worldWidthPixels = WORLD_COLS * TILE;
     private int worldHeightPixels = WORLD_ROWS * TILE;
 
@@ -3106,13 +3113,16 @@ final class FarmGameView extends CanvasGameView {
                     Color.rgb(114, 71, 24), Color.rgb(255, 178, 63), Color.rgb(255, 237, 205));
         }
         if (activeInteractionKind == InteractionKind.SWAP_TOKEN) {
-            drawSwapRouteCard(canvas);
+            drawSwapRouteCard(canvas, now);
         }
 
         drawDialogButton(canvas, interactionPrimaryButtonBounds(), interactionPrimaryText(),
                 Color.rgb(97, 50, 12), Color.rgb(255, 217, 0), Color.rgb(255, 237, 205));
         drawDialogButton(canvas, interactionSecondaryButtonBounds(), interactionSecondaryText(),
                 Color.rgb(160, 5, 0), Color.rgb(92, 0, 0), Color.WHITE);
+        if (activeInteractionKind == InteractionKind.SWAP_TOKEN && swapAssetMenuOpen) {
+            drawSwapAssetDropdown(canvas);
+        }
     }
 
     private void drawShopCatalog(Canvas canvas) {
@@ -3345,7 +3355,7 @@ final class FarmGameView extends CanvasGameView {
         canvas.drawText("Stok x" + gameState.seedCounts[seedIndex], bounds.left + 68f, bounds.top + 62f, paint);
     }
 
-    private void drawSwapRouteCard(Canvas canvas) {
+    private void drawSwapRouteCard(Canvas canvas, long now) {
         drawSwapField(canvas, swapFromCardBounds(), true);
         drawSwapField(canvas, swapToCardBounds(), false);
 
@@ -3363,16 +3373,22 @@ final class FarmGameView extends CanvasGameView {
         paint.setColor(Color.rgb(30, 36, 17));
         paint.setTextSize(30f);
         paint.setFakeBoldText(true);
+        float spin = clamp((now - swapSwitchAnimStartMs) / 260f, 0f, 1f);
+        canvas.save();
+        canvas.rotate(spin * 180f, button.centerX(), button.centerY());
         drawCenteredText(canvas, "<->", button.centerX(), button.centerY() + 10f);
+        canvas.restore();
         paint.setFakeBoldText(false);
+
     }
 
     private void drawSwapField(Canvas canvas, RectF bounds, boolean from) {
         String headerLeft = from ? "From" : "To";
         String headerRight = from ? "Jumlah input" : "Estimasi output";
-        String symbol = from ? "COIN" : swapTargetLabel();
-        String name = from ? "Game Coin" : swapOutputName();
-        String amount = from ? String.valueOf(gameState.coins) : selectedSwapOutputAmount();
+        int asset = from ? SWAP_ASSET_COIN : selectedSwapToAsset();
+        String symbol = swapAssetSymbol(asset);
+        String name = swapAssetName(asset);
+        String amount = from ? String.valueOf(selectedSwapInputAmount()) : selectedSwapOutputAmount();
 
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.argb(95, 0, 0, 0));
@@ -3393,15 +3409,15 @@ final class FarmGameView extends CanvasGameView {
         canvas.drawText(headerRight, bounds.right - 28f - paint.measureText(headerRight), bounds.top + 28f, paint);
         paint.setFakeBoldText(false);
 
-        RectF chip = new RectF(bounds.left + 28f, bounds.top + 44f, bounds.left + Math.min(250f, bounds.width() * 0.38f), bounds.bottom - 22f);
+        RectF chip = swapChipBounds(from);
         paint.setColor(Color.rgb(31, 32, 38));
         canvas.drawRoundRect(chip, 25, 25, paint);
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(3f);
-        paint.setColor(Color.rgb(50, 51, 60));
+        paint.setStrokeWidth(swapAssetMenuOpen && swapAssetMenuFrom == from ? 4f : 3f);
+        paint.setColor(swapAssetMenuOpen && swapAssetMenuFrom == from ? Color.rgb(203, 255, 42) : Color.rgb(50, 51, 60));
         canvas.drawRoundRect(chip, 25, 25, paint);
 
-        drawSwapTokenIcon(canvas, chip.left + 31f, chip.centerY(), from ? SWAP_TARGET_TANI : gameState.swapTarget, from);
+        drawSwapTokenIcon(canvas, chip.left + 31f, chip.centerY(), asset);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.WHITE);
         paint.setTextSize(fitTextSize(symbol, 25f, chip.width() - 88f));
@@ -3416,17 +3432,72 @@ final class FarmGameView extends CanvasGameView {
         paint.setTextSize(fitTextSize(name, 17f, bounds.width() * 0.42f));
         canvas.drawText(name, bounds.left + 30f, bounds.bottom - 12f, paint);
 
+        RectF amountBox = swapAmountBounds(from);
+        if (from) {
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(2f);
+            paint.setColor(Color.rgb(53, 55, 66));
+            canvas.drawRoundRect(amountBox, 12, 12, paint);
+            paint.setStyle(Paint.Style.FILL);
+        }
         paint.setColor(gameState.coins > 0 || from ? Color.rgb(232, 229, 238) : Color.rgb(112, 108, 122));
-        paint.setTextSize(fitTextSize(amount, 40f, bounds.width() * 0.42f));
+        paint.setTextSize(fitTextSize(amount, 40f, amountBox.width() - 18f));
         paint.setFakeBoldText(true);
-        canvas.drawText(amount, bounds.right - 28f - paint.measureText(amount), bounds.centerY() + 18f, paint);
+        canvas.drawText(amount, amountBox.right - 12f - paint.measureText(amount), bounds.centerY() + 18f, paint);
         paint.setFakeBoldText(false);
     }
 
-    private void drawSwapTokenIcon(Canvas canvas, float cx, float cy, int target, boolean coin) {
-        if (coin) {
+    private void drawSwapAssetDropdown(Canvas canvas) {
+        boolean from = swapAssetMenuFrom;
+        RectF menu = swapAssetMenuBounds(from);
+        int count = swapAssetOptionCount(from);
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.argb(125, 0, 0, 0));
+        canvas.drawRoundRect(menu.left + 4f, menu.top + 5f, menu.right + 4f, menu.bottom + 5f, 16, 16, paint);
+        paint.setColor(Color.rgb(20, 21, 26));
+        canvas.drawRoundRect(menu, 16, 16, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(3f);
+        paint.setColor(Color.rgb(69, 72, 86));
+        canvas.drawRoundRect(menu, 16, 16, paint);
+
+        for (int i = 0; i < count; i++) {
+            drawSwapAssetOption(canvas, swapAssetOptionBounds(from, i), from, i);
+        }
+    }
+
+    private void drawSwapAssetOption(Canvas canvas, RectF row, boolean from, int index) {
+        int asset = swapAssetOptionAsset(from, index);
+        boolean selected = from ? asset == SWAP_ASSET_COIN : asset == selectedSwapToAsset();
+        boolean enabled = !from || asset == SWAP_ASSET_COIN;
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(selected ? Color.rgb(38, 43, 48) : Color.rgb(20, 21, 26));
+        canvas.drawRoundRect(row, 12, 12, paint);
+        if (selected) {
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(2f);
+            paint.setColor(Color.rgb(203, 255, 42));
+            canvas.drawRoundRect(row, 12, 12, paint);
+            paint.setStyle(Paint.Style.FILL);
+        }
+
+        drawSwapTokenIcon(canvas, row.left + 30f, row.centerY(), asset);
+        paint.setColor(enabled ? Color.rgb(239, 238, 247) : Color.rgb(118, 114, 126));
+        paint.setTextSize(20f);
+        paint.setFakeBoldText(true);
+        canvas.drawText(swapAssetSymbol(asset), row.left + 66f, row.top + 29f, paint);
+        paint.setFakeBoldText(false);
+        paint.setColor(enabled ? Color.rgb(144, 141, 154) : Color.rgb(92, 88, 98));
+        paint.setTextSize(14f);
+        canvas.drawText(enabled ? swapAssetName(asset) : "Belum aktif", row.left + 66f, row.top + 48f, paint);
+    }
+
+    private void drawSwapTokenIcon(Canvas canvas, float cx, float cy, int asset) {
+        if (asset == SWAP_ASSET_COIN) {
             paint.setColor(Color.rgb(244, 192, 46));
-        } else if (target == SWAP_TARGET_ETH) {
+        } else if (asset == SWAP_ASSET_ETH) {
             paint.setColor(Color.rgb(111, 136, 244));
         } else {
             paint.setColor(Color.rgb(50, 184, 113));
@@ -3434,9 +3505,9 @@ final class FarmGameView extends CanvasGameView {
         paint.setStyle(Paint.Style.FILL);
         canvas.drawCircle(cx, cy, 24f, paint);
         paint.setColor(Color.WHITE);
-        paint.setTextSize(target == SWAP_TARGET_ETH && !coin ? 25f : 20f);
+        paint.setTextSize(asset == SWAP_ASSET_ETH ? 25f : 20f);
         paint.setFakeBoldText(true);
-        String label = coin ? "C" : (target == SWAP_TARGET_ETH ? "E" : "T");
+        String label = asset == SWAP_ASSET_COIN ? "C" : (asset == SWAP_ASSET_ETH ? "E" : "T");
         drawCenteredText(canvas, label, cx, cy + 8f);
         paint.setFakeBoldText(false);
     }
@@ -4067,7 +4138,25 @@ final class FarmGameView extends CanvasGameView {
             }
         }
         if (activeInteractionKind == InteractionKind.SWAP_TOKEN) {
-            if (swapToCardBounds().contains(x, y) || swapSwitchButtonBounds().contains(x, y)) {
+            if (swapAssetMenuOpen) {
+                return handleSwapAssetMenuTouch(x, y);
+            }
+            if (swapChipBounds(true).contains(x, y)) {
+                playClickSound();
+                openSwapAssetMenu(true);
+                return true;
+            }
+            if (swapChipBounds(false).contains(x, y)) {
+                playClickSound();
+                openSwapAssetMenu(false);
+                return true;
+            }
+            if (swapAmountBounds(true).contains(x, y)) {
+                playClickSound();
+                openSwapAmountDialog();
+                return true;
+            }
+            if (swapSwitchButtonBounds().contains(x, y)) {
                 playClickSound();
                 toggleSwapTarget();
                 return true;
@@ -4086,6 +4175,31 @@ final class FarmGameView extends CanvasGameView {
         return true;
     }
 
+    private boolean handleSwapAssetMenuTouch(float x, float y) {
+        boolean from = swapAssetMenuFrom;
+        for (int i = 0; i < swapAssetOptionCount(from); i++) {
+            if (swapAssetOptionBounds(from, i).contains(x, y)) {
+                playClickSound();
+                int asset = swapAssetOptionAsset(from, i);
+                swapAssetMenuOpen = false;
+                if (from) {
+                    if (asset != SWAP_ASSET_COIN) {
+                        showMessage("Input swap saat ini memakai Game Coin.");
+                    } else {
+                        showMessage("Input swap: Game Coin");
+                    }
+                } else {
+                    selectSwapOutputAsset(asset);
+                }
+                invalidate();
+                return true;
+            }
+        }
+        swapAssetMenuOpen = false;
+        invalidate();
+        return true;
+    }
+
     private void selectNextSeed(int direction) {
         gameState.selectedSeedIndex = (gameState.selectedSeedIndex + direction + SEED_NAMES.length) % SEED_NAMES.length;
         showMessage("Benih dipilih: " + SEED_NAMES[gameState.selectedSeedIndex]);
@@ -4097,7 +4211,22 @@ final class FarmGameView extends CanvasGameView {
         showMessage("Output swap: " + swapTargetLabel());
     }
 
+    private void selectSwapOutputAsset(int asset) {
+        if (asset == SWAP_ASSET_ETH) {
+            selectSwapTarget(SWAP_TARGET_ETH);
+            return;
+        }
+        selectSwapTarget(SWAP_TARGET_TANI);
+    }
+
+    private void openSwapAssetMenu(boolean from) {
+        swapAssetMenuOpen = true;
+        swapAssetMenuFrom = from;
+        invalidate();
+    }
+
     private void toggleSwapTarget() {
+        swapSwitchAnimStartMs = System.currentTimeMillis();
         selectSwapTarget(gameState.swapTarget == SWAP_TARGET_ETH ? SWAP_TARGET_TANI : SWAP_TARGET_ETH);
     }
 
@@ -4109,8 +4238,27 @@ final class FarmGameView extends CanvasGameView {
         return selectedSwapOutputAmount() + " " + swapTargetLabel() + " Sepolia";
     }
 
+    private int selectedSwapInputAmount() {
+        if (gameState.coins <= 0) {
+            return 0;
+        }
+        if (gameState.swapAmount <= 0) {
+            return gameState.coins;
+        }
+        return clampInt(gameState.swapAmount, 1, gameState.coins);
+    }
+
+    private void ensureSwapAmountWithinBalance() {
+        if (gameState.coins <= 0) {
+            gameState.swapAmount = 0;
+        } else if (gameState.swapAmount <= 0 || gameState.swapAmount > gameState.coins) {
+            gameState.swapAmount = gameState.coins;
+        }
+        saveGameState();
+    }
+
     private String selectedSwapOutputAmount() {
-        return swapOutputAmount(gameState.coins);
+        return swapOutputAmount(selectedSwapInputAmount());
     }
 
     private String swapOutputAmount(int coinAmount) {
@@ -4122,6 +4270,47 @@ final class FarmGameView extends CanvasGameView {
 
     private String swapOutputName() {
         return gameState.swapTarget == SWAP_TARGET_ETH ? "Sepolia ETH" : "TANI Sepolia";
+    }
+
+    private int selectedSwapToAsset() {
+        return gameState.swapTarget == SWAP_TARGET_ETH ? SWAP_ASSET_ETH : SWAP_ASSET_TANI;
+    }
+
+    private String swapAssetSymbol(int asset) {
+        if (asset == SWAP_ASSET_ETH) {
+            return "ETH";
+        }
+        if (asset == SWAP_ASSET_TANI) {
+            return "TANI";
+        }
+        return "COIN";
+    }
+
+    private String swapAssetName(int asset) {
+        if (asset == SWAP_ASSET_ETH) {
+            return "Sepolia ETH";
+        }
+        if (asset == SWAP_ASSET_TANI) {
+            return "TANI Sepolia";
+        }
+        return "Game Coin";
+    }
+
+    private int swapAssetOptionCount(boolean from) {
+        return from ? 3 : 2;
+    }
+
+    private int swapAssetOptionAsset(boolean from, int index) {
+        if (from) {
+            if (index == 1) {
+                return SWAP_ASSET_TANI;
+            }
+            if (index == 2) {
+                return SWAP_ASSET_ETH;
+            }
+            return SWAP_ASSET_COIN;
+        }
+        return index == 1 ? SWAP_ASSET_ETH : SWAP_ASSET_TANI;
     }
 
     private void activateInteractionPrimary() {
@@ -4269,6 +4458,10 @@ final class FarmGameView extends CanvasGameView {
         interactionDialogOpen = true;
         shopCatalogOpen = false;
         menuOpen = false;
+        swapAssetMenuOpen = false;
+        if (kind == InteractionKind.SWAP_TOKEN) {
+            ensureSwapAmountWithinBalance();
+        }
     }
 
     private String interactionTitle() {
@@ -4309,8 +4502,9 @@ final class FarmGameView extends CanvasGameView {
                 if (walletAddress.isEmpty()) {
                     return "Connect wallet dulu supaya coin bisa diswap ke Sepolia.";
                 }
-                return gameState.coins > 0
-                        ? "Swap " + gameState.coins + " coin -> " + selectedSwapOutputText() + "."
+                int swapAmount = selectedSwapInputAmount();
+                return swapAmount > 0
+                        ? "Swap " + swapAmount + " coin -> " + selectedSwapOutputText() + "."
                         : "Coin belum ada untuk diswap.";
             case BUY_LAND:
                 return "Lahan ini bisa dibeli seharga " + LAND_BUY_PRICE + " coin.";
@@ -4345,7 +4539,7 @@ final class FarmGameView extends CanvasGameView {
                 if (walletAddress.isEmpty()) {
                     return "Connect wallet";
                 }
-                return gameState.coins > 0 ? "Swap ke " + swapTargetLabel() : "Oke";
+                return selectedSwapInputAmount() > 0 ? "Swap ke " + swapTargetLabel() : "Oke";
             case BUY_LAND:
                 return "Ya, beli lahan";
             case PLANT:
@@ -4439,6 +4633,32 @@ final class FarmGameView extends CanvasGameView {
         float left = from.centerX() - size * 0.5f;
         float top = from.bottom - 12f;
         return new RectF(left, top, left + size, top + size);
+    }
+
+    private RectF swapChipBounds(boolean from) {
+        RectF card = from ? swapFromCardBounds() : swapToCardBounds();
+        float width = Math.min(250f, card.width() * 0.38f);
+        return new RectF(card.left + 28f, card.top + 44f, card.left + 28f + width, card.bottom - 22f);
+    }
+
+    private RectF swapAmountBounds(boolean from) {
+        RectF card = from ? swapFromCardBounds() : swapToCardBounds();
+        return new RectF(card.right - card.width() * 0.42f - 28f, card.top + 43f, card.right - 20f, card.bottom - 16f);
+    }
+
+    private RectF swapAssetMenuBounds(boolean from) {
+        RectF chip = swapChipBounds(from);
+        RectF card = from ? swapFromCardBounds() : swapToCardBounds();
+        int rows = swapAssetOptionCount(from);
+        float width = Math.min(330f, card.right - chip.left - 28f);
+        float top = chip.bottom + 8f;
+        return new RectF(chip.left, top, chip.left + width, top + rows * 56f + 14f);
+    }
+
+    private RectF swapAssetOptionBounds(boolean from, int index) {
+        RectF menu = swapAssetMenuBounds(from);
+        float top = menu.top + 8f + index * 56f;
+        return new RectF(menu.left + 8f, top, menu.right - 8f, top + 50f);
     }
 
     private RectF interactionPrimaryButtonBounds() {
@@ -4675,9 +4895,16 @@ final class FarmGameView extends CanvasGameView {
             showErrorMessage("Coin belum ada untuk diswap.");
             return;
         }
-        int swappedCoins = gameState.coins;
+        int swappedCoins = selectedSwapInputAmount();
+        if (swappedCoins <= 0) {
+            showErrorMessage("Masukkan jumlah coin yang mau diswap.");
+            return;
+        }
         boolean swapToEth = gameState.swapTarget == SWAP_TARGET_ETH;
-        gameState.coins = 0;
+        gameState.coins -= swappedCoins;
+        if (gameState.swapAmount > gameState.coins) {
+            gameState.swapAmount = gameState.coins;
+        }
         coinBalanceOnChain = false;
         queueChainAction(new ChainAction(swapToEth ? "SWAP_COIN_ETH" : "SWAP_COIN", 0, swappedCoins));
         saveGameState();
@@ -4685,6 +4912,125 @@ final class FarmGameView extends CanvasGameView {
         showSuccessPopup(String.format(Locale.US, "Swap %d coin. Sepolia +%s.",
                 swappedCoins,
                 output));
+    }
+
+    private void openSwapAmountDialog() {
+        if (gameState.coins <= 0) {
+            showErrorMessage("Coin belum ada untuk diswap.");
+            return;
+        }
+        Context context = getContext();
+        if (!(context instanceof Activity)) {
+            return;
+        }
+
+        Dialog dialog = new Dialog(context);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+
+        LinearLayout root = new LinearLayout(context);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(context, 28), dp(context, 24), dp(context, 28), dp(context, 22));
+        root.setBackground(roundedStrokeDrawable(
+                Color.rgb(31, 28, 34),
+                dp(context, 18),
+                Color.rgb(203, 255, 42),
+                dp(context, 2)));
+
+        TextView title = new TextView(context);
+        title.setText("Jumlah Swap");
+        title.setTextColor(Color.rgb(255, 239, 177));
+        title.setTextSize(24f);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        root.addView(title);
+
+        TextView body = new TextView(context);
+        body.setText("Saldo Game Coin: " + gameState.coins);
+        body.setTextColor(Color.rgb(186, 181, 196));
+        body.setTextSize(16f);
+        body.setPadding(0, dp(context, 12), 0, dp(context, 14));
+        root.addView(body);
+
+        final EditText input = new EditText(context);
+        input.setSingleLine(true);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setImeOptions(EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
+        input.setText(String.valueOf(selectedSwapInputAmount()));
+        input.selectAll();
+        input.setTextColor(Color.WHITE);
+        input.setHintTextColor(Color.rgb(139, 134, 150));
+        input.setTextSize(24f);
+        input.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        input.setPadding(dp(context, 16), 0, dp(context, 16), 0);
+        input.setBackground(roundedStrokeDrawable(
+                Color.rgb(17, 18, 23),
+                dp(context, 12),
+                Color.rgb(74, 76, 90),
+                dp(context, 2)));
+        root.addView(input, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(context, 58)));
+
+        LinearLayout actions = new LinearLayout(context);
+        actions.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        actions.setPadding(0, dp(context, 22), 0, 0);
+        Button close = walletDialogButton(context, "Batal", Color.rgb(91, 35, 30), Color.WHITE);
+        Button save = walletDialogButton(context, "Pakai", Color.rgb(116, 74, 23), Color.WHITE);
+        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(dp(context, 118), dp(context, 48));
+        closeParams.leftMargin = dp(context, 14);
+        actions.addView(close, closeParams);
+        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(dp(context, 126), dp(context, 48));
+        saveParams.leftMargin = dp(context, 14);
+        actions.addView(save, saveParams);
+        root.addView(actions);
+
+        close.setOnClickListener(v -> dialog.dismiss());
+        save.setOnClickListener(v -> applySwapAmountInput(input, dialog));
+        input.setOnEditorActionListener((v, actionId, event) -> {
+            boolean enter = event != null
+                    && event.getAction() == KeyEvent.ACTION_UP
+                    && event.getKeyCode() == KeyEvent.KEYCODE_ENTER;
+            if (actionId == EditorInfo.IME_ACTION_DONE || enter) {
+                return applySwapAmountInput(input, dialog);
+            }
+            return false;
+        });
+
+        dialog.setContentView(root);
+        dialog.show();
+        Window dialogWindow = dialog.getWindow();
+        if (dialogWindow != null) {
+            dialogWindow.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            WindowManager.LayoutParams params = dialogWindow.getAttributes();
+            params.dimAmount = 0.56f;
+            dialogWindow.setAttributes(params);
+            dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            dialogWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+            dialogWindow.setLayout(
+                    (int) clamp(getWidth() * 0.42f, 960f, 1120f),
+                    WindowManager.LayoutParams.WRAP_CONTENT);
+        }
+        input.requestFocus();
+    }
+
+    private boolean applySwapAmountInput(EditText input, Dialog dialog) {
+        String raw = input.getText().toString().trim();
+        int amount;
+        try {
+            long parsed = Long.parseLong(raw);
+            if (parsed <= 0L || parsed > Integer.MAX_VALUE) {
+                throw new NumberFormatException("range");
+            }
+            amount = (int) parsed;
+        } catch (NumberFormatException exception) {
+            showErrorMessage("Jumlah swap tidak valid.");
+            return true;
+        }
+        gameState.swapAmount = clampInt(amount, 1, gameState.coins);
+        saveGameState();
+        showMessage("Jumlah swap: " + gameState.swapAmount + " coin");
+        dialog.dismiss();
+        invalidate();
+        return true;
     }
 
     private void performWallet() {

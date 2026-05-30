@@ -10,6 +10,7 @@ final class GameState {
     int coins = 500;
     int selectedSeedIndex;
     int shopBundleQuantity = 1;
+    int swapAmount;
     int swapTarget;
     int harvests;
     int ownedLand = 1;
