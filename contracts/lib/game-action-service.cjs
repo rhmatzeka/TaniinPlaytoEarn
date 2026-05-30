@@ -127,6 +127,8 @@ async function submitGameAction(body) {
     }
     case "SWAP_COIN_ETH": {
       const payoutWei = ethPayoutWei(amount);
+      ensureRecipientIsNotSigner(service, walletAddress);
+      await ensureSignerCanPayEth(service, payoutWei);
       txHashes.push(await sendTransaction("ETH swap payout", service.signer.sendTransaction({
         to: walletAddress,
         value: payoutWei
@@ -150,10 +152,16 @@ async function submitGameAction(body) {
 
 async function health() {
   const service = await getGameService();
+  const signerBalanceWei = await service.provider.getBalance(service.wallet.address);
+  const { weiPerCoin, maxPayoutWei } = ethSwapConfig();
   return {
     ok: true,
     chainId: Number(SEPOLIA_CHAIN_ID),
     signer: service.wallet.address,
+    signerBalanceWei: signerBalanceWei.toString(),
+    signerBalanceEth: ethers.formatEther(signerBalanceWei),
+    ethWeiPerCoin: weiPerCoin.toString(),
+    maxEthPayoutWei: maxPayoutWei.toString(),
     contracts: service.addresses
   };
 }
@@ -173,8 +181,7 @@ function toTani(amount) {
 }
 
 function ethPayoutWei(amount) {
-  const weiPerCoin = envBigInt("TANIIN_ETH_WEI_PER_COIN", DEFAULT_ETH_WEI_PER_COIN);
-  const maxPayoutWei = envBigInt("TANIIN_MAX_ETH_PAYOUT_WEI", DEFAULT_MAX_ETH_PAYOUT_WEI);
+  const { weiPerCoin, maxPayoutWei } = ethSwapConfig();
   const payoutWei = BigInt(amount) * weiPerCoin;
   if (payoutWei <= 0n) {
     throw httpError(400, "Nominal swap ETH tidak valid.");
@@ -183,6 +190,32 @@ function ethPayoutWei(amount) {
     throw httpError(400, "Nominal swap ETH melebihi batas payout signer.");
   }
   return payoutWei;
+}
+
+function ethSwapConfig() {
+  return {
+    weiPerCoin: envBigInt("TANIIN_ETH_WEI_PER_COIN", DEFAULT_ETH_WEI_PER_COIN),
+    maxPayoutWei: envBigInt("TANIIN_MAX_ETH_PAYOUT_WEI", DEFAULT_MAX_ETH_PAYOUT_WEI)
+  };
+}
+
+function ensureRecipientIsNotSigner(service, walletAddress) {
+  if (walletAddress.toLowerCase() === service.wallet.address.toLowerCase()) {
+    throw httpError(400, "Wallet penerima ETH sama dengan signer backend. Pakai wallet pemain yang berbeda supaya saldo Sepolia bisa bertambah.");
+  }
+}
+
+async function ensureSignerCanPayEth(service, payoutWei) {
+  const [balanceWei, feeData] = await Promise.all([
+    service.provider.getBalance(service.wallet.address),
+    service.provider.getFeeData()
+  ]);
+  const gasPriceWei = feeData.maxFeePerGas || feeData.gasPrice || 0n;
+  const gasReserveWei = gasPriceWei * 21_000n;
+  const requiredWei = payoutWei + gasReserveWei;
+  if (balanceWei < requiredWei) {
+    throw httpError(402, `Saldo ETH signer backend tidak cukup untuk payout. Isi signer ${service.wallet.address} minimal ${ethers.formatEther(requiredWei)} ETH.`);
+  }
 }
 
 function envBigInt(name, fallback) {

@@ -5182,10 +5182,10 @@ final class FarmGameView extends CanvasGameView {
         if (gameState.swapAmount > gameState.coins) {
             gameState.swapAmount = gameState.coins;
         }
-        queueChainAction(new ChainAction(swapToEth ? "SWAP_COIN_ETH" : "SWAP_COIN", 0, swappedCoins));
+        queueChainAction(new ChainAction(swapToEth ? "SWAP_COIN_ETH" : "SWAP_COIN", 0, swappedCoins), swappedCoins);
         saveGameState();
         String output = swapOutputAmount(swappedCoins) + " " + (swapToEth ? "ETH" : "TANI");
-        showSuccessPopup(String.format(Locale.US, "Swap %d coin. Sepolia +%s.",
+        showMessage(String.format(Locale.US, "Mengirim swap %d coin ke Sepolia. Estimasi +%s.",
                 swappedCoins,
                 output));
     }
@@ -5567,6 +5567,10 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void queueChainAction(ChainAction action) {
+        queueChainAction(action, 0);
+    }
+
+    private void queueChainAction(ChainAction action, int refundCoinsOnFailure) {
         ChainHistoryEntry historyEntry = addChainHistory(action, initialChainHistoryStatus());
         chainPanelUntilMs = System.currentTimeMillis() + 2200L;
         if (!walletAddress.isEmpty() && blockchainClient.hasGameApi()) {
@@ -5577,12 +5581,18 @@ final class FarmGameView extends CanvasGameView {
                     String status = BlockchainClient.isValidTransactionHash(result.txHash) ? "on-chain" : "dikirim";
                     updateChainHistory(historyEntry, status, result.txHash);
                     chainStatus = result.message;
+                    showSwapChainSuccess(action);
                     if (actionUpdatesCoinBalance(action)) {
-                        postDelayed(() -> refreshWalletState(true), 9000L);
+                        scheduleWalletRefreshAfterChainAction(action);
                     }
                 } else {
-                    updateChainHistory(historyEntry, "belum sync", "");
-                    chainStatus = syncedLocalChainStatus(action, result.message);
+                    if (refundCoinsOnFailure > 0) {
+                        refundFailedSwapCoins(action, refundCoinsOnFailure, result.message);
+                        updateChainHistory(historyEntry, "gagal refund", "");
+                    } else {
+                        updateChainHistory(historyEntry, "belum sync", "");
+                        chainStatus = syncedLocalChainStatus(action, result.message);
+                    }
                 }
                 chainPanelUntilMs = System.currentTimeMillis() + 3600L;
                 invalidate();
@@ -5592,6 +5602,37 @@ final class FarmGameView extends CanvasGameView {
             chainPanelUntilMs = System.currentTimeMillis() + 3600L;
             invalidate();
         }
+    }
+
+    private void showSwapChainSuccess(ChainAction action) {
+        if ("SWAP_COIN_ETH".equals(action.type)) {
+            showSuccessPopup(String.format(Locale.US,
+                    "Swap %d coin ke %s ETH terkirim.",
+                    action.amount,
+                    estimatedEthSwapAmount(action.amount)));
+        } else if ("SWAP_COIN".equals(action.type)) {
+            showSuccessPopup("Swap " + action.amount + " coin ke TANI terkirim.");
+        }
+    }
+
+    private void scheduleWalletRefreshAfterChainAction(ChainAction action) {
+        postDelayed(() -> refreshWalletState(true), 9000L);
+        if ("SWAP_COIN_ETH".equals(action.type)) {
+            postDelayed(() -> refreshWalletState(true), 18000L);
+        }
+    }
+
+    private void refundFailedSwapCoins(ChainAction action, int refundCoins, String reason) {
+        long restoredCoins = Math.min(Integer.MAX_VALUE, (long) gameState.coins + refundCoins);
+        gameState.coins = (int) restoredCoins;
+        if (gameState.swapFromAsset == SWAP_ASSET_COIN && gameState.coins > 0) {
+            gameState.swapAmount = clampInt(action.amount, 1, gameState.coins);
+        }
+        saveGameState();
+        String detail = conciseChainError(reason);
+        chainStatus = action.label() + " gagal; coin dikembalikan +" + refundCoins
+                + (detail.isEmpty() ? "." : ": " + detail);
+        showErrorMessage("Swap gagal, coin dikembalikan +" + refundCoins + ".");
     }
 
     private boolean actionUpdatesCoinBalance(ChainAction action) {
@@ -6185,7 +6226,7 @@ final class FarmGameView extends CanvasGameView {
         if (dot < 0) {
             return cleaned;
         }
-        int end = Math.min(cleaned.length(), dot + 7);
+        int end = Math.min(cleaned.length(), dot + 13);
         String compact = cleaned.substring(0, end);
         while (compact.endsWith("0") && compact.indexOf('.') >= 0) {
             compact = compact.substring(0, compact.length() - 1);
