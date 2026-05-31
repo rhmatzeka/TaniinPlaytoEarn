@@ -17,6 +17,7 @@ import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.text.InputType;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -5219,9 +5220,15 @@ final class FarmGameView extends CanvasGameView {
         Dialog dialog = new Dialog(context);
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
 
+        boolean compactForKeyboard = getWidth() > getHeight();
+
         LinearLayout root = new LinearLayout(context);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(context, 30), dp(context, 26), dp(context, 30), dp(context, 24));
+        root.setPadding(
+                dp(context, compactForKeyboard ? 10 : 30),
+                dp(context, compactForKeyboard ? 8 : 26),
+                dp(context, compactForKeyboard ? 10 : 30),
+                dp(context, compactForKeyboard ? 8 : 24));
         root.setBackground(roundedStrokeDrawable(
                 Color.rgb(116, 55, 22),
                 dp(context, 18),
@@ -5231,9 +5238,8 @@ final class FarmGameView extends CanvasGameView {
         TextView title = new TextView(context);
         title.setText("Jumlah Swap");
         title.setTextColor(Color.rgb(255, 224, 84));
-        title.setTextSize(24f);
+        title.setTextSize(compactForKeyboard ? 18f : 24f);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
-        root.addView(title);
 
         TextView body = new TextView(context);
         String balanceText = selectedSwapFromAsset() == SWAP_ASSET_ETH
@@ -5241,29 +5247,24 @@ final class FarmGameView extends CanvasGameView {
                 : "Saldo Game Coin: " + gameState.coins + " coin";
         body.setText(balanceText);
         body.setTextColor(Color.rgb(255, 238, 211));
-        body.setTextSize(16f);
-        body.setPadding(0, dp(context, 12), 0, dp(context, 10));
-        root.addView(body);
+        body.setTextSize(compactForKeyboard ? 11f : 16f);
 
         TextView route = new TextView(context);
-        route.setText(selectedSwapFromAsset() == SWAP_ASSET_ETH
+        String routeText = selectedSwapFromAsset() == SWAP_ASSET_ETH
                 ? "Isi Game Coin: " + selectedSwapOutputText()
-                : "Estimasi: " + selectedSwapOutputText());
+                : "Estimasi: " + selectedSwapOutputText();
+        route.setText(routeText);
         route.setTextColor(Color.rgb(245, 194, 124));
-        route.setTextSize(14f);
-        route.setPadding(dp(context, 16), 0, dp(context, 16), 0);
+        route.setTextSize(compactForKeyboard ? 11f : 14f);
+        route.setPadding(dp(context, compactForKeyboard ? 10 : 16), 0, dp(context, compactForKeyboard ? 10 : 16), 0);
         route.setGravity(Gravity.CENTER);
         route.setSingleLine(true);
+        route.setEllipsize(TextUtils.TruncateAt.END);
         route.setBackground(roundedStrokeDrawable(
                 Color.rgb(82, 39, 17),
                 dp(context, 11),
                 Color.rgb(145, 77, 30),
                 dp(context, 2)));
-        LinearLayout.LayoutParams routeParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(context, 44));
-        routeParams.bottomMargin = dp(context, 14);
-        root.addView(route, routeParams);
 
         final EditText input = new EditText(context);
         input.setSingleLine(true);
@@ -5274,32 +5275,99 @@ final class FarmGameView extends CanvasGameView {
         input.setTextColor(Color.rgb(255, 240, 212));
         input.setHint("Jumlah Game Coin");
         input.setHintTextColor(Color.rgb(190, 151, 124));
-        input.setTextSize(24f);
+        input.setTextSize(compactForKeyboard ? 18f : 24f);
         input.setGravity(Gravity.CENTER);
-        input.setPadding(dp(context, 16), 0, dp(context, 16), 0);
+        input.setPadding(dp(context, compactForKeyboard ? 12 : 16), 0, dp(context, compactForKeyboard ? 12 : 16), 0);
         input.setBackground(roundedStrokeDrawable(
                 Color.rgb(60, 32, 18),
                 dp(context, 12),
                 Color.rgb(255, 200, 65),
                 dp(context, 3)));
-        root.addView(input, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(context, 58)));
 
         LinearLayout actions = new LinearLayout(context);
         actions.setGravity(Gravity.CENTER);
-        actions.setPadding(0, dp(context, 22), 0, 0);
+        actions.setPadding(0, dp(context, compactForKeyboard ? 0 : 22), 0, 0);
         Button close = walletDialogButton(context, "Batal", Color.rgb(100, 54, 28), Color.rgb(255, 238, 211));
         Button save = walletDialogButton(context, "Pakai", Color.rgb(207, 119, 35), Color.WHITE);
-        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(dp(context, 118), dp(context, 48));
-        closeParams.rightMargin = dp(context, 12);
+        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(
+                dp(context, compactForKeyboard ? 92 : 118),
+                dp(context, compactForKeyboard ? 38 : 48));
+        closeParams.rightMargin = dp(context, compactForKeyboard ? 7 : 12);
         actions.addView(close, closeParams);
-        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(dp(context, 126), dp(context, 48));
-        saveParams.leftMargin = dp(context, 12);
+        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(
+                dp(context, compactForKeyboard ? 94 : 126),
+                dp(context, compactForKeyboard ? 38 : 48));
+        saveParams.leftMargin = dp(context, compactForKeyboard ? 7 : 12);
         actions.addView(save, saveParams);
-        root.addView(actions, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        if (compactForKeyboard) {
+            LinearLayout header = new LinearLayout(context);
+            header.setOrientation(LinearLayout.HORIZONTAL);
+            header.setGravity(Gravity.CENTER_VERTICAL);
+
+            LinearLayout headerText = new LinearLayout(context);
+            headerText.setOrientation(LinearLayout.VERTICAL);
+            headerText.addView(title, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
+
+            TextView summary = new TextView(context);
+            summary.setText(balanceText + " | " + routeText);
+            summary.setTextColor(Color.rgb(255, 238, 211));
+            summary.setTextSize(10.5f);
+            summary.setSingleLine(true);
+            summary.setEllipsize(TextUtils.TruncateAt.END);
+            headerText.addView(summary, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
+
+            LinearLayout.LayoutParams headerTextParams = new LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    1f);
+            header.addView(headerText, headerTextParams);
+
+            LinearLayout.LayoutParams routeParams = new LinearLayout.LayoutParams(
+                    dp(context, 270),
+                    dp(context, 32));
+            routeParams.leftMargin = dp(context, 12);
+            header.addView(route, routeParams);
+            root.addView(header, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
+
+            LinearLayout inputRow = new LinearLayout(context);
+            inputRow.setOrientation(LinearLayout.HORIZONTAL);
+            inputRow.setGravity(Gravity.CENTER_VERTICAL);
+            inputRow.setPadding(0, dp(context, 7), 0, 0);
+            inputRow.addView(input, new LinearLayout.LayoutParams(
+                    0,
+                    dp(context, 38),
+                    1f));
+            LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            actionsParams.leftMargin = dp(context, 10);
+            inputRow.addView(actions, actionsParams);
+            root.addView(inputRow, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
+        } else {
+            root.addView(title);
+            body.setPadding(0, dp(context, 12), 0, dp(context, 10));
+            root.addView(body);
+            LinearLayout.LayoutParams routeParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(context, 44));
+            routeParams.bottomMargin = dp(context, 14);
+            root.addView(route, routeParams);
+            root.addView(input, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(context, 58)));
+            root.addView(actions, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
+        }
 
         close.setOnClickListener(v -> dialog.dismiss());
         save.setOnClickListener(v -> applySwapAmountInput(input, dialog));
@@ -5323,9 +5391,19 @@ final class FarmGameView extends CanvasGameView {
             dialogWindow.setAttributes(params);
             dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
             dialogWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
-                    | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+                    | (compactForKeyboard
+                    ? WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
+                    : WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE));
             int maxDialogWidth = Math.max(1, getWidth() - dp(context, 32));
-            int desiredDialogWidth = (int) clamp(getWidth() * 0.44f, 760f, 980f);
+            int desiredDialogWidth = (int) (compactForKeyboard
+                    ? clamp(getWidth() * 0.66f, 900f, 1280f)
+                    : clamp(getWidth() * 0.44f, 760f, 980f));
+            if (compactForKeyboard) {
+                dialogWindow.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+                params = dialogWindow.getAttributes();
+                params.y = dp(context, 4);
+                dialogWindow.setAttributes(params);
+            }
             dialogWindow.setLayout(
                     Math.min(maxDialogWidth, desiredDialogWidth),
                     WindowManager.LayoutParams.WRAP_CONTENT);
