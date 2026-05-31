@@ -177,6 +177,7 @@ final class FarmGameView extends CanvasGameView {
     private String statusPopupTitle = "";
     private String statusPopupMessage = "";
     private String walletAddress = "";
+    private String chainSignerAddress = "";
     private String chainStatus = "Mode lokal. Sepolia belum dicek.";
     private String walletNativeBalance = "";
     private int walletTaniBalance;
@@ -2592,7 +2593,7 @@ final class FarmGameView extends CanvasGameView {
         paint.setFakeBoldText(false);
         paint.setColor(Color.rgb(202, 223, 207));
         String mode = blockchainClient.hasGameApi()
-                ? "Gameplay lokal + sync signer"
+                ? "Gameplay lokal + signer Sepolia"
                 : "Gameplay lokal: signer belum diset";
         float modeMaxWidth = chainHistory.isEmpty()
                 ? panel.width() - 138f
@@ -2691,7 +2692,9 @@ final class FarmGameView extends CanvasGameView {
         boolean sending = chainStatusContains(entry.status, "mengirim");
         boolean waitingSync = chainStatusContains(entry.status, "belum sync")
                 || chainStatusContains(entry.status, "belum on-chain")
-                || chainStatusContains(entry.status, "butuh wallet");
+                || chainStatusContains(entry.status, "butuh wallet")
+                || chainStatusContains(entry.status, "terkirim signer")
+                || chainStatusContains(entry.status, "tx hash");
         boolean localSaved = chainStatusContains(entry.status, "lokal")
                 || chainStatusContains(entry.status, "tersimpan");
         boolean failed = chainStatusContains(entry.status, "gagal");
@@ -5133,6 +5136,10 @@ final class FarmGameView extends CanvasGameView {
             performWallet();
             return;
         }
+        if (!blockchainClient.hasGameApi()) {
+            showErrorMessage("Signer backend belum diset, isi Game Coin belum bisa punya tx hash.");
+            return;
+        }
         if (walletNativeBalance.isEmpty()) {
             refreshWalletState(true);
             showErrorMessage("Sync saldo ETH Sepolia dulu.");
@@ -5143,18 +5150,10 @@ final class FarmGameView extends CanvasGameView {
             showErrorMessage("Saldo ETH Sepolia belum cukup untuk isi Game Coin.");
             return;
         }
-        gameState.coins += fundedCoins;
-        gameState.swapFromAsset = SWAP_ASSET_COIN;
-        gameState.swapAmount = gameState.coins;
-        recordLocalEthFunding(fundedCoins);
-        saveGameState();
-
         ChainAction action = new ChainAction("SWAP_ETH_COIN", 0, fundedCoins);
-        addChainHistory(action, "lokal tersimpan");
-        chainStatus = "Game Coin diisi dari saldo ETH Sepolia via RPC. Transaksi debit ETH butuh WalletConnect di versi produksi.";
-        chainPanelUntilMs = System.currentTimeMillis() + 5200L;
-        showSuccessPopup(String.format(Locale.US,
-                "Game Coin +%d dari %s ETH Sepolia.",
+        queueChainAction(action, 0);
+        showMessage(String.format(Locale.US,
+                "Mengirim isi coin %d dari %s ETH Sepolia.",
                 fundedCoins,
                 estimatedEthSwapAmount(fundedCoins)));
     }
@@ -5179,6 +5178,12 @@ final class FarmGameView extends CanvasGameView {
             return;
         }
         boolean swapToEth = gameState.swapTarget == SWAP_TARGET_ETH;
+        if (swapToEth && isConnectedWalletBackendSigner()) {
+            chainStatus = "Wallet ini signer backend. Ganti wallet pemain supaya payout ETH bisa bertambah.";
+            chainPanelUntilMs = System.currentTimeMillis() + 5200L;
+            showErrorMessage("Ganti wallet pemain untuk menerima ETH.");
+            return;
+        }
         gameState.coins -= swappedCoins;
         if (gameState.swapAmount > gameState.coins) {
             gameState.swapAmount = gameState.coins;
@@ -5624,6 +5629,7 @@ final class FarmGameView extends CanvasGameView {
         chainStatus = "Sync wallet Sepolia...";
         blockchainClient.loadWalletState(walletAddress, state -> {
             checkingChain = false;
+            chainSignerAddress = state.signerAddress;
             chainStatus = state.message;
             walletNativeBalance = state.nativeEth;
             if (!state.success) {
@@ -5636,6 +5642,9 @@ final class FarmGameView extends CanvasGameView {
             } else if (state.success) {
                 walletTaniBalance = 0;
                 walletTaniBalanceAvailable = false;
+            }
+            if (state.success && isConnectedWalletBackendSigner()) {
+                chainStatus = state.message + " Wallet ini signer backend; pakai wallet pemain untuk payout ETH.";
             }
             if (revealPanel) {
                 chainPanelUntilMs = System.currentTimeMillis() + 5200L;
@@ -5656,21 +5665,24 @@ final class FarmGameView extends CanvasGameView {
             blockchainClient.submitGameAction(walletAddress, action, result -> {
                 pendingChainActions.remove(action);
                 if (result.success) {
+                    if (requiresSepoliaHash(action) && !BlockchainClient.isValidTransactionHash(result.txHash)) {
+                        handleChainActionFailure(historyEntry, action, refundCoinsOnFailure, "Backend tidak mengembalikan tx hash.");
+                        chainPanelUntilMs = System.currentTimeMillis() + 3600L;
+                        invalidate();
+                        return;
+                    }
                     String status = BlockchainClient.isValidTransactionHash(result.txHash) ? "on-chain" : "dikirim";
                     updateChainHistory(historyEntry, status, result.txHash);
                     chainStatus = result.message;
+                    if ("SWAP_ETH_COIN".equals(action.type)) {
+                        creditSepoliaEthFunding(action.amount);
+                    }
                     showSwapChainSuccess(action);
                     if (actionUpdatesCoinBalance(action)) {
                         scheduleWalletRefreshAfterChainAction(action);
                     }
                 } else {
-                    if (refundCoinsOnFailure > 0) {
-                        refundFailedSwapCoins(action, refundCoinsOnFailure, result.message);
-                        updateChainHistory(historyEntry, "gagal refund", "");
-                    } else {
-                        updateChainHistory(historyEntry, "belum sync", "");
-                        chainStatus = syncedLocalChainStatus(action, result.message);
-                    }
+                    handleChainActionFailure(historyEntry, action, refundCoinsOnFailure, result.message);
                 }
                 chainPanelUntilMs = System.currentTimeMillis() + 3600L;
                 invalidate();
@@ -5682,8 +5694,53 @@ final class FarmGameView extends CanvasGameView {
         }
     }
 
+    private boolean requiresSepoliaHash(ChainAction action) {
+        return "SWAP_ETH_COIN".equals(action.type)
+                || "SWAP_COIN_ETH".equals(action.type)
+                || "SWAP_COIN".equals(action.type);
+    }
+
+    private void handleChainActionFailure(ChainHistoryEntry historyEntry, ChainAction action, int refundCoinsOnFailure, String reason) {
+        if (refundCoinsOnFailure > 0) {
+            refundFailedSwapCoins(action, refundCoinsOnFailure, reason);
+            updateChainHistory(historyEntry, failedChainHistoryStatus(reason, "gagal; coin kembali"), "");
+            return;
+        }
+        if ("SWAP_ETH_COIN".equals(action.type)) {
+            String detail = conciseChainError(reason);
+            updateChainHistory(historyEntry, failedChainHistoryStatus(reason, "gagal isi coin"), "");
+            chainStatus = action.label() + " gagal" + (detail.isEmpty() ? "." : ": " + detail);
+            showErrorMessage(detail.isEmpty() ? "Isi coin gagal." : "Isi coin gagal: " + shortPopupDetail(detail));
+            return;
+        }
+        updateChainHistory(historyEntry, "belum sync", "");
+        chainStatus = syncedLocalChainStatus(action, reason);
+    }
+
+    private String failedChainHistoryStatus(String reason, String fallback) {
+        String detail = conciseChainError(reason);
+        return detail.isEmpty() ? fallback : "gagal: " + detail;
+    }
+
+    private void creditSepoliaEthFunding(int fundedCoins) {
+        if (fundedCoins <= 0) {
+            return;
+        }
+        long totalCoins = Math.min(Integer.MAX_VALUE, (long) gameState.coins + fundedCoins);
+        gameState.coins = (int) totalCoins;
+        gameState.swapFromAsset = SWAP_ASSET_COIN;
+        gameState.swapAmount = gameState.coins;
+        recordLocalEthFunding(fundedCoins);
+        saveGameState();
+    }
+
     private void showSwapChainSuccess(ChainAction action) {
-        if ("SWAP_COIN_ETH".equals(action.type)) {
+        if ("SWAP_ETH_COIN".equals(action.type)) {
+            showSuccessPopup(String.format(Locale.US,
+                    "Game Coin +%d dari %s ETH Sepolia.",
+                    action.amount,
+                    estimatedEthSwapAmount(action.amount)));
+        } else if ("SWAP_COIN_ETH".equals(action.type)) {
             showSuccessPopup(String.format(Locale.US,
                     "Swap %d coin ke %s ETH terkirim.",
                     action.amount,
@@ -5695,7 +5752,7 @@ final class FarmGameView extends CanvasGameView {
 
     private void scheduleWalletRefreshAfterChainAction(ChainAction action) {
         postDelayed(() -> refreshWalletState(true), 9000L);
-        if ("SWAP_COIN_ETH".equals(action.type)) {
+        if ("SWAP_COIN_ETH".equals(action.type) || "SWAP_ETH_COIN".equals(action.type)) {
             postDelayed(() -> refreshWalletState(true), 18000L);
         }
     }
@@ -5710,7 +5767,9 @@ final class FarmGameView extends CanvasGameView {
         String detail = conciseChainError(reason);
         chainStatus = action.label() + " gagal; coin dikembalikan +" + refundCoins
                 + (detail.isEmpty() ? "." : ": " + detail);
-        showErrorMessage("Swap gagal, coin dikembalikan +" + refundCoins + ".");
+        showErrorMessage(detail.isEmpty()
+                ? "Swap gagal, coin dikembalikan +" + refundCoins + "."
+                : "Swap gagal: " + shortPopupDetail(detail));
     }
 
     private boolean actionUpdatesCoinBalance(ChainAction action) {
@@ -5718,6 +5777,7 @@ final class FarmGameView extends CanvasGameView {
                 || "SELL_CROP".equals(action.type)
                 || "SWAP_CROP".equals(action.type)
                 || "SWAP_COIN".equals(action.type)
+                || "SWAP_ETH_COIN".equals(action.type)
                 || "SWAP_COIN_ETH".equals(action.type);
     }
 
@@ -5771,7 +5831,35 @@ final class FarmGameView extends CanvasGameView {
         if (cleaned.toLowerCase(Locale.US).startsWith(prefix.toLowerCase(Locale.US))) {
             cleaned = cleaned.substring(prefix.length()).trim();
         }
+        cleaned = cleaned.replaceFirst("^HTTP\\s+\\d+\\s*", "").trim();
+        if (cleaned.startsWith("{")) {
+            try {
+                JSONObject object = new JSONObject(cleaned);
+                String error = object.optString("error", "").trim();
+                cleaned = error.isEmpty() ? object.optString("message", cleaned).trim() : error;
+            } catch (JSONException ignored) {
+                // Keep the backend response text when it is not valid JSON.
+            }
+        }
+        String lower = cleaned.toLowerCase(Locale.US);
+        if (lower.contains("wallet penerima eth sama dengan signer backend")) {
+            cleaned = "wallet sama signer; ganti wallet pemain";
+        } else if (lower.contains("saldo eth signer backend tidak cukup")) {
+            cleaned = "saldo ETH signer backend kurang";
+        } else if (lower.contains("tipe aksi tidak dikenal")) {
+            cleaned = "backend belum support aksi ini";
+        } else if (lower.contains("tidak mengembalikan tx hash")) {
+            cleaned = "backend belum mengembalikan tx hash";
+        }
         return cleaned.length() > 96 ? cleaned.substring(0, 93) + "..." : cleaned;
+    }
+
+    private String shortPopupDetail(String detail) {
+        if (detail == null) {
+            return "";
+        }
+        String cleaned = detail.trim();
+        return cleaned.length() > 54 ? cleaned.substring(0, 51) + "..." : cleaned;
     }
 
     private ChainHistoryEntry addChainHistory(ChainAction action, String status) {
@@ -6274,6 +6362,12 @@ final class FarmGameView extends CanvasGameView {
 
     private String localEthFundingPreferenceKey() {
         return "game_eth_funded_wei_" + walletAddress.toLowerCase(Locale.US);
+    }
+
+    private boolean isConnectedWalletBackendSigner() {
+        return isValidAddress(walletAddress)
+                && isValidAddress(chainSignerAddress)
+                && walletAddress.equalsIgnoreCase(chainSignerAddress);
     }
 
     private BigDecimal walletNativeWeiValue() {

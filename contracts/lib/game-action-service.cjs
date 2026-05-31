@@ -82,7 +82,11 @@ async function submitGameAction(body) {
   const walletAddress = normalizeAddress(body.wallet, "wallet");
   const type = String(body.type || "").trim().toUpperCase();
   const plotId = toPositiveInt(body.plotId || 0, "plotId", {
-    allowZero: type === "SELL_CROP" || type === "SWAP_CROP" || type === "SWAP_COIN" || type === "SWAP_COIN_ETH"
+    allowZero: type === "SELL_CROP"
+      || type === "SWAP_CROP"
+      || type === "SWAP_COIN"
+      || type === "SWAP_COIN_ETH"
+      || type === "SWAP_ETH_COIN"
   });
   const amount = toPositiveInt(body.amount || 1, "amount");
   const tokenUri = landTokenUri(walletAddress, plotId);
@@ -123,6 +127,11 @@ async function submitGameAction(body) {
     }
     case "SWAP_COIN": {
       txHashes.push(await sendTransaction("coin swap", coin.mint(walletAddress, toTani(BigInt(amount) * BigInt(COIN_SWAP_RATE)))));
+      break;
+    }
+    case "SWAP_ETH_COIN": {
+      await ensureWalletHasEthForFunding(service, walletAddress, amount);
+      txHashes.push(await sendTransaction("ETH funding receipt", coin.mint(walletAddress, toTani(BigInt(amount) * BigInt(COIN_SWAP_RATE)))));
       break;
     }
     case "SWAP_COIN_ETH": {
@@ -215,6 +224,14 @@ async function ensureSignerCanPayEth(service, payoutWei) {
   const requiredWei = payoutWei + gasReserveWei;
   if (balanceWei < requiredWei) {
     throw httpError(402, `Saldo ETH signer backend tidak cukup untuk payout. Isi signer ${service.wallet.address} minimal ${ethers.formatEther(requiredWei)} ETH.`);
+  }
+}
+
+async function ensureWalletHasEthForFunding(service, walletAddress, amount) {
+  const requiredWei = ethPayoutWei(amount);
+  const balanceWei = await service.provider.getBalance(walletAddress);
+  if (balanceWei < requiredWei) {
+    throw httpError(402, `Saldo ETH wallet belum cukup untuk isi Game Coin. Butuh minimal ${ethers.formatEther(requiredWei)} ETH.`);
   }
 }
 

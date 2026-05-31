@@ -80,7 +80,7 @@ cmd.exe /c gradlew.bat :app:assembleDebug --console=plain
 5. The shop coin display uses the ERC-20 TANI balance when `TANIIN_COIN_CONTRACT_ADDRESS` is set. Otherwise it falls back to local prototype coins saved on the device.
 6. Start the local backend signer with `cd contracts && npm run game-api`. It listens on port `8787` and signs `/game-actions` with the deployer wallet from the root `.env`. On a USB device, also run `adb reverse tcp:8787 tcp:8787`.
 7. Gameplay actions are recorded in the local history. When `TANIIN_GAME_API_URL` is set, the app posts each action to `/game-actions` for the backend signer to process. If the backend returns a transaction hash, the app saves it in the transaction history and opens Sepolia Etherscan when tapped. Without that signer URL, the history marks actions as not yet on-chain instead of leaving them pending forever.
-8. The swap house can swap game coins to either TANI or native Sepolia ETH. ETH payout is sent from the backend signer wallet, so keep the signer funded, connect a player wallet that is different from the signer, and configure `TANIIN_ETH_WEI_PER_COIN` plus `TANIIN_MAX_ETH_PAYOUT_WEI` deliberately before using this on a public deployment.
+8. The swap house can fund local Game Coin from Sepolia ETH through a signer receipt transaction, and can swap game coins to either TANI or native Sepolia ETH. ETH payout is sent from the backend signer wallet, so keep the signer funded, connect a player wallet that is different from the signer, and configure `TANIIN_ETH_WEI_PER_COIN` plus `TANIIN_MAX_ETH_PAYOUT_WEI` deliberately before using this on a public deployment.
 
 For non-local testing, deploy the signer in `contracts/api/` to Vercel with the Vercel project root set to `contracts`. Set `TANIIN_GAME_API_URL=https://your-project.vercel.app` in the Android root `.env` and rebuild the APK. The Vercel rewrites keep the Android endpoint as `/game-actions`, so do not add `/api` to the URL.
 
@@ -88,7 +88,7 @@ The Android app does not sign transactions with a private key. A production setu
 
 Land ownership is represented by `TaniinLand` ERC-721 on-chain, but the Android gameplay state remains local unless the backend signer maps each game action to the deployed contracts and returns confirmed transaction hashes.
 
-The included development signer maps gameplay actions like this: land buy mints an ERC-721 land NFT to the player's wallet, land sell burns that plot NFT and mints a TANI reward, plant/harvest update the land contract, seed purchases mint ERC-1155 seed items, harvests mint ERC-1155 crop items, crop sales mint ERC-20 TANI rewards, TANI swaps mint ERC-20 TANI, and ETH swaps pay native ETH from the signer wallet.
+The included development signer maps gameplay actions like this: land buy mints an ERC-721 land NFT to the player's wallet, land sell burns that plot NFT and mints a TANI reward, plant/harvest update the land contract, seed purchases mint ERC-1155 seed items, harvests mint ERC-1155 crop items, crop sales mint ERC-20 TANI rewards, ETH-to-coin funding mints a signer receipt, TANI swaps mint ERC-20 TANI, and ETH swaps pay native ETH from the signer wallet.
 
 ## Deploy Contracts
 

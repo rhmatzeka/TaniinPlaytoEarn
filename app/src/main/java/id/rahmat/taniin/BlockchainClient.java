@@ -4,6 +4,7 @@ import android.os.Handler;
 import android.os.Looper;
 
 import org.json.JSONException;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -89,6 +90,7 @@ final class BlockchainClient {
                     BigInteger nativeWei = ethGetBalance(walletAddress);
                     String nativeEth = formatEth(nativeWei);
 
+                    String signerAddress = loadGameApiSignerAddress();
                     if (hasCoinContract()) {
                         BigInteger rawCoin = erc20BalanceOf(coinContractAddress, walletAddress);
                         int wholeCoin = clampToGameCoin(rawCoin.divide(ERC20_DECIMALS));
@@ -96,13 +98,15 @@ final class BlockchainClient {
                                 network.message + " TANI " + wholeCoin + " | ETH " + nativeEth,
                                 wholeCoin,
                                 true,
-                                nativeEth);
+                                nativeEth,
+                                signerAddress);
                     } else {
                         state = WalletState.ok(
                                 network.message + " ETH " + nativeEth + ". Contract TANI belum diset, coin masih lokal.",
                                 0,
                                 false,
-                                nativeEth);
+                                nativeEth,
+                                signerAddress);
                     }
                 }
             } catch (IOException exception) {
@@ -129,6 +133,13 @@ final class BlockchainClient {
                     body.put("amount", action.amount);
                     body.put("createdAtMs", action.createdAtMs);
                     String response = postGameApi("/game-actions", body.toString());
+                    String apiError = extractApiError(response);
+                    if (!apiError.isEmpty()) {
+                        result = Result.error(apiError);
+                        Result finalResult = result;
+                        mainHandler.post(() -> callback.onResult(finalResult));
+                        return;
+                    }
                     String txHash = extractTransactionHash(response);
                     result = txHash.isEmpty()
                             ? Result.ok("Aksi dikirim, tapi backend belum mengembalikan txHash.")
@@ -201,6 +212,30 @@ final class BlockchainClient {
         throw lastException == null ? new IOException("Game API tidak valid.") : lastException;
     }
 
+    private String getGameApi(String path) throws IOException {
+        IOException lastException = null;
+        for (String baseUrl : gameApiUrlCandidates()) {
+            try {
+                return getJson(baseUrl + path);
+            } catch (IOException exception) {
+                lastException = exception;
+            }
+        }
+        throw lastException == null ? new IOException("Game API tidak valid.") : lastException;
+    }
+
+    private String loadGameApiSignerAddress() {
+        if (!hasGameApi()) {
+            return "";
+        }
+        try {
+            JSONObject object = new JSONObject(getGameApi("/health"));
+            return cleanAddress(object.optString("signer", ""));
+        } catch (IOException | JSONException ignored) {
+            return "";
+        }
+    }
+
     private String[] gameApiUrlCandidates() {
         String fallback = localGameApiFallback(gameApiUrl);
         if (fallback.isEmpty() || fallback.equals(gameApiUrl)) {
@@ -222,23 +257,39 @@ final class BlockchainClient {
             outputStream.write(body);
         }
 
+        return readHttpResponse(connection);
+    }
+
+    private static String getJson(String urlString) throws IOException {
+        HttpURLConnection connection = (HttpURLConnection) new URL(urlString).openConnection();
+        connection.setConnectTimeout(9000);
+        connection.setReadTimeout(9000);
+        connection.setRequestMethod("GET");
+        connection.setRequestProperty("Accept", "application/json");
+        return readHttpResponse(connection);
+    }
+
+    private static String readHttpResponse(HttpURLConnection connection) throws IOException {
         int status = connection.getResponseCode();
         InputStream inputStream = status >= 200 && status < 300
                 ? connection.getInputStream()
                 : connection.getErrorStream();
         StringBuilder response = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                response.append(line);
+        if (inputStream != null) {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    response.append(line);
+                }
             }
-        } finally {
-            connection.disconnect();
         }
+        connection.disconnect();
+        String body = response.toString();
         if (status < 200 || status >= 300) {
-            throw new IOException("HTTP " + status + " " + response);
+            String apiError = extractApiError(body);
+            throw new IOException("HTTP " + status + (apiError.isEmpty() ? " " + body : " " + apiError));
         }
-        return response.toString();
+        return body;
     }
 
     private static String erc20BalanceOfData(String walletAddress) {
@@ -359,15 +410,55 @@ final class BlockchainClient {
             }
             JSONObject result = object.optJSONObject("result");
             if (result != null) {
-                return firstValidTransactionHash(
+                String nestedResult = firstValidTransactionHash(
                         result.optString("txHash", ""),
                         result.optString("transactionHash", ""),
                         result.optString("hash", ""));
+                if (!nestedResult.isEmpty()) {
+                    return nestedResult;
+                }
+            }
+            String arrayHash = firstValidTransactionHash(object.optJSONArray("txHashes"));
+            if (!arrayHash.isEmpty()) {
+                return arrayHash;
             }
         } catch (JSONException ignored) {
             return "";
         }
         return "";
+    }
+
+    private static String firstValidTransactionHash(JSONArray values) {
+        if (values == null) {
+            return "";
+        }
+        for (int i = 0; i < values.length(); i++) {
+            String hash = values.optString(i, "");
+            if (isValidTransactionHash(hash)) {
+                return hash.trim();
+            }
+        }
+        return "";
+    }
+
+    private static String extractApiError(String response) {
+        String cleaned = response == null ? "" : response.trim();
+        if (cleaned.isEmpty()) {
+            return "";
+        }
+        try {
+            JSONObject object = new JSONObject(cleaned);
+            if (object.optBoolean("ok", true)) {
+                return "";
+            }
+            String error = object.optString("error", "").trim();
+            if (!error.isEmpty()) {
+                return error;
+            }
+            return object.optString("message", "").trim();
+        } catch (JSONException ignored) {
+            return "";
+        }
     }
 
     private static String firstValidTransactionHash(String... values) {
@@ -418,21 +509,23 @@ final class BlockchainClient {
         final int coinBalance;
         final boolean coinBalanceAvailable;
         final String nativeEth;
+        final String signerAddress;
 
-        private WalletState(boolean success, String message, int coinBalance, boolean coinBalanceAvailable, String nativeEth) {
+        private WalletState(boolean success, String message, int coinBalance, boolean coinBalanceAvailable, String nativeEth, String signerAddress) {
             this.success = success;
             this.message = message;
             this.coinBalance = coinBalance;
             this.coinBalanceAvailable = coinBalanceAvailable;
             this.nativeEth = nativeEth;
+            this.signerAddress = signerAddress == null ? "" : signerAddress.trim();
         }
 
-        static WalletState ok(String message, int coinBalance, boolean coinBalanceAvailable, String nativeEth) {
-            return new WalletState(true, message, coinBalance, coinBalanceAvailable, nativeEth);
+        static WalletState ok(String message, int coinBalance, boolean coinBalanceAvailable, String nativeEth, String signerAddress) {
+            return new WalletState(true, message, coinBalance, coinBalanceAvailable, nativeEth, signerAddress);
         }
 
         static WalletState error(String message) {
-            return new WalletState(false, message, 0, false, "");
+            return new WalletState(false, message, 0, false, "", "");
         }
     }
 }
