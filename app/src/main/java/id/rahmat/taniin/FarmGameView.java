@@ -1,10 +1,6 @@
 package id.rahmat.taniin;
 
 import android.app.Activity;
-import android.content.ActivityNotFoundException;
-import android.content.ClipData;
-import android.content.ClipboardManager;
-import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -16,23 +12,11 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.RectF;
-import android.graphics.drawable.ColorDrawable;
-import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
-import android.text.InputType;
-import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
-import android.view.Window;
-import android.view.WindowManager;
-import android.view.inputmethod.EditorInfo;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.LinearLayout;
-import android.widget.TextView;
 
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -89,9 +73,9 @@ final class FarmGameView extends CanvasGameView {
     private static final int COIN_SWAP_RATE = 1;
     private static final int SWAP_TARGET_TANI = 0;
     private static final int SWAP_TARGET_ETH = 1;
-    private static final int SWAP_ASSET_COIN = 0;
+    static final int SWAP_ASSET_COIN = 0;
     private static final int SWAP_ASSET_TANI = 1;
-    private static final int SWAP_ASSET_ETH = 2;
+    static final int SWAP_ASSET_ETH = 2;
     private static final String DEFAULT_ETH_WEI_PER_COIN = "10000000000";
     private static final BigDecimal WEI_PER_ETH = new BigDecimal("1000000000000000000");
     private static final int SEED_BUNDLE_AMOUNT = 3;
@@ -148,6 +132,13 @@ final class FarmGameView extends CanvasGameView {
     private final GameAudio gameAudio;
     private final SharedPreferences preferences;
     private final GameStateStore gameStateStore;
+    private final ChainHistoryStore chainHistoryStore;
+    private final WorldRenderer worldRenderer = new WorldRenderer(TILE, WORLD_COLS, WORLD_ROWS, paint, pixelPaint, src, dst);
+    private final HudRenderer hudRenderer = new HudRenderer(paint);
+    private final ChainHistoryRenderer chainHistoryRenderer = new ChainHistoryRenderer(paint, CHAIN_HISTORY_LIMIT);
+    private final WalletDialogController walletDialogController = new WalletDialogController(this);
+    private final SwapAmountDialogController swapAmountDialogController = new SwapAmountDialogController(this);
+    private MapDecorationRenderer mapDecorationRenderer;
     private TmxMap tmxMap;
 
     private final Bitmap idleSheet;
@@ -229,6 +220,7 @@ final class FarmGameView extends CanvasGameView {
         gameAudio = new GameAudio(context);
         preferences = context.getSharedPreferences("taniin_chain", Context.MODE_PRIVATE);
         gameStateStore = new GameStateStore(preferences, SEED_NAMES.length, MAX_SHOP_BUNDLE_QUANTITY, GROW_TIME_MS);
+        chainHistoryStore = new ChainHistoryStore(preferences, PREF_CHAIN_HISTORY, CHAIN_HISTORY_LIMIT);
         walletAddress = resolveInitialWalletAddress();
         loadAudioSettings();
         idleSheet = decodePixelResource(R.drawable.idle);
@@ -244,10 +236,11 @@ final class FarmGameView extends CanvasGameView {
         appIcon = decodePixelResource(R.drawable.iconaplikasi);
         shopNpcSheet = decodePixelAsset(context, "game/Tileset/Cute_Fantasy_Free/Player/Player.png", idleSheet);
         outdoorDecorSheet = decodePixelAsset(context, "game/Tileset/Cute_Fantasy_Free/Outdoor decoration/Outdoor_Decor_Free.png", null);
+        mapDecorationRenderer = new MapDecorationRenderer(TILE, worldRenderer, chicken, babyChicken, cow, maleCow, chickenRed);
         loadTmxMap(context);
         createWorld();
         loadGameState();
-        loadChainHistory();
+        chainHistoryStore.load(chainHistory);
         if (!walletAddress.isEmpty()) {
             refreshWalletState(false);
         }
@@ -356,37 +349,7 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void createFallbackCollisionRects() {
-        addCollisionRect(0, 7 * TILE, 44 * TILE, 4 * TILE);
-        addCollisionRect(0, 0, 3 * TILE, WORLD_ROWS * TILE);
-        addCollisionRect(0, 45 * TILE, 34 * TILE, 7 * TILE);
-        addCollisionRect(52 * TILE, 0, 4 * TILE, 19 * TILE);
-
-        addFenceCollision(27 * TILE, 22 * TILE, 22 * TILE, 11 * TILE);
-        addFenceCollision(6 * TILE, 23 * TILE, 20 * TILE, 9 * TILE);
-
-        addHouseCollision(32 * TILE, 24 * TILE, 7 * TILE, 7 * TILE);
-        addHouseCollision(56 * TILE, 10 * TILE, 7 * TILE, 7 * TILE);
-        addCollisionRect(39 * TILE, 29 * TILE, 4.6f * TILE, 1.3f * TILE);
-
-        addTreeCollision(6 * TILE, 15 * TILE, 1.2f);
-        addTreeCollision(14 * TILE, 13 * TILE, 1.0f);
-        addTreeCollision(23 * TILE, 13 * TILE, 1.0f);
-        addTreeCollision(42 * TILE, 13 * TILE, 1.0f);
-        addTreeCollision(62 * TILE, 5 * TILE, 1.05f);
-        addTreeCollision(58 * TILE, 22 * TILE, 1.0f);
-        addTreeCollision(31 * TILE, 43 * TILE, 1.3f);
-        addTreeCollision(37 * TILE, 43 * TILE, 1.3f);
-        addTreeCollision(43 * TILE, 43 * TILE, 1.3f);
-        addTreeCollision(49 * TILE, 43 * TILE, 1.3f);
-
-        addCollisionRect(17 * TILE, 16 * TILE + 12, 58, 30);
-        addCollisionRect(31 * TILE, 15 * TILE + 12, 58, 30);
-        addCollisionRect(13 * TILE, 10 * TILE + 9, 24, 18);
-        addCollisionRect(54 * TILE, 32 * TILE + 9, 24, 18);
-        addCollisionRect(65 * TILE, 29 * TILE + 9, 24, 18);
-        addCollisionRect(40 * TILE, 30 * TILE, 42, 42);
-        addCollisionRect(29 * TILE, 32 * TILE, 64, 32);
-        addCollisionRect(45 * TILE, 30 * TILE, 86, 64);
+        worldRenderer.appendFallbackCollisionRects(collisionRects);
     }
 
     @Override
@@ -483,6 +446,7 @@ final class FarmGameView extends CanvasGameView {
         int height = getHeight();
         cameraX = Math.round(clamp(playerX - width * 0.5f, 0, Math.max(0, worldWidthPixels - width)));
         cameraY = Math.round(clamp(playerY - height * 0.56f, 0, Math.max(0, worldHeightPixels - height)));
+        worldRenderer.setCamera(cameraX, cameraY);
 
         drawWorld(canvas);
         drawMapDecorations(canvas, false, now);
@@ -507,31 +471,7 @@ final class FarmGameView extends CanvasGameView {
             return;
         }
 
-        canvas.drawColor(Color.rgb(113, 181, 82));
-        drawGrassTexture(canvas);
-
-        drawWaterRect(canvas, 0, 7 * TILE, 44 * TILE, 4 * TILE);
-        drawWaterRect(canvas, 0, 0, 3 * TILE, WORLD_ROWS * TILE);
-        drawWaterRect(canvas, 0, 45 * TILE, 34 * TILE, 7 * TILE);
-        drawWaterRect(canvas, 52 * TILE, 0, 4 * TILE, 19 * TILE);
-
-        drawRoad(canvas, 8 * TILE, 6 * TILE, 39 * TILE, 2 * TILE);
-        drawRoad(canvas, 44 * TILE, 5 * TILE, 10 * TILE, 2 * TILE);
-        drawRoad(canvas, 44 * TILE, 5 * TILE, 2 * TILE, 19 * TILE);
-        drawRoad(canvas, 16 * TILE, 20 * TILE, 34 * TILE, 2 * TILE);
-        drawRoad(canvas, 26 * TILE, 33 * TILE, 42 * TILE, 2 * TILE);
-        drawRoad(canvas, 34 * TILE, 23 * TILE, 2 * TILE, 12 * TILE);
-        drawRoad(canvas, 62 * TILE, 30 * TILE, 7 * TILE, 5 * TILE);
-
-        drawBridge(canvas, 44 * TILE, 7 * TILE, 2 * TILE, 4 * TILE, true);
-        drawBridge(canvas, 52 * TILE, 11 * TILE, 4 * TILE, 2 * TILE, false);
-
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(3f);
-        paint.setColor(Color.rgb(37, 128, 63));
-        drawWorldLine(canvas, 3 * TILE, 6 * TILE, 47 * TILE, 6 * TILE);
-        drawWorldLine(canvas, 3 * TILE, 11 * TILE, 44 * TILE, 11 * TILE);
-        drawWorldLine(canvas, 3 * TILE, 45 * TILE, 34 * TILE, 45 * TILE);
+        worldRenderer.drawFallbackWorld(canvas, getWidth(), getHeight());
     }
 
     private void drawPlots(Canvas canvas, long now) {
@@ -701,38 +641,7 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void drawDecorations(Canvas canvas) {
-        drawFence(canvas, 27 * TILE, 22 * TILE, 22 * TILE, 11 * TILE);
-        drawFence(canvas, 6 * TILE, 23 * TILE, 20 * TILE, 9 * TILE);
-
-        drawHouse(canvas, 32 * TILE, 24 * TILE, 7 * TILE, 7 * TILE, true);
-        drawHouse(canvas, 56 * TILE, 10 * TILE, 7 * TILE, 7 * TILE, false);
-        drawShopStand(canvas, 39 * TILE, 29 * TILE);
-
-        drawLamp(canvas, 48 * TILE, 4 * TILE);
-        drawLamp(canvas, 20 * TILE, 18 * TILE);
-        drawLamp(canvas, 50 * TILE, 32 * TILE);
-        drawLamp(canvas, 11 * TILE, 33 * TILE);
-
-        drawTree(canvas, 6 * TILE, 15 * TILE, 1.2f);
-        drawTree(canvas, 14 * TILE, 13 * TILE, 1.0f);
-        drawTree(canvas, 23 * TILE, 13 * TILE, 1.0f);
-        drawTree(canvas, 42 * TILE, 13 * TILE, 1.0f);
-        drawTree(canvas, 62 * TILE, 5 * TILE, 1.05f);
-        drawTree(canvas, 58 * TILE, 22 * TILE, 1.0f);
-        drawTree(canvas, 31 * TILE, 43 * TILE, 1.3f);
-        drawTree(canvas, 37 * TILE, 43 * TILE, 1.3f);
-        drawTree(canvas, 43 * TILE, 43 * TILE, 1.3f);
-        drawTree(canvas, 49 * TILE, 43 * TILE, 1.3f);
-
-        drawBush(canvas, 17 * TILE, 16 * TILE);
-        drawBush(canvas, 31 * TILE, 15 * TILE);
-        drawRock(canvas, 13 * TILE, 10 * TILE);
-        drawRock(canvas, 54 * TILE, 32 * TILE);
-        drawRock(canvas, 65 * TILE, 29 * TILE);
-
-        drawBitmapWorld(canvas, chest, 40 * TILE, 30 * TILE, 42, 42);
-        drawBitmapWorld(canvas, chicken, 29 * TILE, 32 * TILE, 64, 32);
-        drawBitmapWorld(canvas, cow, 45 * TILE, 30 * TILE, 86, 64);
+        worldRenderer.drawFallbackDecorations(canvas, chest, chicken, cow);
     }
 
     private void drawMapDecorations(Canvas canvas, boolean foreground, long now) {
@@ -745,312 +654,7 @@ final class FarmGameView extends CanvasGameView {
             drawSwapHouseSign(canvas);
             return;
         }
-        drawFieldEdgeAnimals(canvas, now);
-        drawOpenMeadowAnimals(canvas, now);
-        drawRoadsideAnimals(canvas, now);
-        drawShopPenAnimals(canvas, now);
-    }
-
-    private void drawShopPenAnimals(Canvas canvas, long now) {
-        int chickenFrame = (int) ((now / 440L) % 4L);
-        int babyFrame = (int) ((now / 520L) % 4L);
-        int cowFrame = (int) ((now / 620L) % 4L);
-
-        float chickenWiggleA = (float) Math.sin(now / 360.0) * TILE * 0.025f;
-        float chickenWiggleB = (float) Math.sin(now / 430.0 + 1.7) * TILE * 0.025f;
-        float babyWiggle = (float) Math.sin(now / 390.0 + 2.4) * TILE * 0.020f;
-        float cowWiggle = (float) Math.sin(now / 720.0 + 0.8) * TILE * 0.018f;
-
-        drawSpriteWithShadowWorld(canvas, chicken, chickenFrame, 16, 16, 4,
-                22.38f * TILE + chickenWiggleA, 18.08f * TILE, TILE * 0.50f, TILE * 0.50f);
-        drawSpriteWithShadowWorld(canvas, chicken, (chickenFrame + 1) % 4, 16, 16, 4,
-                23.34f * TILE + chickenWiggleB, 18.42f * TILE, TILE * 0.50f, TILE * 0.50f);
-        drawSpriteWithShadowWorld(canvas, cow, cowFrame, 32, 32, 4,
-                22.82f * TILE + cowWiggle, 20.04f * TILE, TILE, TILE);
-        drawSpriteWithShadowWorld(canvas, chicken, (chickenFrame + 2) % 4, 16, 16, 4,
-                23.58f * TILE - chickenWiggleA, 21.68f * TILE, TILE * 0.50f, TILE * 0.50f);
-        drawSpriteWithShadowWorld(canvas, babyChicken, babyFrame, 16, 16, 4,
-                22.42f * TILE + babyWiggle, 22.00f * TILE, TILE * 0.38f, TILE * 0.38f);
-        drawSpriteWithShadowWorld(canvas, chicken, (chickenFrame + 3) % 4, 16, 16, 4,
-                22.98f * TILE - chickenWiggleB, 22.50f * TILE, TILE * 0.50f, TILE * 0.50f);
-        drawSpriteWithShadowWorld(canvas, babyChicken, (babyFrame + 1) % 4, 16, 16, 4,
-                23.66f * TILE - babyWiggle, 22.34f * TILE, TILE * 0.38f, TILE * 0.38f);
-    }
-
-    private void drawFieldEdgeAnimals(Canvas canvas, long now) {
-        int chickenFrame = (int) ((now / 440L) % 4L);
-        int babyFrame = (int) ((now / 520L) % 4L);
-
-        drawSpriteWithShadowWorld(canvas, chicken, chickenFrame, 16, 16, 4,
-                10.86f * TILE, 24.54f * TILE, TILE * 0.50f, TILE * 0.50f);
-        drawSpriteWithShadowWorld(canvas, babyChicken, babyFrame, 16, 16, 4,
-                11.62f * TILE, 24.92f * TILE, TILE * 0.37f, TILE * 0.37f);
-        drawSpriteWithShadowWorld(canvas, chicken, (chickenFrame + 2) % 4, 16, 16, 4,
-                13.74f * TILE, 24.64f * TILE, TILE * 0.48f, TILE * 0.48f);
-        drawSpriteWithShadowWorld(canvas, babyChicken, (babyFrame + 1) % 4, 16, 16, 4,
-                14.42f * TILE, 24.96f * TILE, TILE * 0.35f, TILE * 0.35f);
-    }
-
-    private void drawOpenMeadowAnimals(Canvas canvas, long now) {
-        int chickenFrame = (int) ((now / 430L) % 4L);
-        int babyFrame = (int) ((now / 510L) % 4L);
-        int cowFrame = (int) ((now / 660L) % 4L);
-        float swayA = (float) Math.sin(now / 520.0) * TILE * 0.018f;
-        float swayB = (float) Math.sin(now / 610.0 + 1.8) * TILE * 0.018f;
-
-        drawSpriteWithShadowWorld(canvas, chickenRed, chickenFrame, 16, 16, 4,
-                19.70f * TILE + swayA, 28.24f * TILE, TILE * 0.54f, TILE * 0.54f);
-        drawSpriteWithShadowWorld(canvas, babyChicken, babyFrame, 16, 16, 4,
-                20.38f * TILE - swayB, 28.68f * TILE, TILE * 0.38f, TILE * 0.38f);
-        drawSpriteWithShadowWorld(canvas, maleCow, cowFrame, 32, 32, 4,
-                24.10f * TILE + swayB, 28.14f * TILE, TILE * 1.04f, TILE * 1.04f);
-        drawSpriteWithShadowWorld(canvas, chicken, (chickenFrame + 2) % 4, 16, 16, 4,
-                24.18f * TILE - swayA, 30.22f * TILE, TILE * 0.52f, TILE * 0.52f);
-        drawSpriteWithShadowWorld(canvas, babyChicken, (babyFrame + 1) % 4, 16, 16, 4,
-                24.82f * TILE + swayA, 30.58f * TILE, TILE * 0.38f, TILE * 0.38f);
-    }
-
-    private void drawRoadsideAnimals(Canvas canvas, long now) {
-        int chickenFrame = (int) ((now / 470L) % 4L);
-        int cowFrame = (int) ((now / 690L) % 4L);
-        float drift = (float) Math.sin(now / 720.0) * TILE * 0.016f;
-
-        drawSpriteWithShadowWorld(canvas, cow, cowFrame, 32, 32, 4,
-                31.18f * TILE + drift, 29.22f * TILE, TILE * 1.02f, TILE * 1.02f);
-        drawSpriteWithShadowWorld(canvas, chicken, chickenFrame, 16, 16, 4,
-                34.62f * TILE - drift, 31.48f * TILE, TILE * 0.52f, TILE * 0.52f);
-        drawSpriteWithShadowWorld(canvas, chickenRed, (chickenFrame + 1) % 4, 16, 16, 4,
-                35.20f * TILE + drift, 31.82f * TILE, TILE * 0.52f, TILE * 0.52f);
-    }
-
-    private void drawFieldEdgeNatureDecorations(Canvas canvas, long now) {
-        int chickenFrame = (int) ((now / 440L) % 4L);
-        int babyFrame = (int) ((now / 520L) % 4L);
-
-        drawOutdoorTile(canvas, 0, 2, 10.10f * TILE, 23.38f * TILE, TILE * 0.72f);
-        drawOutdoorTile(canvas, 1, 2, 11.22f * TILE, 24.08f * TILE, TILE * 0.56f);
-        drawOutdoorTile(canvas, 2, 3, 13.10f * TILE, 23.76f * TILE, TILE * 0.56f);
-        drawOutdoorTile(canvas, 1, 2, 14.35f * TILE, 23.18f * TILE, TILE * 0.50f);
-        drawOutdoorTile(canvas, 2, 3, 14.92f * TILE, 23.76f * TILE, TILE * 0.54f);
-        drawOutdoorTile(canvas, 0, 8, 12.12f * TILE, 22.70f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 0, 11, 12.82f * TILE, 24.58f * TILE, TILE * 0.52f);
-        drawOutdoorTile(canvas, 1, 11, 13.74f * TILE, 24.42f * TILE, TILE * 0.52f);
-
-        drawOutdoorTile(canvas, 0, 8, 16.42f * TILE, 25.66f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 1, 8, 16.90f * TILE, 25.76f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 2, 0, 18.04f * TILE, 26.82f * TILE, TILE * 0.42f);
-        drawOutdoorTile(canvas, 0, 2, 19.56f * TILE, 26.12f * TILE, TILE * 0.62f);
-        drawOutdoorTile(canvas, 1, 2, 20.34f * TILE, 26.46f * TILE, TILE * 0.50f);
-        drawOutdoorTile(canvas, 5, 8, 21.68f * TILE, 27.74f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 6, 8, 22.16f * TILE, 27.84f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 0, 10, 17.74f * TILE, 29.38f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 1, 10, 18.22f * TILE, 29.32f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 0, 11, 20.82f * TILE, 30.22f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 2, 10, 22.88f * TILE, 29.92f * TILE, TILE * 0.46f);
-
-        drawSpriteWithShadowWorld(canvas, chicken, chickenFrame, 16, 16, 4,
-                10.86f * TILE, 24.54f * TILE, TILE * 0.50f, TILE * 0.50f);
-        drawSpriteWithShadowWorld(canvas, babyChicken, babyFrame, 16, 16, 4,
-                11.62f * TILE, 24.92f * TILE, TILE * 0.37f, TILE * 0.37f);
-        drawSpriteWithShadowWorld(canvas, chicken, (chickenFrame + 2) % 4, 16, 16, 4,
-                13.74f * TILE, 24.64f * TILE, TILE * 0.48f, TILE * 0.48f);
-        drawSpriteWithShadowWorld(canvas, babyChicken, (babyFrame + 1) % 4, 16, 16, 4,
-                14.42f * TILE, 24.96f * TILE, TILE * 0.35f, TILE * 0.35f);
-    }
-
-    private void drawShopPenNatureDecorations(Canvas canvas) {
-        drawOutdoorTile(canvas, 0, 8, 15.42f * TILE, 23.72f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 1, 8, 15.88f * TILE, 23.88f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 4, 8, 17.20f * TILE, 24.22f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 5, 8, 17.68f * TILE, 24.14f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 0, 2, 19.24f * TILE, 23.70f * TILE, TILE * 0.62f);
-        drawOutdoorTile(canvas, 2, 3, 20.02f * TILE, 24.16f * TILE, TILE * 0.54f);
-        drawOutdoorTile(canvas, 0, 10, 21.54f * TILE, 23.92f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 1, 10, 22.02f * TILE, 23.86f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 5, 1, 23.24f * TILE, 24.34f * TILE, TILE * 0.58f);
-        drawOutdoorTile(canvas, 6, 1, 23.80f * TILE, 24.50f * TILE, TILE * 0.52f);
-
-        drawOutdoorTile(canvas, 1, 2, 15.08f * TILE, 27.48f * TILE, TILE * 0.52f);
-        drawOutdoorTile(canvas, 2, 3, 16.68f * TILE, 28.12f * TILE, TILE * 0.56f);
-        drawOutdoorTile(canvas, 0, 2, 18.12f * TILE, 27.34f * TILE, TILE * 0.68f);
-        drawOutdoorTile(canvas, 1, 3, 20.02f * TILE, 27.94f * TILE, TILE * 0.52f);
-        drawOutdoorTile(canvas, 1, 2, 22.10f * TILE, 27.42f * TILE, TILE * 0.54f);
-        drawOutdoorTile(canvas, 2, 3, 24.00f * TILE, 28.04f * TILE, TILE * 0.54f);
-        drawOutdoorTile(canvas, 0, 11, 23.66f * TILE, 26.82f * TILE, TILE * 0.46f);
-        drawOutdoorTile(canvas, 2, 10, 24.62f * TILE, 27.14f * TILE, TILE * 0.48f);
-
-        drawOutdoorTile(canvas, 2, 8, 16.06f * TILE, 20.18f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 3, 8, 16.54f * TILE, 20.08f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 0, 1, 17.40f * TILE, 22.36f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 1, 1, 18.04f * TILE, 22.22f * TILE, TILE * 0.44f);
-        drawOutdoorTile(canvas, 2, 0, 18.42f * TILE, 19.92f * TILE, TILE * 0.42f);
-        drawOutdoorTile(canvas, 0, 9, 20.18f * TILE, 20.96f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 1, 9, 20.66f * TILE, 20.86f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 5, 8, 21.86f * TILE, 22.22f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 6, 8, 22.34f * TILE, 22.32f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 0, 11, 24.02f * TILE, 20.18f * TILE, TILE * 0.44f);
-        drawOutdoorTile(canvas, 2, 10, 24.16f * TILE, 21.36f * TILE, TILE * 0.46f);
-    }
-
-    private void drawWestMeadowDecorations(Canvas canvas) {
-        drawOutdoorTile(canvas, 0, 1, 6.58f * TILE, 28.18f * TILE, TILE * 0.52f);
-        drawOutdoorTile(canvas, 2, 0, 8.18f * TILE, 28.86f * TILE, TILE * 0.44f);
-        drawOutdoorTile(canvas, 5, 1, 9.84f * TILE, 29.58f * TILE, TILE * 0.58f);
-        drawOutdoorTile(canvas, 6, 1, 10.40f * TILE, 29.74f * TILE, TILE * 0.52f);
-        drawOutdoorTile(canvas, 0, 2, 11.76f * TILE, 28.46f * TILE, TILE * 0.62f);
-        drawOutdoorTile(canvas, 2, 3, 12.64f * TILE, 28.98f * TILE, TILE * 0.54f);
-        drawOutdoorTile(canvas, 4, 8, 7.36f * TILE, 30.72f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 5, 8, 7.84f * TILE, 30.64f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 3, 5, 9.42f * TILE, 31.52f * TILE, TILE * 0.74f);
-        drawOutdoorTile(canvas, 0, 3, 11.32f * TILE, 31.16f * TILE, TILE * 0.68f);
-        drawOutdoorTile(canvas, 1, 3, 12.54f * TILE, 31.68f * TILE, TILE * 0.52f);
-        drawOutdoorTile(canvas, 0, 10, 14.34f * TILE, 30.42f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 1, 10, 14.82f * TILE, 30.34f * TILE, TILE * 0.48f);
-
-        drawOutdoorTile(canvas, 0, 1, 6.96f * TILE, 26.08f * TILE, TILE * 0.52f);
-        drawOutdoorTile(canvas, 1, 1, 7.58f * TILE, 26.36f * TILE, TILE * 0.44f);
-        drawOutdoorTile(canvas, 0, 2, 8.88f * TILE, 25.82f * TILE, TILE * 0.68f);
-        drawOutdoorTile(canvas, 2, 3, 9.72f * TILE, 26.22f * TILE, TILE * 0.54f);
-        drawOutdoorTile(canvas, 2, 0, 11.54f * TILE, 25.46f * TILE, TILE * 0.44f);
-        drawOutdoorTile(canvas, 5, 1, 12.92f * TILE, 26.26f * TILE, TILE * 0.58f);
-        drawOutdoorTile(canvas, 6, 1, 13.46f * TILE, 26.42f * TILE, TILE * 0.52f);
-        drawOutdoorTile(canvas, 3, 5, 15.08f * TILE, 25.62f * TILE, TILE * 0.74f);
-        drawOutdoorTile(canvas, 4, 8, 16.44f * TILE, 38.20f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 5, 8, 16.92f * TILE, 38.12f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 0, 9, 18.02f * TILE, 38.80f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 1, 9, 18.50f * TILE, 38.72f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 2, 1, 19.82f * TILE, 39.20f * TILE, TILE * 0.54f);
-        drawOutdoorTile(canvas, 0, 11, 21.06f * TILE, 38.18f * TILE, TILE * 0.48f);
-
-        drawOutdoorTile(canvas, 2, 1, 6.76f * TILE, 30.70f * TILE, TILE * 0.54f);
-        drawOutdoorTile(canvas, 0, 2, 8.16f * TILE, 31.02f * TILE, TILE * 0.66f);
-        drawOutdoorTile(canvas, 1, 2, 9.02f * TILE, 31.20f * TILE, TILE * 0.52f);
-        drawOutdoorTile(canvas, 4, 5, 10.52f * TILE, 30.64f * TILE, TILE * 0.76f);
-        drawOutdoorTile(canvas, 2, 3, 12.18f * TILE, 31.08f * TILE, TILE * 0.54f);
-        drawOutdoorTile(canvas, 2, 0, 14.94f * TILE, 30.74f * TILE, TILE * 0.44f);
-        drawOutdoorTile(canvas, 6, 5, 15.78f * TILE, 31.04f * TILE, TILE * 0.76f);
-        drawOutdoorTile(canvas, 0, 1, 17.92f * TILE, 38.04f * TILE, TILE * 0.52f);
-        drawOutdoorTile(canvas, 1, 1, 18.60f * TILE, 38.26f * TILE, TILE * 0.46f);
-        drawOutdoorTile(canvas, 0, 9, 20.02f * TILE, 38.52f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 1, 9, 20.52f * TILE, 38.44f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 5, 1, 22.58f * TILE, 38.24f * TILE, TILE * 0.58f);
-        drawOutdoorTile(canvas, 6, 1, 23.12f * TILE, 38.40f * TILE, TILE * 0.52f);
-        drawOutdoorTile(canvas, 5, 8, 8.94f * TILE, 38.60f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 6, 8, 9.42f * TILE, 38.72f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 0, 11, 11.70f * TILE, 39.00f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 2, 10, 16.94f * TILE, 39.06f * TILE, TILE * 0.46f);
-    }
-
-    private void drawOpenMeadowDecorations(Canvas canvas, long now) {
-        int chickenFrame = (int) ((now / 430L) % 4L);
-        int babyFrame = (int) ((now / 510L) % 4L);
-        int cowFrame = (int) ((now / 660L) % 4L);
-        float swayA = (float) Math.sin(now / 520.0) * TILE * 0.018f;
-        float swayB = (float) Math.sin(now / 610.0 + 1.8) * TILE * 0.018f;
-
-        drawOutdoorTile(canvas, 0, 8, 18.70f * TILE, 28.86f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 1, 8, 19.25f * TILE, 29.06f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 5, 8, 20.45f * TILE, 28.82f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 6, 8, 21.00f * TILE, 29.08f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 0, 1, 22.18f * TILE, 29.10f * TILE, TILE * 0.58f);
-        drawOutdoorTile(canvas, 2, 1, 23.02f * TILE, 29.34f * TILE, TILE * 0.50f);
-
-        drawOutdoorTile(canvas, 0, 2, 19.18f * TILE, 30.84f * TILE, TILE * 0.68f);
-        drawOutdoorTile(canvas, 1, 2, 20.16f * TILE, 31.20f * TILE, TILE * 0.54f);
-        drawOutdoorTile(canvas, 0, 3, 22.48f * TILE, 30.96f * TILE, TILE * 0.70f);
-        drawOutdoorTile(canvas, 2, 3, 23.54f * TILE, 31.52f * TILE, TILE * 0.56f);
-        drawOutdoorTile(canvas, 4, 5, 18.52f * TILE, 30.72f * TILE, TILE * 0.78f);
-        drawOutdoorTile(canvas, 5, 5, 24.26f * TILE, 30.96f * TILE, TILE * 0.78f);
-        drawOutdoorTile(canvas, 6, 4, 21.36f * TILE, 30.80f * TILE, TILE * 1.10f);
-
-        drawSpriteWithShadowWorld(canvas, chickenRed, chickenFrame, 16, 16, 4,
-                19.70f * TILE + swayA, 28.24f * TILE, TILE * 0.54f, TILE * 0.54f);
-        drawSpriteWithShadowWorld(canvas, babyChicken, babyFrame, 16, 16, 4,
-                20.38f * TILE - swayB, 28.68f * TILE, TILE * 0.38f, TILE * 0.38f);
-        drawSpriteWithShadowWorld(canvas, maleCow, cowFrame, 32, 32, 4,
-                24.10f * TILE + swayB, 28.14f * TILE, TILE * 1.04f, TILE * 1.04f);
-        drawSpriteWithShadowWorld(canvas, chicken, (chickenFrame + 2) % 4, 16, 16, 4,
-                24.18f * TILE - swayA, 30.22f * TILE, TILE * 0.52f, TILE * 0.52f);
-        drawSpriteWithShadowWorld(canvas, babyChicken, (babyFrame + 1) % 4, 16, 16, 4,
-                24.82f * TILE + swayA, 30.58f * TILE, TILE * 0.38f, TILE * 0.38f);
-    }
-
-    private void drawRoadsideDecorations(Canvas canvas, long now) {
-        int chickenFrame = (int) ((now / 470L) % 4L);
-        int cowFrame = (int) ((now / 690L) % 4L);
-        float drift = (float) Math.sin(now / 720.0) * TILE * 0.016f;
-
-        drawOutdoorTile(canvas, 2, 8, 29.12f * TILE, 25.92f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 3, 8, 29.60f * TILE, 25.84f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 0, 9, 31.70f * TILE, 25.12f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 1, 9, 32.24f * TILE, 25.10f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 0, 2, 34.10f * TILE, 31.08f * TILE, TILE * 0.64f);
-        drawOutdoorTile(canvas, 2, 3, 35.00f * TILE, 31.30f * TILE, TILE * 0.58f);
-
-        drawOutdoorTile(canvas, 0, 8, 29.28f * TILE, 18.82f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 1, 8, 29.82f * TILE, 18.98f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 2, 0, 31.24f * TILE, 19.76f * TILE, TILE * 0.42f);
-        drawOutdoorTile(canvas, 0, 2, 32.58f * TILE, 19.26f * TILE, TILE * 0.58f);
-        drawOutdoorTile(canvas, 1, 2, 33.10f * TILE, 20.02f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 0, 10, 30.42f * TILE, 22.08f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 1, 10, 30.90f * TILE, 22.02f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 5, 8, 32.06f * TILE, 23.24f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 6, 8, 32.54f * TILE, 23.34f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 2, 3, 31.38f * TILE, 24.22f * TILE, TILE * 0.54f);
-        drawOutdoorTile(canvas, 0, 11, 33.00f * TILE, 24.56f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 4, 8, 31.74f * TILE, 18.58f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 5, 8, 32.22f * TILE, 18.52f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 0, 1, 30.18f * TILE, 20.64f * TILE, TILE * 0.50f);
-        drawOutdoorTile(canvas, 1, 1, 31.06f * TILE, 21.12f * TILE, TILE * 0.44f);
-        drawOutdoorTile(canvas, 2, 8, 32.42f * TILE, 21.42f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 3, 8, 32.90f * TILE, 21.54f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 0, 9, 29.64f * TILE, 23.46f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 1, 9, 30.12f * TILE, 23.38f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 5, 1, 33.08f * TILE, 22.72f * TILE, TILE * 0.56f);
-        drawOutdoorTile(canvas, 6, 1, 33.44f * TILE, 23.06f * TILE, TILE * 0.46f);
-
-        drawOutdoorTile(canvas, 0, 10, 29.22f * TILE, 38.30f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 1, 10, 29.68f * TILE, 38.24f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 4, 8, 32.72f * TILE, 38.64f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 5, 8, 33.16f * TILE, 38.58f * TILE, TILE * 0.48f);
-        drawOutdoorTile(canvas, 3, 5, 35.54f * TILE, 38.50f * TILE, TILE * 0.80f);
-        drawOutdoorTile(canvas, 6, 5, 36.50f * TILE, 38.76f * TILE, TILE * 0.78f);
-
-        drawSpriteWithShadowWorld(canvas, cow, cowFrame, 32, 32, 4,
-                31.18f * TILE + drift, 29.22f * TILE, TILE * 1.02f, TILE * 1.02f);
-        drawSpriteWithShadowWorld(canvas, chicken, chickenFrame, 16, 16, 4,
-                34.62f * TILE - drift, 31.48f * TILE, TILE * 0.52f, TILE * 0.52f);
-        drawSpriteWithShadowWorld(canvas, chickenRed, (chickenFrame + 1) % 4, 16, 16, 4,
-                35.20f * TILE + drift, 31.82f * TILE, TILE * 0.52f, TILE * 0.52f);
-
-        drawOutdoorTile(canvas, 0, 11, 13.26f * TILE, 39.52f * TILE, TILE * 0.50f);
-        drawOutdoorTile(canvas, 1, 11, 13.74f * TILE, 39.46f * TILE, TILE * 0.50f);
-        drawOutdoorTile(canvas, 2, 11, 14.22f * TILE, 39.52f * TILE, TILE * 0.50f);
-        drawOutdoorTile(canvas, 5, 1, 16.66f * TILE, 40.02f * TILE, TILE * 0.62f);
-        drawOutdoorTile(canvas, 6, 1, 17.30f * TILE, 40.02f * TILE, TILE * 0.62f);
-        drawOutdoorTile(canvas, 0, 3, 20.62f * TILE, 39.46f * TILE, TILE * 0.68f);
-        drawOutdoorTile(canvas, 2, 3, 21.52f * TILE, 39.84f * TILE, TILE * 0.56f);
-    }
-
-    private void drawVillageNpcDecorations(Canvas canvas, long now) {
-        int frame = (int) ((now / 360L) % 6L);
-        float bob = (float) Math.sin(now / 540.0) * 1.5f;
-        drawNpcWorld(canvas, 6 + frame, 17.80f * TILE, 27.70f * TILE + bob, TILE * 1.05f);
-        drawNpcWorld(canvas, 18 + frame, 33.96f * TILE, 31.92f * TILE - bob, TILE * 1.02f);
-    }
-
-    private void drawNpcWorld(Canvas canvas, int frame, float worldX, float worldY, float size) {
-        drawSpriteWithShadowWorld(canvas, shopNpcSheet, frame, 32, 32, 6, worldX, worldY, size, size);
-    }
-
-    private void drawOutdoorTile(Canvas canvas, int col, int row, float worldX, float worldY, float size) {
-        if (outdoorDecorSheet == null) {
-            return;
-        }
-        int tileSize = 16;
-        src.set(col * tileSize, row * tileSize, col * tileSize + tileSize, row * tileSize + tileSize);
-        dst.set(worldX - cameraX, worldY - cameraY, worldX - cameraX + size, worldY - cameraY + size);
-        canvas.drawBitmap(outdoorDecorSheet, src, dst, pixelPaint);
+        mapDecorationRenderer.drawBackgroundDecorations(canvas, now);
     }
 
     private void drawShopHouseSign(Canvas canvas) {
@@ -1466,10 +1070,10 @@ final class FarmGameView extends CanvasGameView {
         drawMiniMap(canvas);
         drawTopMenu(canvas);
         drawJoystick(canvas);
-        drawActionButton(canvas);
+        hudRenderer.drawActionButton(canvas, getWidth(), getHeight());
         drawWalletButton(canvas);
         drawChainHistoryButton(canvas);
-        drawContextMessage(canvas, now);
+        hudRenderer.drawContextMessage(canvas, getWidth(), getHeight(), contextText(now));
         if (shopUntilMs > now) {
             drawShopPanel(canvas);
         }
@@ -2506,442 +2110,48 @@ final class FarmGameView extends CanvasGameView {
         canvas.drawCircle(knobX, knobY, JOYSTICK_KNOB_RADIUS, paint);
     }
 
-    private void drawActionButton(Canvas canvas) {
-        float cx = getWidth() - 92;
-        float cy = getHeight() - 86;
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(31, 100, 178));
-        canvas.drawCircle(cx, cy, 42, paint);
-        paint.setColor(Color.WHITE);
-        paint.setTextSize(28f);
-        paint.setFakeBoldText(true);
-        canvas.drawText("A", cx - 10, cy + 10, paint);
-        paint.setFakeBoldText(false);
-    }
-
     private void drawWalletButton(Canvas canvas) {
-        RectF bounds = walletButtonBounds();
         boolean connected = !walletAddress.isEmpty();
         boolean signerWallet = connected && isConnectedWalletBackendSigner();
-
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.argb(95, 0, 0, 0));
-        canvas.drawRoundRect(bounds.left + 5f, bounds.top + 6f, bounds.right + 5f, bounds.bottom + 6f, 14, 14, paint);
-        paint.setColor(signerWallet ? Color.rgb(96, 72, 34) : connected ? Color.rgb(36, 102, 68) : Color.rgb(42, 87, 62));
-        canvas.drawRoundRect(bounds, 14, 14, paint);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(4f);
-        paint.setColor(signerWallet ? Color.rgb(255, 202, 86) : connected ? Color.rgb(105, 196, 135) : Color.rgb(91, 143, 104));
-        canvas.drawRoundRect(bounds, 14, 14, paint);
-
-        float iconCx = bounds.left + 40f;
-        float iconCy = (bounds.top + bounds.bottom) * 0.5f;
-        drawWalletHudIcon(canvas, iconCx, iconCy, connected, signerWallet);
-
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(236, 248, 226));
-        paint.setTextSize(connected ? 20f : 21f);
-        paint.setFakeBoldText(true);
         String label = connected ? shortAddress(walletAddress) : "CONNECT WALLET";
-        paint.setTextSize(fitTextSize(label, connected ? 20f : 21f, bounds.width() - 96f));
-        canvas.drawText(label, bounds.left + 76f, bounds.top + (connected ? 34f : 44f), paint);
-        if (connected) {
-            paint.setFakeBoldText(false);
-            paint.setColor(signerWallet ? Color.rgb(255, 227, 137) : Color.rgb(177, 238, 185));
-            String subtitle = walletSubtitle();
-            paint.setTextSize(fitTextSize(subtitle, 15f, bounds.width() - 96f));
-            canvas.drawText(subtitle, bounds.left + 76f, bounds.top + 58f, paint);
-        }
-        paint.setFakeBoldText(false);
+        String compactNativeEth = walletNativeBalance.isEmpty() ? "" : compactEth(walletNativeBalance);
+        hudRenderer.drawWalletButton(canvas, walletButtonBounds(), connected, checkingChain, signerWallet, label, compactNativeEth);
     }
 
     private void drawChainHistoryButton(Canvas canvas) {
-        RectF bounds = chainHistoryButtonBounds();
-        boolean hasHash = !chainHistory.isEmpty() && BlockchainClient.isValidTransactionHash(chainHistory.get(0).txHash);
-        boolean needsSync = hasUnsyncedChainHistory();
-
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.argb(90, 0, 0, 0));
-        canvas.drawRoundRect(bounds.left + 5f, bounds.top + 6f, bounds.right + 5f, bounds.bottom + 6f, 14, 14, paint);
-        paint.setColor(Color.rgb(28, 69, 52));
-        canvas.drawRoundRect(bounds, 14, 14, paint);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(4f);
-        paint.setColor(hasHash ? Color.rgb(105, 207, 123)
-                : needsSync ? Color.rgb(230, 180, 85) : Color.rgb(92, 151, 105));
-        canvas.drawRoundRect(bounds, 14, 14, paint);
-
-        drawChainHistoryListIcon(canvas, bounds.centerX(), bounds.centerY(), hasHash);
-
-        paint.setColor(chainHistory.isEmpty() ? Color.rgb(76, 112, 84) : Color.rgb(255, 219, 95));
-        canvas.drawCircle(bounds.right - 10f, bounds.top + 12f, 17f, paint);
-        paint.setColor(Color.rgb(30, 42, 28));
-        paint.setTextSize(16f);
-        paint.setFakeBoldText(true);
-        drawCenteredText(canvas, String.valueOf(chainHistory.size()), bounds.right - 10f, bounds.top + 18f);
-        paint.setFakeBoldText(false);
+        chainHistoryRenderer.drawButton(canvas, walletButtonBounds(), chainHistory);
     }
 
     private void drawChainHistoryDialog(Canvas canvas) {
-        canvas.drawColor(Color.argb(166, 0, 0, 0));
-
-        RectF panel = chainHistoryDialogBounds();
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.argb(135, 0, 0, 0));
-        canvas.drawRoundRect(panel.left + 7f, panel.top + 9f, panel.right + 7f, panel.bottom + 9f, 18, 18, paint);
-        paint.setColor(Color.rgb(23, 45, 39));
-        canvas.drawRoundRect(panel, 18, 18, paint);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(4f);
-        paint.setColor(Color.rgb(92, 178, 114));
-        canvas.drawRoundRect(panel, 18, 18, paint);
-
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(190, 248, 188));
-        paint.setTextSize(32f);
-        paint.setFakeBoldText(true);
-        canvas.drawText("Riwayat transaksi", panel.left + 34f, panel.top + 52f, paint);
-        paint.setFakeBoldText(false);
-        paint.setColor(Color.rgb(202, 223, 207));
-        String mode = blockchainClient.hasGameApi()
-                ? "Gameplay lokal + signer Sepolia"
-                : "Gameplay lokal: signer belum diset";
-        float modeMaxWidth = chainHistory.isEmpty()
-                ? panel.width() - 138f
-                : chainHistoryDialogClearAllBounds().left - panel.left - 46f;
-        paint.setTextSize(fitTextSize(mode, 20f, Math.max(160f, modeMaxWidth)));
-        canvas.drawText(mode, panel.left + 34f, panel.top + 86f, paint);
-
-        if (!chainHistory.isEmpty()) {
-            drawChainHistoryClearAllButton(canvas, chainHistoryDialogClearAllBounds());
-        }
-        drawChainHistoryCloseButton(canvas, chainHistoryDialogCloseBounds());
-
-        if (chainHistory.isEmpty()) {
-            RectF empty = new RectF(panel.left + 30f, panel.top + 120f, panel.right - 30f, panel.bottom - 30f);
-            paint.setStyle(Paint.Style.FILL);
-            paint.setColor(Color.rgb(34, 61, 51));
-            canvas.drawRoundRect(empty, 12, 12, paint);
-            paint.setColor(Color.rgb(211, 228, 211));
-            paint.setTextSize(fitTextSize("Belum ada transaksi.", 22f, empty.width() - 40f));
-            drawCenteredText(canvas, "Belum ada transaksi.", empty.centerX(), empty.centerY() + 7f);
-            return;
-        }
-
-        int rows = visibleChainHistoryDialogRows();
-        for (int i = 0; i < rows; i++) {
-            drawChainHistoryRow(canvas, chainHistoryDialogRowBounds(i), chainHistory.get(i));
-        }
-
-        if (chainHistory.size() > rows) {
-            String more = "+" + (chainHistory.size() - rows) + " riwayat lain";
-            paint.setStyle(Paint.Style.FILL);
-            paint.setColor(Color.rgb(197, 218, 201));
-            paint.setTextSize(18f);
-            drawCenteredText(canvas, more, panel.centerX(), panel.bottom - 22f);
-        }
-    }
-
-    private void drawChainHistoryCloseButton(Canvas canvas, RectF close) {
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(43, 78, 61));
-        canvas.drawRoundRect(close, 12, 12, paint);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(5f);
-        paint.setColor(Color.rgb(213, 248, 211));
-        canvas.drawLine(close.left + 17f, close.top + 17f, close.right - 17f, close.bottom - 17f, paint);
-        canvas.drawLine(close.right - 17f, close.top + 17f, close.left + 17f, close.bottom - 17f, paint);
-        paint.setStyle(Paint.Style.FILL);
-    }
-
-    private void drawChainHistoryClearAllButton(Canvas canvas, RectF bounds) {
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.argb(72, 0, 0, 0));
-        canvas.drawRoundRect(bounds.left + 3f, bounds.top + 4f, bounds.right + 3f, bounds.bottom + 4f, 11, 11, paint);
-        paint.setColor(Color.rgb(105, 50, 42));
-        canvas.drawRoundRect(bounds, 11, 11, paint);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(3f);
-        paint.setColor(Color.rgb(229, 143, 117));
-        canvas.drawRoundRect(bounds, 11, 11, paint);
-
-        drawChainHistoryTrashIcon(canvas, bounds.left + 28f, bounds.centerY(), 0.82f, Color.rgb(255, 225, 200));
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(255, 238, 218));
-        paint.setTextSize(fitTextSize("Hapus semua", 18f, bounds.width() - 58f));
-        paint.setFakeBoldText(true);
-        canvas.drawText("Hapus semua", bounds.left + 52f, bounds.centerY() + 7f, paint);
-        paint.setFakeBoldText(false);
-    }
-
-    private void drawChainHistoryListIcon(Canvas canvas, float cx, float cy, boolean hasHash) {
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(hasHash ? Color.rgb(107, 224, 130) : Color.rgb(255, 219, 95));
-        canvas.drawCircle(cx, cy, 27f, paint);
-
-        int iconColor = Color.rgb(31, 49, 36);
-        RectF arc = new RectF(cx - 16f, cy - 16f, cx + 16f, cy + 16f);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(5f);
-        paint.setStrokeCap(Paint.Cap.ROUND);
-        paint.setColor(iconColor);
-        canvas.drawArc(arc, -210f, 285f, false, paint);
-        canvas.drawLine(cx + 14f, cy - 9f, cx + 14f, cy - 21f, paint);
-        canvas.drawLine(cx + 14f, cy - 9f, cx + 3f, cy - 9f, paint);
-
-        paint.setStrokeWidth(4f);
-        canvas.drawLine(cx, cy, cx, cy - 10f, paint);
-        canvas.drawLine(cx, cy, cx + 9f, cy + 5f, paint);
-        paint.setStrokeCap(Paint.Cap.BUTT);
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(iconColor);
-        canvas.drawCircle(cx, cy, 3.6f, paint);
-    }
-
-    private void drawChainHistoryRow(Canvas canvas, RectF row, ChainHistoryEntry entry) {
-        boolean hasHash = BlockchainClient.isValidTransactionHash(entry.txHash);
-        boolean sending = chainStatusContains(entry.status, "mengirim");
-        boolean waitingSync = chainStatusContains(entry.status, "belum sync")
-                || chainStatusContains(entry.status, "belum on-chain")
-                || chainStatusContains(entry.status, "butuh wallet")
-                || chainStatusContains(entry.status, "terkirim signer")
-                || chainStatusContains(entry.status, "tx hash");
-        boolean localSaved = chainStatusContains(entry.status, "lokal")
-                || chainStatusContains(entry.status, "tersimpan");
-        boolean failed = chainStatusContains(entry.status, "gagal");
-        RectF delete = chainHistoryRowDeleteBounds(row);
-        float textRight = hasHash ? delete.left - 52f : delete.left - 14f;
-        float textWidth = Math.max(120f, textRight - (row.left + 50f));
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(chainHistoryRowFillColor(hasHash, sending, waitingSync, localSaved, failed));
-        canvas.drawRoundRect(row, 10, 10, paint);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(3f);
-        paint.setColor(chainHistoryRowStrokeColor(hasHash, sending, waitingSync, localSaved, failed));
-        canvas.drawRoundRect(row, 10, 10, paint);
-
-        drawChainHistoryStateDot(canvas, row.left + 24f, row.top + 25f, hasHash, entry.status);
-
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(241, 252, 232));
-        paint.setFakeBoldText(true);
-        paint.setTextSize(fitTextSize(entry.label, 21f, textWidth));
-        canvas.drawText(entry.label, row.left + 50f, row.top + 27f, paint);
-
-        paint.setFakeBoldText(false);
-        paint.setColor(hasHash ? Color.rgb(181, 248, 188) : Color.rgb(203, 219, 207));
-        String status = hasHash ? "Sepolia " + BlockchainClient.shortTransactionHash(entry.txHash) : entry.status;
-        paint.setTextSize(fitTextSize(status, 16f, textWidth));
-        canvas.drawText(status, row.left + 50f, row.top + 54f, paint);
-
-        if (hasHash) {
-            drawExternalLinkIcon(canvas, delete.left - 28f, row.centerY());
-        }
-        drawChainHistoryDeleteButton(canvas, delete);
-    }
-
-    private void drawChainHistoryDeleteButton(Canvas canvas, RectF bounds) {
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(92, 46, 40));
-        canvas.drawRoundRect(bounds, 9, 9, paint);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(2.5f);
-        paint.setColor(Color.rgb(218, 119, 101));
-        canvas.drawRoundRect(bounds, 9, 9, paint);
-        drawChainHistoryTrashIcon(canvas, bounds.centerX(), bounds.centerY(), 0.76f, Color.rgb(255, 225, 207));
-    }
-
-    private void drawChainHistoryTrashIcon(Canvas canvas, float cx, float cy, float scale, int color) {
-        float w = 22f * scale;
-        float h = 22f * scale;
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(3.2f * scale);
-        paint.setStrokeCap(Paint.Cap.ROUND);
-        paint.setStrokeJoin(Paint.Join.ROUND);
-        paint.setColor(color);
-        canvas.drawLine(cx - w * 0.50f, cy - h * 0.38f, cx + w * 0.50f, cy - h * 0.38f, paint);
-        canvas.drawLine(cx - w * 0.16f, cy - h * 0.56f, cx + w * 0.16f, cy - h * 0.56f, paint);
-        canvas.drawRoundRect(cx - w * 0.36f, cy - h * 0.26f, cx + w * 0.36f, cy + h * 0.50f, 2.5f, 2.5f, paint);
-        canvas.drawLine(cx - w * 0.12f, cy - h * 0.10f, cx - w * 0.12f, cy + h * 0.30f, paint);
-        canvas.drawLine(cx + w * 0.12f, cy - h * 0.10f, cx + w * 0.12f, cy + h * 0.30f, paint);
-        paint.setStrokeCap(Paint.Cap.BUTT);
-        paint.setStrokeJoin(Paint.Join.MITER);
-        paint.setStyle(Paint.Style.FILL);
-    }
-
-    private int chainHistoryRowFillColor(boolean hasHash, boolean sending, boolean waitingSync, boolean localSaved, boolean failed) {
-        if (hasHash) {
-            return Color.rgb(33, 78, 58);
-        }
-        if (failed) {
-            return Color.rgb(74, 49, 45);
-        }
-        if (sending) {
-            return Color.rgb(61, 66, 42);
-        }
-        if (waitingSync) {
-            return Color.rgb(67, 58, 39);
-        }
-        if (localSaved) {
-            return Color.rgb(39, 70, 61);
-        }
-        return Color.rgb(44, 63, 53);
-    }
-
-    private int chainHistoryRowStrokeColor(boolean hasHash, boolean sending, boolean waitingSync, boolean localSaved, boolean failed) {
-        if (hasHash) {
-            return Color.rgb(102, 207, 123);
-        }
-        if (failed) {
-            return Color.rgb(218, 119, 101);
-        }
-        if (sending) {
-            return Color.rgb(235, 201, 93);
-        }
-        if (waitingSync) {
-            return Color.rgb(219, 167, 81);
-        }
-        if (localSaved) {
-            return Color.rgb(104, 183, 156);
-        }
-        return Color.rgb(83, 116, 92);
-    }
-
-    private void drawChainHistoryStateDot(Canvas canvas, float cx, float cy, boolean hasHash, String status) {
-        paint.setStyle(Paint.Style.FILL);
-        if (hasHash) {
-            paint.setColor(Color.rgb(105, 224, 129));
-        } else if (chainStatusContains(status, "gagal")) {
-            paint.setColor(Color.rgb(232, 105, 88));
-        } else if (chainStatusContains(status, "mengirim")) {
-            paint.setColor(Color.rgb(255, 216, 89));
-        } else if (chainStatusContains(status, "belum") || chainStatusContains(status, "butuh")) {
-            paint.setColor(Color.rgb(245, 166, 72));
-        } else if (chainStatusContains(status, "lokal") || chainStatusContains(status, "tersimpan")) {
-            paint.setColor(Color.rgb(104, 216, 181));
-        } else {
-            paint.setColor(Color.rgb(157, 184, 165));
-        }
-        canvas.drawCircle(cx, cy, 6f, paint);
-    }
-
-    private boolean hasUnsyncedChainHistory() {
-        for (ChainHistoryEntry entry : chainHistory) {
-            if (!BlockchainClient.isValidTransactionHash(entry.txHash)
-                    && !chainStatusContains(entry.status, "on-chain")) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static boolean chainStatusContains(String status, String needle) {
-        return status != null && status.toLowerCase(Locale.US).contains(needle);
+        chainHistoryRenderer.drawDialog(canvas, getWidth(), getHeight(), chainHistory, blockchainClient.hasGameApi());
     }
 
     private RectF chainHistoryButtonBounds() {
-        RectF wallet = walletButtonBounds();
-        float top = wallet.bottom + 8f;
-        float size = 86f;
-        return new RectF(wallet.right - size, top, wallet.right, top + size);
+        return chainHistoryRenderer.buttonBounds(walletButtonBounds());
     }
 
     private RectF chainHistoryDialogBounds() {
-        int desiredRows = Math.min(CHAIN_HISTORY_LIMIT, chainHistory.size());
-        float desiredWidth = clamp(getWidth() * 0.78f, 740f, 1060f);
-        float width = Math.min(getWidth() - 40f, desiredWidth);
-        float desiredHeight = chainHistory.isEmpty() ? 304f : 180f + desiredRows * 78f;
-        float maxHeight = Math.max(220f, getHeight() - 54f);
-        float height = Math.min(desiredHeight, maxHeight);
-        float left = (getWidth() - width) * 0.5f;
-        float top = (getHeight() - height) * 0.5f;
-        return new RectF(left, top, left + width, top + height);
+        return chainHistoryRenderer.dialogBounds(getWidth(), getHeight(), chainHistory.size());
     }
 
     private RectF chainHistoryDialogCloseBounds() {
-        RectF panel = chainHistoryDialogBounds();
-        return new RectF(panel.right - 82f, panel.top + 24f, panel.right - 30f, panel.top + 76f);
+        return chainHistoryRenderer.dialogCloseBounds(getWidth(), getHeight(), chainHistory.size());
     }
 
     private RectF chainHistoryDialogClearAllBounds() {
-        RectF panel = chainHistoryDialogBounds();
-        float width = Math.min(158f, Math.max(122f, panel.width() * 0.23f));
-        return new RectF(panel.right - width - 98f, panel.top + 27f, panel.right - 98f, panel.top + 73f);
+        return chainHistoryRenderer.dialogClearAllBounds(getWidth(), getHeight(), chainHistory.size());
     }
 
     private RectF chainHistoryDialogRowBounds(int rowIndex) {
-        RectF panel = chainHistoryDialogBounds();
-        float left = panel.left + 30f;
-        float top = panel.top + 132f + rowIndex * 78f;
-        return new RectF(left, top, panel.right - 30f, top + 66f);
+        return chainHistoryRenderer.dialogRowBounds(rowIndex, getWidth(), getHeight(), chainHistory.size());
     }
 
     private RectF chainHistoryRowDeleteBounds(int rowIndex) {
-        return chainHistoryRowDeleteBounds(chainHistoryDialogRowBounds(rowIndex));
-    }
-
-    private RectF chainHistoryRowDeleteBounds(RectF row) {
-        float size = 44f;
-        float left = row.right - size - 12f;
-        float top = row.centerY() - size * 0.5f;
-        return new RectF(left, top, left + size, top + size);
+        return chainHistoryRenderer.rowDeleteBounds(rowIndex, getWidth(), getHeight(), chainHistory.size());
     }
 
     private int visibleChainHistoryDialogRows() {
-        if (chainHistory.isEmpty()) {
-            return 0;
-        }
-        RectF panel = chainHistoryDialogBounds();
-        int rowsByHeight = Math.max(1, (int) ((panel.height() - 154f) / 78f));
-        return Math.min(Math.min(CHAIN_HISTORY_LIMIT, chainHistory.size()), rowsByHeight);
-    }
-
-    private String walletSubtitle() {
-        if (checkingChain) {
-            return "sync Sepolia...";
-        }
-        if (isConnectedWalletBackendSigner()) {
-            return "ganti wallet pemain";
-        }
-        if (!walletNativeBalance.isEmpty()) {
-            return "Sepolia ETH " + compactEth(walletNativeBalance);
-        }
-        return "tap untuk ganti/sync";
-    }
-
-    private void drawWalletHudIcon(Canvas canvas, float cx, float cy, boolean connected, boolean signerWallet) {
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(signerWallet ? Color.rgb(255, 225, 118) : connected ? Color.rgb(112, 224, 132) : Color.rgb(244, 208, 87));
-        canvas.drawCircle(cx, cy, 23f, paint);
-        paint.setColor(Color.rgb(33, 47, 32));
-        canvas.drawRoundRect(cx - 15f, cy - 11f, cx + 16f, cy + 12f, 5, 5, paint);
-        paint.setColor(Color.rgb(240, 246, 228));
-        canvas.drawRect(cx - 10f, cy - 4f, cx + 11f, cy + 0f, paint);
-        if (signerWallet) {
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(4f);
-            paint.setColor(Color.rgb(111, 61, 23));
-            canvas.drawLine(cx - 12f, cy + 14f, cx + 12f, cy + 14f, paint);
-            paint.setStyle(Paint.Style.FILL);
-        }
-        paint.setColor(signerWallet ? Color.rgb(207, 126, 35) : connected ? Color.rgb(69, 170, 83) : Color.rgb(193, 138, 36));
-        canvas.drawCircle(cx + 15f, cy - 15f, 6f, paint);
-    }
-
-    private void drawContextMessage(Canvas canvas, long now) {
-        String text = contextText(now);
-        if (text.isEmpty()) {
-            return;
-        }
-        paint.setTextSize(20f);
-        float textW = paint.measureText(text);
-        float x = (getWidth() - textW) / 2f;
-        float y = getHeight() - 28f;
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.argb(190, 23, 21, 18));
-        canvas.drawRoundRect(x - 16, y - 30, x + textW + 16, y + 10, 8, 8, paint);
-        paint.setColor(Color.WHITE);
-        canvas.drawText(text, x, y, paint);
+        return chainHistoryRenderer.visibleDialogRows(getWidth(), getHeight(), chainHistory.size());
     }
 
     private String contextText(long now) {
@@ -3002,104 +2212,38 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void drawShopPanel(Canvas canvas) {
-        float w = 360;
-        float h = 186;
-        float x = (getWidth() - w) / 2f;
-        float y = 84;
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.argb(230, 52, 34, 21));
-        canvas.drawRoundRect(x, y, x + w, y + h, 10, 10, paint);
-        paint.setColor(Color.rgb(255, 226, 88));
-        paint.setTextSize(24f);
-        paint.setFakeBoldText(true);
-        canvas.drawText("Toko Aset", x + 22, y + 38, paint);
-        paint.setFakeBoldText(false);
-        paint.setColor(Color.WHITE);
-        String shopLine = "SHOP: pilih benih, bayar pakai Game Coin";
-        String landLine = "Lahan: beli " + LAND_BUY_PRICE + ", jual kosong +" + LAND_SELL_PRICE + " coin";
-        String harvestLine = "Rumah Jual: panen -> Game Coin (1 = " + HARVEST_SELL_PRICE + ")";
-        String swapLine = "Rumah Swap: ETH Sepolia -> Game Coin, atau coin -> Sepolia";
-        paint.setTextSize(fitTextSize(shopLine, 19f, w - 44f));
-        canvas.drawText(shopLine, x + 22, y + 78, paint);
-        paint.setTextSize(fitTextSize(landLine, 19f, w - 44f));
-        canvas.drawText(landLine, x + 22, y + 108, paint);
-        paint.setTextSize(fitTextSize(harvestLine, 19f, w - 44f));
-        canvas.drawText(harvestLine, x + 22, y + 138, paint);
-        paint.setTextSize(fitTextSize(swapLine, 19f, w - 44f));
-        canvas.drawText(swapLine, x + 22, y + 168, paint);
+        hudRenderer.drawShopPanel(canvas, getWidth(), LAND_BUY_PRICE, LAND_SELL_PRICE, HARVEST_SELL_PRICE);
     }
 
     private void drawChainPanel(Canvas canvas, long now) {
-        RectF panel = chainPanelBounds(now);
         boolean signerWallet = isConnectedWalletBackendSigner();
-        float w = panel.width();
-        float x = panel.left;
-        float y = panel.top;
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.argb(235, 18, 34, 30));
-        canvas.drawRoundRect(panel, 10, 10, paint);
-        paint.setColor(signerWallet ? Color.rgb(255, 218, 98) : Color.rgb(152, 239, 176));
-        paint.setTextSize(23f);
-        paint.setFakeBoldText(true);
-        canvas.drawText(signerWallet ? "Sepolia Blockchain - Wallet Signer" : "Sepolia Blockchain", x + 22, y + 38, paint);
-        paint.setFakeBoldText(false);
-        paint.setColor(Color.WHITE);
-        paint.setTextSize(18f);
-        paint.setTextSize(fitTextSize(chainStatus, 18f, w - 44f));
-        canvas.drawText(chainStatus, x + 22, y + 72, paint);
-        paint.setTextSize(18f);
         String walletLine = "Wallet: " + (walletAddress.isEmpty() ? "belum diset" : shortAddress(walletAddress))
                 + (signerWallet ? " (signer backend)" : "");
-        paint.setTextSize(fitTextSize(walletLine, 18f, w - 44f));
-        canvas.drawText(walletLine, x + 22, y + 102, paint);
         String balanceLine = "Game Coin " + gameState.coins
                 + (walletNativeBalance.isEmpty() ? "" : " | Sepolia ETH " + compactEth(walletNativeBalance))
                 + (walletTaniBalanceAvailable ? " | TANI " + walletTaniBalance : "");
-        paint.setTextSize(fitTextSize(balanceLine, 18f, w - 44f));
-        canvas.drawText(balanceLine, x + 22, y + 132, paint);
-        paint.setTextSize(fitTextSize(chainModeText(), 17f, w - 44f));
-        canvas.drawText(chainModeText(), x + 22, y + 162, paint);
-
-        paint.setColor(signerWallet ? Color.rgb(255, 198, 91) : Color.rgb(255, 219, 95));
         String nextAction = signerWallet
                 ? "Payout ETH diblokir. Tap wallet untuk ganti wallet pemain."
                 : pendingChainActions.isEmpty()
                 ? "Tidak ada sync chain berjalan."
                 : "Sync berikutnya: " + pendingChainActions.get(0).label();
-        paint.setTextSize(fitTextSize(nextAction, 18f, w - 44f));
-        canvas.drawText(nextAction, x + 22, y + 194, paint);
-        paint.setColor(Color.rgb(210, 225, 216));
         String footnote = signerWallet
                 ? "Gunakan public wallet pemain, bukan wallet deployer/backend."
                 : "Gameplay tetap tersimpan lokal saat signer tidak reachable.";
-        paint.setTextSize(fitTextSize(footnote, 18f, w - 44f));
-        canvas.drawText(footnote, x + 22, y + 220, paint);
-    }
-
-    private RectF chainPanelBounds(long now) {
-        float w = Math.min(getWidth() - 44f, 620f);
-        float h = 232f;
-        float x = (getWidth() - w) * 0.5f;
-        float y = 78f;
-        if (isStatusPopupVisible(now)) {
-            y = statusPopupBounds().bottom + 18f;
-        }
-        float maxY = Math.max(78f, getHeight() - h - 82f);
-        y = Math.min(y, maxY);
-        return new RectF(x, y, x + w, y + h);
-    }
-
-    private String chainModeText() {
-        if (blockchainClient.hasCoinContract() && blockchainClient.hasGameApi()) {
-            return "Mode sinkron: game tersimpan lokal, signer mencoba kirim on-chain.";
-        }
-        if (blockchainClient.hasCoinContract()) {
-            return "Saldo wallet terbaca via RPC; aksi game tersimpan lokal sampai signer diset.";
-        }
-        if (blockchainClient.hasGameApi()) {
-            return "Signer diset; contract TANI belum diset, coin masih lokal.";
-        }
-        return "Mode lokal: contract/API belum diisi di .env, aksi belum on-chain.";
+        hudRenderer.drawChainPanel(
+                canvas,
+                getWidth(),
+                getHeight(),
+                isStatusPopupVisible(now),
+                statusPopupBounds(),
+                signerWallet,
+                chainStatus,
+                walletLine,
+                balanceLine,
+                blockchainClient.hasCoinContract(),
+                blockchainClient.hasGameApi(),
+                nextAction,
+                footnote);
     }
 
     private void drawInteractionDialog(Canvas canvas, long now) {
@@ -4265,7 +3409,7 @@ final class FarmGameView extends CanvasGameView {
 
     private void clearChainHistory() {
         chainHistory.clear();
-        saveChainHistory();
+        chainHistoryStore.save(chainHistory);
         showMessage("Semua riwayat transaksi dihapus.");
         invalidate();
     }
@@ -4275,7 +3419,7 @@ final class FarmGameView extends CanvasGameView {
             return;
         }
         chainHistory.remove(index);
-        saveChainHistory();
+        chainHistoryStore.save(chainHistory);
         showMessage("Riwayat transaksi dihapus.");
         invalidate();
     }
@@ -4436,7 +3580,7 @@ final class FarmGameView extends CanvasGameView {
         return gameState.swapTarget == SWAP_TARGET_ETH ? "ETH" : "TANI";
     }
 
-    private String selectedSwapOutputText() {
+    String selectedSwapOutputText() {
         if (selectedSwapFromAsset() == SWAP_ASSET_ETH) {
             return selectedSwapInputAmount() + " Game Coin";
         }
@@ -4450,7 +3594,7 @@ final class FarmGameView extends CanvasGameView {
         return String.valueOf(selectedSwapInputAmount());
     }
 
-    private int selectedSwapInputAmount() {
+    int selectedSwapInputAmount() {
         int maxAmount = maxSwapCoinAmount();
         if (maxAmount <= 0) {
             return 0;
@@ -4471,7 +3615,7 @@ final class FarmGameView extends CanvasGameView {
         saveGameState();
     }
 
-    private int maxSwapCoinAmount() {
+    int maxSwapCoinAmount() {
         if (selectedSwapFromAsset() == SWAP_ASSET_ETH) {
             return maxEthFundingCoins();
         }
@@ -4506,7 +3650,7 @@ final class FarmGameView extends CanvasGameView {
         return gameState.swapTarget == SWAP_TARGET_ETH ? SWAP_ASSET_ETH : SWAP_ASSET_TANI;
     }
 
-    private int selectedSwapFromAsset() {
+    int selectedSwapFromAsset() {
         return gameState.swapFromAsset == SWAP_ASSET_ETH ? SWAP_ASSET_ETH : SWAP_ASSET_COIN;
     }
 
@@ -4857,10 +4001,7 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private RectF walletButtonBounds() {
-        float right = getWidth() - 20f;
-        float top = topMenuTop() + topMenuButtonSize() + 14f;
-        float width = clamp(getWidth() * 0.28f, 292f, 360f);
-        return new RectF(right - width, top, right, top + 72f);
+        return hudRenderer.walletButtonBounds(getWidth(), topMenuTop(), topMenuButtonSize());
     }
 
     private RectF interactionDialogPanelBounds() {
@@ -5250,713 +4391,43 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void openSwapAmountDialog() {
-        if (selectedSwapFromAsset() == SWAP_ASSET_COIN && gameState.coins <= 0) {
-            showErrorMessage("Coin belum ada untuk diswap.");
-            return;
-        }
-        if (selectedSwapFromAsset() == SWAP_ASSET_ETH && walletAddress.isEmpty()) {
-            showErrorMessage("Connect wallet dulu sebelum isi Game Coin dari Sepolia.");
-            performWallet();
-            return;
-        }
-        if (selectedSwapFromAsset() == SWAP_ASSET_ETH && walletNativeBalance.isEmpty()) {
-            refreshWalletState(true);
-            showErrorMessage("Sync saldo ETH Sepolia dulu.");
-            return;
-        }
-        if (maxSwapCoinAmount() <= 0) {
-            showErrorMessage(selectedSwapFromAsset() == SWAP_ASSET_ETH
-                    ? "Saldo ETH Sepolia belum cukup."
-                    : "Coin belum ada untuk diswap.");
-            return;
-        }
-        Context context = getContext();
-        if (!(context instanceof Activity)) {
-            return;
-        }
-
-        Dialog dialog = new Dialog(context);
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-
-        boolean compactForKeyboard = getWidth() > getHeight();
-
-        LinearLayout root = new LinearLayout(context);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(
-                dp(context, compactForKeyboard ? 10 : 30),
-                dp(context, compactForKeyboard ? 8 : 26),
-                dp(context, compactForKeyboard ? 10 : 30),
-                dp(context, compactForKeyboard ? 8 : 24));
-        root.setBackground(roundedStrokeDrawable(
-                Color.rgb(116, 55, 22),
-                dp(context, 18),
-                Color.rgb(70, 39, 13),
-                dp(context, 4)));
-
-        TextView title = new TextView(context);
-        title.setText("Jumlah Swap");
-        title.setTextColor(Color.rgb(255, 224, 84));
-        title.setTextSize(compactForKeyboard ? 18f : 24f);
-        title.setTypeface(null, android.graphics.Typeface.BOLD);
-
-        TextView body = new TextView(context);
-        String balanceText = selectedSwapFromAsset() == SWAP_ASSET_ETH
-                ? "Saldo ETH Sepolia: " + compactEth(walletNativeBalance) + " ETH"
-                : "Saldo Game Coin: " + gameState.coins + " coin";
-        body.setText(balanceText);
-        body.setTextColor(Color.rgb(255, 238, 211));
-        body.setTextSize(compactForKeyboard ? 11f : 16f);
-
-        TextView route = new TextView(context);
-        String routeText = selectedSwapFromAsset() == SWAP_ASSET_ETH
-                ? "Isi Game Coin: " + selectedSwapOutputText()
-                : "Estimasi: " + selectedSwapOutputText();
-        route.setText(routeText);
-        route.setTextColor(Color.rgb(245, 194, 124));
-        route.setTextSize(compactForKeyboard ? 11f : 14f);
-        route.setPadding(dp(context, compactForKeyboard ? 10 : 16), 0, dp(context, compactForKeyboard ? 10 : 16), 0);
-        route.setGravity(Gravity.CENTER);
-        route.setSingleLine(true);
-        route.setEllipsize(TextUtils.TruncateAt.END);
-        route.setBackground(roundedStrokeDrawable(
-                Color.rgb(82, 39, 17),
-                dp(context, 11),
-                Color.rgb(145, 77, 30),
-                dp(context, 2)));
-
-        final EditText input = new EditText(context);
-        input.setSingleLine(true);
-        input.setInputType(InputType.TYPE_CLASS_NUMBER);
-        input.setImeOptions(EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
-        input.setText(String.valueOf(selectedSwapInputAmount()));
-        input.setSelectAllOnFocus(false);
-        input.setTextColor(Color.rgb(255, 240, 212));
-        input.setHint("Jumlah Game Coin");
-        input.setHintTextColor(Color.rgb(190, 151, 124));
-        input.setTextSize(compactForKeyboard ? 18f : 24f);
-        input.setGravity(Gravity.CENTER);
-        input.setPadding(dp(context, compactForKeyboard ? 12 : 16), 0, dp(context, compactForKeyboard ? 12 : 16), 0);
-        input.setBackground(roundedStrokeDrawable(
-                Color.rgb(60, 32, 18),
-                dp(context, 12),
-                Color.rgb(255, 200, 65),
-                dp(context, 3)));
-
-        LinearLayout actions = new LinearLayout(context);
-        actions.setGravity(Gravity.CENTER);
-        actions.setPadding(0, dp(context, compactForKeyboard ? 0 : 22), 0, 0);
-        Button close = walletDialogButton(context, "Batal", Color.rgb(100, 54, 28), Color.rgb(255, 238, 211));
-        Button save = walletDialogButton(context, "Pakai", Color.rgb(207, 119, 35), Color.WHITE);
-        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(
-                dp(context, compactForKeyboard ? 92 : 118),
-                dp(context, compactForKeyboard ? 38 : 48));
-        closeParams.rightMargin = dp(context, compactForKeyboard ? 7 : 12);
-        actions.addView(close, closeParams);
-        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(
-                dp(context, compactForKeyboard ? 94 : 126),
-                dp(context, compactForKeyboard ? 38 : 48));
-        saveParams.leftMargin = dp(context, compactForKeyboard ? 7 : 12);
-        actions.addView(save, saveParams);
-
-        if (compactForKeyboard) {
-            LinearLayout header = new LinearLayout(context);
-            header.setOrientation(LinearLayout.HORIZONTAL);
-            header.setGravity(Gravity.CENTER_VERTICAL);
-
-            LinearLayout headerText = new LinearLayout(context);
-            headerText.setOrientation(LinearLayout.VERTICAL);
-            headerText.addView(title, new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT));
-
-            TextView summary = new TextView(context);
-            summary.setText(balanceText + " | " + routeText);
-            summary.setTextColor(Color.rgb(255, 238, 211));
-            summary.setTextSize(10.5f);
-            summary.setSingleLine(true);
-            summary.setEllipsize(TextUtils.TruncateAt.END);
-            headerText.addView(summary, new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT));
-
-            LinearLayout.LayoutParams headerTextParams = new LinearLayout.LayoutParams(
-                    0,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    1f);
-            header.addView(headerText, headerTextParams);
-
-            LinearLayout.LayoutParams routeParams = new LinearLayout.LayoutParams(
-                    dp(context, 270),
-                    dp(context, 32));
-            routeParams.leftMargin = dp(context, 12);
-            header.addView(route, routeParams);
-            root.addView(header, new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT));
-
-            LinearLayout inputRow = new LinearLayout(context);
-            inputRow.setOrientation(LinearLayout.HORIZONTAL);
-            inputRow.setGravity(Gravity.CENTER_VERTICAL);
-            inputRow.setPadding(0, dp(context, 7), 0, 0);
-            inputRow.addView(input, new LinearLayout.LayoutParams(
-                    0,
-                    dp(context, 38),
-                    1f));
-            LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT);
-            actionsParams.leftMargin = dp(context, 10);
-            inputRow.addView(actions, actionsParams);
-            root.addView(inputRow, new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT));
-        } else {
-            root.addView(title);
-            body.setPadding(0, dp(context, 12), 0, dp(context, 10));
-            root.addView(body);
-            LinearLayout.LayoutParams routeParams = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    dp(context, 44));
-            routeParams.bottomMargin = dp(context, 14);
-            root.addView(route, routeParams);
-            root.addView(input, new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    dp(context, 58)));
-            root.addView(actions, new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT));
-        }
-
-        close.setOnClickListener(v -> dialog.dismiss());
-        save.setOnClickListener(v -> applySwapAmountInput(input, dialog));
-        input.setOnEditorActionListener((v, actionId, event) -> {
-            boolean enter = event != null
-                    && event.getAction() == KeyEvent.ACTION_UP
-                    && event.getKeyCode() == KeyEvent.KEYCODE_ENTER;
-            if (actionId == EditorInfo.IME_ACTION_DONE || enter) {
-                return applySwapAmountInput(input, dialog);
-            }
-            return false;
-        });
-
-        dialog.setContentView(root);
-        dialog.show();
-        Window dialogWindow = dialog.getWindow();
-        if (dialogWindow != null) {
-            dialogWindow.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            WindowManager.LayoutParams params = dialogWindow.getAttributes();
-            params.dimAmount = 0.62f;
-            dialogWindow.setAttributes(params);
-            dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-            dialogWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
-                    | (compactForKeyboard
-                    ? WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
-                    : WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE));
-            int maxDialogWidth = Math.max(1, getWidth() - dp(context, 32));
-            int desiredDialogWidth = (int) (compactForKeyboard
-                    ? clamp(getWidth() * 0.66f, 900f, 1280f)
-                    : clamp(getWidth() * 0.44f, 760f, 980f));
-            if (compactForKeyboard) {
-                dialogWindow.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-                params = dialogWindow.getAttributes();
-                params.y = dp(context, 4);
-                dialogWindow.setAttributes(params);
-            }
-            dialogWindow.setLayout(
-                    Math.min(maxDialogWidth, desiredDialogWidth),
-                    WindowManager.LayoutParams.WRAP_CONTENT);
-        }
-        input.requestFocus();
-        input.setSelection(input.getText().length());
+        swapAmountDialogController.open();
     }
 
-    private boolean applySwapAmountInput(EditText input, Dialog dialog) {
-        String raw = input.getText().toString().trim();
-        int amount;
-        try {
-            long parsed = Long.parseLong(raw);
-            if (parsed <= 0L || parsed > Integer.MAX_VALUE) {
-                throw new NumberFormatException("range");
-            }
-            amount = (int) parsed;
-        } catch (NumberFormatException exception) {
-            showErrorMessage("Jumlah swap tidak valid.");
-            return true;
-        }
-        gameState.swapAmount = clampInt(amount, 1, maxSwapCoinAmount());
-        saveGameState();
-        showMessage("Jumlah swap: " + gameState.swapAmount + " coin");
-        dialog.dismiss();
-        invalidate();
-        return true;
-    }
-
-    private void performWallet() {
-        Context context = getContext();
-        if (!(context instanceof Activity)) {
-            return;
-        }
-        boolean connected = !walletAddress.isEmpty();
-        boolean signerWallet = isConnectedWalletBackendSigner();
-        boolean compactForLandscape = getWidth() > getHeight();
-
-        Dialog dialog = new Dialog(context);
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-
-        LinearLayout root = new LinearLayout(context);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(
-                dp(context, compactForLandscape ? 24 : 30),
-                dp(context, compactForLandscape ? 18 : 28),
-                dp(context, compactForLandscape ? 24 : 30),
-                dp(context, compactForLandscape ? 18 : 24));
-        root.setBackground(roundedStrokeDrawable(
-                signerWallet ? Color.rgb(64, 46, 26) : Color.rgb(55, 37, 24),
-                dp(context, 18),
-                signerWallet ? Color.rgb(255, 192, 82) : Color.rgb(173, 91, 31),
-                dp(context, 3)));
-
-        LinearLayout header = new LinearLayout(context);
-        header.setOrientation(LinearLayout.HORIZONTAL);
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        TextView icon = new TextView(context);
-        icon.setText("W");
-        icon.setTextColor(Color.rgb(52, 42, 23));
-        icon.setTextSize(18f);
-        icon.setGravity(Gravity.CENTER);
-        icon.setTypeface(null, android.graphics.Typeface.BOLD);
-        icon.setBackground(roundedDrawable(signerWallet ? Color.rgb(255, 222, 112) : Color.rgb(244, 204, 72), dp(context, 11)));
-        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(context, 38), dp(context, 38));
-        header.addView(icon, iconParams);
-
-        LinearLayout titleBlock = new LinearLayout(context);
-        titleBlock.setOrientation(LinearLayout.VERTICAL);
-        titleBlock.setPadding(dp(context, 14), 0, 0, 0);
-        TextView title = new TextView(context);
-        title.setText(connected ? "Ganti Wallet" : "Connect Wallet");
-        title.setTextColor(signerWallet ? Color.rgb(255, 226, 117) : Color.rgb(255, 230, 158));
-        title.setTextSize(compactForLandscape ? 24f : 26f);
-        title.setTypeface(null, android.graphics.Typeface.BOLD);
-        TextView network = new TextView(context);
-        network.setText(signerWallet ? "Wallet signer backend" : connected ? "Sepolia wallet aktif" : "Sepolia network");
-        network.setTextColor(signerWallet ? Color.rgb(255, 197, 105) : Color.rgb(155, 220, 164));
-        network.setTextSize(compactForLandscape ? 14f : 15f);
-        titleBlock.addView(title);
-        titleBlock.addView(network);
-        header.addView(titleBlock, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        root.addView(header);
-
-        TextView body = new TextView(context);
-        body.setText(walletDialogBodyText());
-        body.setTextColor(Color.rgb(237, 223, 200));
-        body.setTextSize(compactForLandscape ? 14.5f : 17f);
-        body.setPadding(0, dp(context, compactForLandscape ? 14 : 20), 0, dp(context, compactForLandscape ? 12 : 18));
-        if (compactForLandscape) {
-            body.setMaxLines(4);
-            body.setEllipsize(TextUtils.TruncateAt.END);
-        }
-        root.addView(body);
-
-        TextView connectLabel = new TextView(context);
-        connectLabel.setText("Connect dari wallet app");
-        connectLabel.setTextColor(Color.rgb(255, 224, 139));
-        connectLabel.setTextSize(compactForLandscape ? 13f : 15f);
-        connectLabel.setTypeface(null, android.graphics.Typeface.BOLD);
-        connectLabel.setPadding(0, 0, 0, dp(context, 8));
-        root.addView(connectLabel);
-
-        LinearLayout walletActions = new LinearLayout(context);
-        walletActions.setOrientation(LinearLayout.HORIZONTAL);
-        walletActions.setGravity(Gravity.CENTER_VERTICAL);
-        Button connectMetaMask = walletDialogButton(context, "MetaMask", Color.rgb(38, 112, 73), Color.WHITE);
-        Button connectBrowser = walletDialogButton(context, "Browser", Color.rgb(95, 73, 132), Color.WHITE);
-        Button pasteAddress = walletDialogButton(context, "Tempel", Color.rgb(111, 78, 43), Color.rgb(255, 238, 211));
-        LinearLayout.LayoutParams walletActionParams = new LinearLayout.LayoutParams(
-                0,
-                dp(context, compactForLandscape ? 40 : 46),
-                1f);
-        walletActions.addView(connectMetaMask, walletActionParams);
-        LinearLayout.LayoutParams walletActionMidParams = new LinearLayout.LayoutParams(
-                0,
-                dp(context, compactForLandscape ? 40 : 46),
-                1f);
-        walletActionMidParams.leftMargin = dp(context, 10);
-        walletActions.addView(connectBrowser, walletActionMidParams);
-        LinearLayout.LayoutParams walletActionLastParams = new LinearLayout.LayoutParams(
-                0,
-                dp(context, compactForLandscape ? 40 : 46),
-                1f);
-        walletActionLastParams.leftMargin = dp(context, 10);
-        walletActions.addView(pasteAddress, walletActionLastParams);
-        root.addView(walletActions, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
-
-        TextView fallbackLabel = new TextView(context);
-        fallbackLabel.setText("Fallback public address");
-        fallbackLabel.setTextColor(Color.rgb(197, 178, 148));
-        fallbackLabel.setTextSize(compactForLandscape ? 12f : 13.5f);
-        fallbackLabel.setPadding(0, dp(context, compactForLandscape ? 10 : 14), 0, dp(context, 6));
-        if (!compactForLandscape) {
-            root.addView(fallbackLabel);
-        }
-
-        final EditText input = new EditText(context);
-        input.setSingleLine(true);
-        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        input.setImeOptions(EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
-        input.setHint("0x wallet address Sepolia");
-        input.setText(walletAddress);
-        input.setSelectAllOnFocus(false);
-        input.setTextColor(Color.WHITE);
-        input.setHintTextColor(Color.rgb(185, 164, 138));
-        input.setTextSize(compactForLandscape ? 16f : 18f);
-        input.setPadding(dp(context, 16), 0, dp(context, 16), 0);
-        input.setBackground(roundedStrokeDrawable(
-                Color.rgb(38, 30, 24),
-                dp(context, 10),
-                Color.rgb(130, 85, 43),
-                dp(context, 2)));
-        if (!compactForLandscape) {
-            root.addView(input, new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    dp(context, 54)));
-        }
-
-        LinearLayout actions = new LinearLayout(context);
-        actions.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-        actions.setPadding(0, dp(context, compactForLandscape ? 14 : 24), 0, 0);
-        Button close = walletDialogButton(context, "Tutup", Color.rgb(91, 64, 40), Color.rgb(239, 220, 191));
-        Button sync = walletDialogButton(context, "Sync", Color.rgb(43, 108, 72), Color.WHITE);
-        Button save = walletDialogButton(context, compactForLandscape ? "Manual" : connected ? "Ganti" : "Simpan", Color.rgb(214, 129, 39), Color.WHITE);
-        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(
-                dp(context, compactForLandscape ? 88 : 108),
-                dp(context, compactForLandscape ? 42 : 48));
-        closeParams.leftMargin = dp(context, compactForLandscape ? 8 : 10);
-        actions.addView(close, closeParams);
-        if (connected) {
-            LinearLayout.LayoutParams syncParams = new LinearLayout.LayoutParams(
-                    dp(context, compactForLandscape ? 92 : 108),
-                    dp(context, compactForLandscape ? 42 : 48));
-            syncParams.leftMargin = dp(context, compactForLandscape ? 8 : 10);
-            actions.addView(sync, syncParams);
-        }
-        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(
-                dp(context, compactForLandscape ? 100 : 126),
-                dp(context, compactForLandscape ? 42 : 48));
-        saveParams.leftMargin = dp(context, compactForLandscape ? 8 : 10);
-        actions.addView(save, saveParams);
-        root.addView(actions);
-
-        close.setOnClickListener(v -> dialog.dismiss());
-        connectMetaMask.setOnClickListener(v -> openWalletConnectPage(dialog, true));
-        connectBrowser.setOnClickListener(v -> openWalletConnectPage(dialog, false));
-        pasteAddress.setOnClickListener(v -> pasteWalletAddressFromClipboard(input, dialog, compactForLandscape));
-        sync.setOnClickListener(v -> {
-            if (compactForLandscape) {
-                syncCurrentWallet(dialog);
-            } else {
-                syncWalletFromInput(input, dialog);
-            }
-        });
-        save.setOnClickListener(v -> {
-            if (compactForLandscape) {
-                dialog.dismiss();
-                openManualWalletAddressDialog();
-            } else {
-                saveWalletFromInput(input, dialog);
-            }
-        });
-        input.setOnEditorActionListener((v, actionId, event) -> {
-            boolean enter = event != null
-                    && event.getAction() == KeyEvent.ACTION_UP
-                    && event.getKeyCode() == KeyEvent.KEYCODE_ENTER;
-            if (actionId == EditorInfo.IME_ACTION_DONE || enter) {
-                return saveWalletFromInput(input, dialog);
-            }
-            return false;
-        });
-
-        dialog.setContentView(root);
-        dialog.show();
-        Window dialogWindow = dialog.getWindow();
-        if (dialogWindow != null) {
-            dialogWindow.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            WindowManager.LayoutParams params = dialogWindow.getAttributes();
-            params.dimAmount = 0.62f;
-            dialogWindow.setAttributes(params);
-            dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-            dialogWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
-                    | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-            dialogWindow.setLayout(
-                    Math.min(Math.max(1, getWidth() - dp(context, 32)), (int) clamp(getWidth() * 0.50f, 720f, compactForLandscape ? 1180f : 900f)),
-                    WindowManager.LayoutParams.WRAP_CONTENT);
-        }
-    }
-
-    private String walletDialogBodyText() {
-        if (isConnectedWalletBackendSigner()) {
-            return "Wallet ini signer backend. Connect wallet pemain lewat MetaMask atau browser wallet supaya payout ETH bisa masuk.";
-        }
-        if (!walletAddress.isEmpty()) {
-            return "Connect wallet pemain dari wallet app, atau tekan Sync untuk baca ulang saldo. Jangan masukkan private key.";
-        }
-        return "Connect wallet pemain dari MetaMask atau browser wallet. Taniin hanya membaca public address.";
+    void performWallet() {
+        walletDialogController.showWalletDialog();
     }
 
     void connectWalletFromDeepLink(String address) {
-        String cleaned = address == null ? "" : address.trim();
-        if (!isValidAddress(cleaned)) {
-            showErrorMessage("Wallet dari wallet app tidak valid.");
-            return;
-        }
-        storeWalletAddress(cleaned);
-        chainStatus = "Wallet tersambung dari wallet app: " + shortAddress(walletAddress) + ". Sync Sepolia...";
-        chainPanelUntilMs = System.currentTimeMillis() + 5200L;
-        showSuccessPopup("Wallet tersambung: " + shortAddress(walletAddress));
-        refreshWalletState(true);
-        invalidate();
+        walletDialogController.connectWalletFromDeepLink(address);
     }
 
-    private void openWalletConnectPage(Dialog dialog, boolean metaMask) {
-        String url = blockchainClient.walletConnectUrl();
-        if (url.isEmpty()) {
-            showErrorMessage("TANIIN_GAME_API_URL belum diset untuk connect wallet app.");
-            return;
-        }
-        Uri uri = metaMask
-                ? Uri.parse("https://metamask.app.link/dapp/" + walletConnectDappPath(url))
-                : Uri.parse(url);
-        Intent intent = new Intent(Intent.ACTION_VIEW, uri);
-        if (!(getContext() instanceof Activity)) {
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        }
-        try {
-            getContext().startActivity(intent);
-            dialog.dismiss();
-            chainStatus = "Approve connect wallet, lalu Taniin akan menerima public address otomatis.";
-            chainPanelUntilMs = System.currentTimeMillis() + 5200L;
-            showMessage(metaMask ? "Membuka MetaMask connect..." : "Membuka halaman connect wallet...");
-            invalidate();
-        } catch (ActivityNotFoundException exception) {
-            showErrorMessage(metaMask ? "MetaMask belum terpasang." : "Tidak bisa membuka browser wallet.");
-        } catch (RuntimeException exception) {
-            showErrorMessage("Tidak bisa membuka connect wallet di perangkat ini.");
-        }
+    String walletAddress() {
+        return walletAddress;
     }
 
-    private String walletConnectDappPath(String url) {
-        Uri uri = Uri.parse(url);
-        String host = uri.getHost();
-        if (host == null || host.trim().isEmpty()) {
-            return url;
-        }
-        String path = uri.getEncodedPath();
-        return host + (path == null ? "" : path);
+    String walletNativeBalance() {
+        return walletNativeBalance;
     }
 
-    private void pasteWalletAddressFromClipboard(EditText input, Dialog dialog, boolean saveDirectly) {
-        String address = clipboardWalletAddress();
-        if (address.isEmpty()) {
-            showErrorMessage("Clipboard belum berisi public address 0x...");
-            return;
-        }
-        if (saveDirectly) {
-            dialog.dismiss();
-            connectWalletFromDeepLink(address);
-            return;
-        }
-        input.setText(address);
-        input.setSelection(input.getText().length());
-        showMessage("Address dari clipboard siap dipakai.");
+    int coinBalance() {
+        return gameState.coins;
     }
 
-    private void syncCurrentWallet(Dialog dialog) {
-        if (walletAddress.isEmpty()) {
-            showErrorMessage("Connect wallet dulu untuk sync.");
-            return;
-        }
-        dialog.dismiss();
-        refreshWalletState(true);
-        showMessage("Wallet sync: " + shortAddress(walletAddress));
+    String walletConnectUrl() {
+        return blockchainClient.walletConnectUrl();
     }
 
-    private void openManualWalletAddressDialog() {
-        Context context = getContext();
-        if (!(context instanceof Activity)) {
-            return;
-        }
-        Dialog dialog = new Dialog(context);
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-
-        LinearLayout root = new LinearLayout(context);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(context, 24), dp(context, 22), dp(context, 24), dp(context, 20));
-        root.setBackground(roundedStrokeDrawable(
-                Color.rgb(55, 37, 24),
-                dp(context, 16),
-                Color.rgb(173, 91, 31),
-                dp(context, 3)));
-
-        TextView title = new TextView(context);
-        title.setText("Input Wallet Manual");
-        title.setTextColor(Color.rgb(255, 230, 158));
-        title.setTextSize(22f);
-        title.setTypeface(null, android.graphics.Typeface.BOLD);
-        root.addView(title);
-
-        TextView body = new TextView(context);
-        body.setText("Fallback saja. Pakai public address 0x, jangan private key.");
-        body.setTextColor(Color.rgb(237, 223, 200));
-        body.setTextSize(14.5f);
-        body.setPadding(0, dp(context, 10), 0, dp(context, 12));
-        root.addView(body);
-
-        final EditText input = new EditText(context);
-        input.setSingleLine(true);
-        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        input.setImeOptions(EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
-        input.setHint("0x wallet address Sepolia");
-        input.setText(walletAddress);
-        input.setSelectAllOnFocus(false);
-        input.setTextColor(Color.WHITE);
-        input.setHintTextColor(Color.rgb(185, 164, 138));
-        input.setTextSize(16f);
-        input.setPadding(dp(context, 16), 0, dp(context, 16), 0);
-        input.setBackground(roundedStrokeDrawable(
-                Color.rgb(38, 30, 24),
-                dp(context, 10),
-                Color.rgb(130, 85, 43),
-                dp(context, 2)));
-        root.addView(input, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(context, 48)));
-
-        LinearLayout actions = new LinearLayout(context);
-        actions.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-        actions.setPadding(0, dp(context, 14), 0, 0);
-        Button close = walletDialogButton(context, "Batal", Color.rgb(91, 64, 40), Color.rgb(239, 220, 191));
-        Button paste = walletDialogButton(context, "Tempel", Color.rgb(111, 78, 43), Color.rgb(255, 238, 211));
-        Button save = walletDialogButton(context, "Simpan", Color.rgb(214, 129, 39), Color.WHITE);
-        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(dp(context, 94), dp(context, 42));
-        actions.addView(close, closeParams);
-        LinearLayout.LayoutParams pasteParams = new LinearLayout.LayoutParams(dp(context, 94), dp(context, 42));
-        pasteParams.leftMargin = dp(context, 8);
-        actions.addView(paste, pasteParams);
-        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(dp(context, 108), dp(context, 42));
-        saveParams.leftMargin = dp(context, 8);
-        actions.addView(save, saveParams);
-        root.addView(actions);
-
-        close.setOnClickListener(v -> dialog.dismiss());
-        paste.setOnClickListener(v -> pasteWalletAddressFromClipboard(input, dialog, false));
-        save.setOnClickListener(v -> saveWalletFromInput(input, dialog));
-        input.setOnEditorActionListener((v, actionId, event) -> {
-            boolean enter = event != null
-                    && event.getAction() == KeyEvent.ACTION_UP
-                    && event.getKeyCode() == KeyEvent.KEYCODE_ENTER;
-            if (actionId == EditorInfo.IME_ACTION_DONE || enter) {
-                return saveWalletFromInput(input, dialog);
-            }
-            return false;
-        });
-
-        dialog.setContentView(root);
-        dialog.show();
-        Window dialogWindow = dialog.getWindow();
-        if (dialogWindow != null) {
-            dialogWindow.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            WindowManager.LayoutParams params = dialogWindow.getAttributes();
-            params.dimAmount = 0.62f;
-            dialogWindow.setAttributes(params);
-            dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-            dialogWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
-                    | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-            dialogWindow.setLayout(
-                    Math.min(Math.max(1, getWidth() - dp(context, 32)), (int) clamp(getWidth() * 0.46f, 680f, 980f)),
-                    WindowManager.LayoutParams.WRAP_CONTENT);
-        }
-        input.requestFocus();
-        input.setSelection(input.getText().length());
+    void setChainStatus(String status, long visibleForMs) {
+        chainStatus = status;
+        chainPanelUntilMs = System.currentTimeMillis() + visibleForMs;
     }
 
-    private String clipboardWalletAddress() {
-        Object service = getContext().getSystemService(Context.CLIPBOARD_SERVICE);
-        if (!(service instanceof ClipboardManager)) {
-            return "";
-        }
-        ClipboardManager clipboard = (ClipboardManager) service;
-        ClipData clipData = clipboard.getPrimaryClip();
-        if (clipData == null) {
-            return "";
-        }
-        for (int i = 0; i < clipData.getItemCount(); i++) {
-            CharSequence text = clipData.getItemAt(i).coerceToText(getContext());
-            String address = firstWalletAddressInText(text == null ? "" : text.toString());
-            if (!address.isEmpty()) {
-                return address;
-            }
-        }
-        return "";
+    void setSwapAmount(int amount) {
+        gameState.swapAmount = amount;
     }
 
-    private String firstWalletAddressInText(String text) {
-        if (text == null) {
-            return "";
-        }
-        String lower = text.toLowerCase(Locale.US);
-        int from = 0;
-        while (from < lower.length()) {
-            int start = lower.indexOf("0x", from);
-            if (start < 0) {
-                return "";
-            }
-            int end = start + 42;
-            if (end <= text.length()) {
-                String candidate = text.substring(start, end);
-                if (isValidAddress(candidate)) {
-                    return candidate;
-                }
-            }
-            from = start + 2;
-        }
-        return "";
-    }
-
-    private boolean syncWalletFromInput(EditText input, Dialog dialog) {
-        String address = input.getText().toString().trim();
-        if (!address.isEmpty()) {
-            if (!isValidAddress(address)) {
-                showErrorMessage("Wallet address tidak valid.");
-                return true;
-            }
-            storeWalletAddress(address);
-        }
-        if (walletAddress.isEmpty()) {
-            showErrorMessage("Isi wallet address dulu untuk sync.");
-            return true;
-        }
-        dialog.dismiss();
-        refreshWalletState(true);
-        showMessage("Wallet sync: " + shortAddress(walletAddress));
-        return true;
-    }
-
-    private boolean saveWalletFromInput(EditText input, Dialog dialog) {
-        String address = input.getText().toString().trim();
-        if (!isValidAddress(address)) {
-            showErrorMessage("Wallet address tidak valid.");
-            return true;
-        }
-        boolean changed = storeWalletAddress(address);
-        showMessage((changed ? "Wallet diganti: " : "Wallet tersimpan: ") + shortAddress(walletAddress));
-        dialog.dismiss();
-        refreshWalletState(true);
-        invalidate();
-        return true;
-    }
-
-    private boolean storeWalletAddress(String address) {
+    boolean storeWalletAddress(String address) {
         String cleaned = address.trim();
         boolean changed = !cleaned.equalsIgnoreCase(walletAddress);
         walletAddress = cleaned;
@@ -5972,34 +4443,6 @@ final class FarmGameView extends CanvasGameView {
                 .remove(PREF_DEFAULT_WALLET_DISABLED)
                 .apply();
         return changed;
-    }
-
-    private static Button walletDialogButton(Context context, String label, int background, int textColor) {
-        Button button = new Button(context);
-        button.setText(label);
-        button.setAllCaps(false);
-        button.setTextSize(15f);
-        button.setTypeface(null, android.graphics.Typeface.BOLD);
-        button.setTextColor(textColor);
-        button.setBackground(roundedStrokeDrawable(background, dp(context, 10), Color.rgb(235, 164, 74), dp(context, 2)));
-        return button;
-    }
-
-    private static GradientDrawable roundedDrawable(int color, float radius) {
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setColor(color);
-        drawable.setCornerRadius(radius);
-        return drawable;
-    }
-
-    private static GradientDrawable roundedStrokeDrawable(int color, float radius, int strokeColor, int strokeWidth) {
-        GradientDrawable drawable = roundedDrawable(color, radius);
-        drawable.setStroke(strokeWidth, strokeColor);
-        return drawable;
-    }
-
-    private static int dp(Context context, float value) {
-        return Math.round(value * context.getResources().getDisplayMetrics().density);
     }
 
     private void checkSepolia() {
@@ -6029,7 +4472,7 @@ final class FarmGameView extends CanvasGameView {
         });
     }
 
-    private void refreshWalletState(boolean revealPanel) {
+    void refreshWalletState(boolean revealPanel) {
         if (checkingChain) {
             return;
         }
@@ -6073,7 +4516,7 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void queueChainAction(ChainAction action, int refundCoinsOnFailure) {
-        ChainHistoryEntry historyEntry = addChainHistory(action, initialChainHistoryStatus());
+        ChainHistoryEntry historyEntry = chainHistoryStore.add(chainHistory, action, initialChainHistoryStatus());
         chainPanelUntilMs = System.currentTimeMillis() + 2200L;
         if (!walletAddress.isEmpty() && blockchainClient.hasGameApi()) {
             pendingChainActions.add(action);
@@ -6087,7 +4530,7 @@ final class FarmGameView extends CanvasGameView {
                         return;
                     }
                     String status = BlockchainClient.isValidTransactionHash(result.txHash) ? "on-chain" : "dikirim";
-                    updateChainHistory(historyEntry, status, result.txHash);
+                    chainHistoryStore.update(chainHistory, historyEntry, status, result.txHash);
                     chainStatus = result.message;
                     if ("SWAP_ETH_COIN".equals(action.type)) {
                         creditSepoliaEthFunding(action.amount);
@@ -6118,17 +4561,17 @@ final class FarmGameView extends CanvasGameView {
     private void handleChainActionFailure(ChainHistoryEntry historyEntry, ChainAction action, int refundCoinsOnFailure, String reason) {
         if (refundCoinsOnFailure > 0) {
             refundFailedSwapCoins(action, refundCoinsOnFailure, reason);
-            updateChainHistory(historyEntry, failedChainHistoryStatus(reason, "gagal; coin kembali"), "");
+            chainHistoryStore.update(chainHistory, historyEntry, failedChainHistoryStatus(reason, "gagal; coin kembali"), "");
             return;
         }
         if ("SWAP_ETH_COIN".equals(action.type)) {
             String detail = conciseChainError(reason);
-            updateChainHistory(historyEntry, failedChainHistoryStatus(reason, "gagal isi coin"), "");
+            chainHistoryStore.update(chainHistory, historyEntry, failedChainHistoryStatus(reason, "gagal isi coin"), "");
             chainStatus = action.label() + " gagal" + (detail.isEmpty() ? "." : ": " + detail);
             showErrorMessage(detail.isEmpty() ? "Isi coin gagal." : "Isi coin gagal: " + shortPopupDetail(detail));
             return;
         }
-        updateChainHistory(historyEntry, "belum sync", "");
+        chainHistoryStore.update(chainHistory, historyEntry, "belum sync", "");
         chainStatus = syncedLocalChainStatus(action, reason);
     }
 
@@ -6277,68 +4720,11 @@ final class FarmGameView extends CanvasGameView {
         return cleaned.length() > 54 ? cleaned.substring(0, 51) + "..." : cleaned;
     }
 
-    private ChainHistoryEntry addChainHistory(ChainAction action, String status) {
-        ChainHistoryEntry entry = new ChainHistoryEntry(action.label(), action.type, action.createdAtMs, status, "");
-        chainHistory.add(0, entry);
-        trimChainHistory();
-        saveChainHistory();
-        return entry;
-    }
-
-    private void updateChainHistory(ChainHistoryEntry entry, String status, String txHash) {
-        entry.status = ChainHistoryEntry.normalizeStatus(status);
-        if (BlockchainClient.isValidTransactionHash(txHash)) {
-            entry.txHash = txHash.trim();
-        }
-        saveChainHistory();
-    }
-
-    private void trimChainHistory() {
-        while (chainHistory.size() > CHAIN_HISTORY_LIMIT) {
-            chainHistory.remove(chainHistory.size() - 1);
-        }
-    }
-
     private void loadGameState() {
         gameStateStore.load(gameState);
     }
 
-    private void loadChainHistory() {
-        chainHistory.clear();
-        String raw = preferences.getString(PREF_CHAIN_HISTORY, "");
-        if (raw == null || raw.trim().isEmpty()) {
-            return;
-        }
-        try {
-            JSONArray array = new JSONArray(raw);
-            for (int i = 0; i < array.length(); i++) {
-                JSONObject object = array.optJSONObject(i);
-                ChainHistoryEntry entry = ChainHistoryEntry.fromJson(object);
-                if (entry != null) {
-                    chainHistory.add(entry);
-                }
-            }
-            trimChainHistory();
-            saveChainHistory();
-        } catch (JSONException exception) {
-            chainHistory.clear();
-            preferences.edit().remove(PREF_CHAIN_HISTORY).apply();
-        }
-    }
-
-    private void saveChainHistory() {
-        try {
-            JSONArray array = new JSONArray();
-            for (ChainHistoryEntry entry : chainHistory) {
-                array.put(entry.toJson());
-            }
-            preferences.edit().putString(PREF_CHAIN_HISTORY, array.toString()).apply();
-        } catch (JSONException ignored) {
-            // A malformed local history entry should not block gameplay saves.
-        }
-    }
-
-    private void saveGameState() {
+    void saveGameState() {
         gameStateStore.save(gameState);
     }
 
@@ -6362,7 +4748,7 @@ final class FarmGameView extends CanvasGameView {
         return shopSystem.totalSeedAmountForQuantity(quantity);
     }
 
-    private void showMessage(String text) {
+    void showMessage(String text) {
         long now = System.currentTimeMillis();
         message = text;
         messageUntilMs = now + 1800L;
@@ -6371,12 +4757,12 @@ final class FarmGameView extends CanvasGameView {
         }
     }
 
-    private void showErrorMessage(String text) {
+    void showErrorMessage(String text) {
         playErrorSound();
         showMessage(text);
     }
 
-    private void showSuccessPopup(String text) {
+    void showSuccessPopup(String text) {
         showMessage(text);
         statusPopupTitle = "BERHASIL";
         statusPopupMessage = text;
@@ -6449,182 +4835,6 @@ final class FarmGameView extends CanvasGameView {
                 && playerY < SWAP_HOUSE_BOTTOM_TILE * TILE;
     }
 
-    private void drawGrassTexture(Canvas canvas) {
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.argb(90, 79, 156, 72));
-        int firstCol = Math.max(0, (int) (cameraX / TILE) - 1);
-        int lastCol = Math.min(WORLD_COLS, (int) ((cameraX + getWidth()) / TILE) + 2);
-        int firstRow = Math.max(0, (int) (cameraY / TILE) - 1);
-        int lastRow = Math.min(WORLD_ROWS, (int) ((cameraY + getHeight()) / TILE) + 2);
-        for (int y = firstRow; y < lastRow; y++) {
-            for (int x = firstCol; x < lastCol; x++) {
-                if ((x * 17 + y * 11) % 9 == 0) {
-                    drawWorldRect(canvas, x * TILE + 9, y * TILE + 8, 4, 4);
-                } else if ((x * 7 + y * 13) % 17 == 0) {
-                    drawWorldRect(canvas, x * TILE + 21, y * TILE + 20, 3, 5);
-                }
-            }
-        }
-    }
-
-    private void drawWaterRect(Canvas canvas, float x, float y, float w, float h) {
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(58, 177, 215));
-        drawWorldRect(canvas, x, y, w, h);
-        paint.setColor(Color.rgb(33, 138, 186));
-        for (float yy = y + 12; yy < y + h; yy += 22) {
-            for (float xx = x + 8; xx < x + w; xx += 58) {
-                drawWorldRoundRect(canvas, xx, yy, 20, 5, 3);
-            }
-        }
-        paint.setColor(Color.rgb(40, 113, 153));
-        drawWorldRect(canvas, x, y, w, 5);
-        drawWorldRect(canvas, x, y + h - 5, w, 5);
-        drawWorldRect(canvas, x, y, 5, h);
-        drawWorldRect(canvas, x + w - 5, y, 5, h);
-    }
-
-    private void drawRoad(Canvas canvas, float x, float y, float w, float h) {
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(238, 158, 78));
-        drawWorldRect(canvas, x, y, w, h);
-        paint.setColor(Color.rgb(210, 128, 58));
-        for (float yy = y + 8; yy < y + h; yy += TILE) {
-            for (float xx = x + 8; xx < x + w; xx += TILE) {
-                drawWorldRect(canvas, xx, yy, 3, 3);
-            }
-        }
-        paint.setColor(Color.rgb(31, 125, 64));
-        for (float xx = x; xx < x + w; xx += 14) {
-            drawWorldRect(canvas, xx, y - 5, 7, 5);
-            drawWorldRect(canvas, xx, y + h, 7, 5);
-        }
-        for (float yy = y; yy < y + h; yy += 14) {
-            drawWorldRect(canvas, x - 5, yy, 5, 7);
-            drawWorldRect(canvas, x + w, yy, 5, 7);
-        }
-    }
-
-    private void drawBridge(Canvas canvas, float x, float y, float w, float h, boolean vertical) {
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(153, 92, 55));
-        drawWorldRect(canvas, x, y, w, h);
-        paint.setColor(Color.rgb(93, 55, 43));
-        if (vertical) {
-            for (float yy = y + 6; yy < y + h; yy += 14) {
-                drawWorldRect(canvas, x, yy, w, 4);
-            }
-        } else {
-            for (float xx = x + 6; xx < x + w; xx += 14) {
-                drawWorldRect(canvas, xx, y, 4, h);
-            }
-        }
-    }
-
-    private void drawFence(Canvas canvas, float x, float y, float w, float h) {
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(78, 43, 37));
-        for (float xx = x; xx <= x + w; xx += TILE) {
-            drawWorldRect(canvas, xx, y, 7, 30);
-            drawWorldRect(canvas, xx, y + h - 30, 7, 30);
-        }
-        for (float yy = y; yy <= y + h; yy += TILE) {
-            drawWorldRect(canvas, x, yy, 7, 30);
-            drawWorldRect(canvas, x + w, yy, 7, 30);
-        }
-        paint.setColor(Color.rgb(126, 73, 47));
-        drawWorldRect(canvas, x, y + 11, w, 7);
-        drawWorldRect(canvas, x, y + h - 18, w, 7);
-        drawWorldRect(canvas, x + 11, y, 7, h);
-        drawWorldRect(canvas, x + w - 18, y, 7, h);
-    }
-
-    private void drawHouse(Canvas canvas, float x, float y, float w, float h, boolean shopHouse) {
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(101, 53, 42));
-        drawWorldRect(canvas, x + 16, y + 58, w - 32, h - 62);
-        paint.setColor(Color.rgb(244, 201, 166));
-        drawWorldRect(canvas, x + 28, y + 72, w - 56, h - 92);
-        paint.setColor(Color.rgb(119, 38, 24));
-        drawWorldRect(canvas, x + 4, y + 42, w - 8, 30);
-        paint.setColor(Color.rgb(183, 62, 26));
-        for (int i = 0; i < 5; i++) {
-            drawWorldRect(canvas, x + 12 + i * 36, y + 22 + i % 2 * 5, 46, 30);
-        }
-        paint.setColor(Color.rgb(70, 34, 31));
-        drawWorldRect(canvas, x + 70, y + h - 100, 44, 82);
-        paint.setColor(Color.rgb(139, 61, 35));
-        drawWorldRect(canvas, x + 81, y + h - 86, 24, 48);
-        paint.setColor(Color.rgb(74, 126, 181));
-        drawWorldRect(canvas, x + w - 90, y + 93, 42, 36);
-        paint.setColor(Color.WHITE);
-        drawWorldRect(canvas, x + w - 84, y + 99, 12, 11);
-        drawWorldRect(canvas, x + w - 66, y + 99, 12, 11);
-        if (shopHouse) {
-            paint.setColor(Color.rgb(255, 219, 95));
-            drawWorldRect(canvas, x + 34, y + 100, 36, 20);
-        }
-    }
-
-    private void drawShopStand(Canvas canvas, float x, float y) {
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(91, 55, 34));
-        drawWorldRoundRect(canvas, x, y, 4.6f * TILE, 1.3f * TILE, 8);
-        drawBitmapWorld(canvas, chest, x + 13, y + 3, 34, 34);
-        paint.setColor(Color.WHITE);
-        paint.setTextSize(15f);
-        paint.setFakeBoldText(true);
-        canvas.drawText("TOKO", x + 58 - cameraX, y + 27 - cameraY, paint);
-        paint.setFakeBoldText(false);
-    }
-
-    private void drawLamp(Canvas canvas, float x, float y) {
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(37, 34, 40));
-        drawWorldRect(canvas, x + 13, y + 16, 6, 58);
-        drawWorldRect(canvas, x + 6, y + 72, 20, 7);
-        paint.setColor(Color.rgb(255, 203, 60));
-        drawWorldRect(canvas, x + 7, y + 2, 18, 24);
-        paint.setColor(Color.rgb(57, 48, 56));
-        drawWorldRect(canvas, x + 4, y, 24, 5);
-        drawWorldRect(canvas, x + 4, y + 25, 24, 5);
-    }
-
-    private void drawTree(Canvas canvas, float x, float y, float scale) {
-        float s = TILE * scale;
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(92, 48, 31));
-        drawWorldRect(canvas, x + s * 0.42f, y + s * 0.78f, s * 0.16f, s * 0.45f);
-        paint.setColor(Color.rgb(40, 129, 62));
-        drawWorldRoundRect(canvas, x, y + s * 0.2f, s, s * 0.7f, s * 0.18f);
-        paint.setColor(Color.rgb(62, 179, 72));
-        drawWorldRoundRect(canvas, x + s * 0.15f, y, s * 0.72f, s * 0.58f, s * 0.18f);
-        paint.setColor(Color.rgb(107, 207, 82));
-        drawWorldRoundRect(canvas, x + s * 0.38f, y + s * 0.08f, s * 0.25f, s * 0.16f, s * 0.08f);
-    }
-
-    private void drawBush(Canvas canvas, float x, float y) {
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(39, 132, 63));
-        drawWorldRoundRect(canvas, x, y + 12, 58, 30, 16);
-        paint.setColor(Color.rgb(219, 44, 63));
-        drawWorldRoundRect(canvas, x + 8, y + 9, 10, 10, 5);
-        drawWorldRoundRect(canvas, x + 34, y + 18, 10, 10, 5);
-    }
-
-    private void drawRock(Canvas canvas, float x, float y) {
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(111, 130, 130));
-        drawWorldRoundRect(canvas, x, y + 9, 24, 18, 7);
-        paint.setColor(Color.rgb(170, 186, 181));
-        drawWorldRoundRect(canvas, x + 6, y + 5, 12, 9, 4);
-    }
-
-    private void drawBitmapWorld(Canvas canvas, Bitmap bitmap, float worldX, float worldY, float w, float h) {
-        dst.set(worldX - cameraX, worldY - cameraY, worldX - cameraX + w, worldY - cameraY + h);
-        canvas.drawBitmap(bitmap, null, dst, pixelPaint);
-    }
-
     private void drawSpriteWorld(
             Canvas canvas,
             Bitmap bitmap,
@@ -6636,11 +4846,7 @@ final class FarmGameView extends CanvasGameView {
             float worldY,
             float w,
             float h) {
-        int sourceX = (frame % columns) * frameW;
-        int sourceY = (frame / columns) * frameH;
-        src.set(sourceX, sourceY, sourceX + frameW, sourceY + frameH);
-        dst.set(worldX - cameraX, worldY - cameraY, worldX - cameraX + w, worldY - cameraY + h);
-        canvas.drawBitmap(bitmap, src, dst, pixelPaint);
+        worldRenderer.drawSpriteWorld(canvas, bitmap, frame, frameW, frameH, columns, worldX, worldY, w, h);
     }
 
     private void drawSpriteWithShadowWorld(
@@ -6654,57 +4860,19 @@ final class FarmGameView extends CanvasGameView {
             float worldY,
             float w,
             float h) {
-        drawSpriteShadowWorld(canvas, worldX, worldY, w, h);
-        drawSpriteWorld(canvas, bitmap, frame, frameW, frameH, columns, worldX, worldY, w, h);
-    }
-
-    private void drawSpriteShadowWorld(Canvas canvas, float worldX, float worldY, float w, float h) {
-        float shadowW = w * 0.72f;
-        float shadowH = Math.max(5f, h * 0.16f);
-        float centerX = worldX + w * 0.5f - cameraX;
-        float centerY = worldY + h * 0.87f - cameraY;
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.argb(62, 0, 0, 0));
-        canvas.drawOval(
-                centerX - shadowW * 0.5f,
-                centerY - shadowH * 0.5f,
-                centerX + shadowW * 0.5f,
-                centerY + shadowH * 0.5f,
-                paint);
+        worldRenderer.drawSpriteWithShadowWorld(canvas, bitmap, frame, frameW, frameH, columns, worldX, worldY, w, h);
     }
 
     private void drawWorldRect(Canvas canvas, float x, float y, float w, float h) {
-        canvas.drawRect(x - cameraX, y - cameraY, x - cameraX + w, y - cameraY + h, paint);
+        worldRenderer.drawWorldRect(canvas, x, y, w, h);
     }
 
     private void drawWorldRoundRect(Canvas canvas, float x, float y, float w, float h, float r) {
-        canvas.drawRoundRect(x - cameraX, y - cameraY, x - cameraX + w, y - cameraY + h, r, r, paint);
+        worldRenderer.drawWorldRoundRect(canvas, x, y, w, h, r);
     }
 
     private void drawWorldLine(Canvas canvas, float x1, float y1, float x2, float y2) {
-        canvas.drawLine(x1 - cameraX, y1 - cameraY, x2 - cameraX, y2 - cameraY, paint);
-    }
-
-    private void addFenceCollision(float x, float y, float w, float h) {
-        float rail = TILE * 0.24f;
-        addCollisionRect(x, y, w, rail);
-        addCollisionRect(x, y + h - rail, w, rail);
-        addCollisionRect(x, y, rail, h);
-        addCollisionRect(x + w - rail, y, rail, h);
-    }
-
-    private void addHouseCollision(float x, float y, float w, float h) {
-        addCollisionRect(x + TILE * 0.18f, y + TILE * 0.48f, w - TILE * 0.36f, h - TILE * 0.64f);
-        addCollisionRect(x + TILE * 0.45f, y + h - TILE * 1.02f, TILE * 0.62f, TILE * 0.72f);
-    }
-
-    private void addTreeCollision(float x, float y, float scale) {
-        float s = TILE * scale;
-        addCollisionRect(x + s * 0.16f, y + s * 0.62f, s * 0.68f, s * 0.55f);
-    }
-
-    private void addCollisionRect(float x, float y, float w, float h) {
-        collisionRects.add(new RectF(x, y, x + w, y + h));
+        worldRenderer.drawWorldLine(canvas, x1, y1, x2, y2);
     }
 
     private static float clamp(float value, float min, float max) {
@@ -6779,7 +4947,7 @@ final class FarmGameView extends CanvasGameView {
         return "game_eth_funded_wei_" + walletAddress.toLowerCase(Locale.US);
     }
 
-    private boolean isConnectedWalletBackendSigner() {
+    boolean isConnectedWalletBackendSigner() {
         return isValidAddress(walletAddress)
                 && isValidAddress(chainSignerAddress)
                 && walletAddress.equalsIgnoreCase(chainSignerAddress);
@@ -6804,7 +4972,7 @@ final class FarmGameView extends CanvasGameView {
         return BlockchainClient.isValidAddress(address);
     }
 
-    private static String compactEth(String value) {
+    static String compactEth(String value) {
         if (value == null || value.trim().isEmpty()) {
             return "0";
         }
@@ -6823,121 +4991,5 @@ final class FarmGameView extends CanvasGameView {
 
     private static String shortAddress(String address) {
         return BlockchainClient.shortAddress(address);
-    }
-}
-enum PlotState {
-    EMPTY,
-    GROWING,
-    READY
-}
-
-enum InteractionKind {
-    NONE,
-    SHOP,
-    SELL_HARVEST,
-    SWAP_TOKEN,
-    BUY_LAND,
-    PLANT,
-    SELL_LAND,
-    WAIT_CROP,
-    HARVEST
-}
-
-final class HarvestEffect {
-    final float centerX;
-    final float centerY;
-    final int seedIndex;
-    final int amount;
-    final long startedAtMs;
-    final float phase;
-
-    HarvestEffect(float centerX, float centerY, int seedIndex, int amount, long startedAtMs) {
-        this.centerX = centerX;
-        this.centerY = centerY;
-        this.seedIndex = seedIndex;
-        this.amount = amount;
-        this.startedAtMs = startedAtMs;
-        this.phase = (centerX * 0.017f + centerY * 0.011f) % 6.28f;
-    }
-}
-
-final class ChainHistoryEntry {
-    final String label;
-    final String type;
-    final long createdAtMs;
-    String status;
-    String txHash;
-
-    ChainHistoryEntry(String label, String type, long createdAtMs, String status, String txHash) {
-        this.label = label == null ? "Transaksi" : label;
-        this.type = type == null ? "" : type;
-        this.createdAtMs = createdAtMs;
-        this.status = normalizeStatus(status);
-        this.txHash = txHash == null ? "" : txHash;
-    }
-
-    static String normalizeStatus(String status) {
-        String cleaned = status == null ? "" : status.trim();
-        String lower = cleaned.toLowerCase(Locale.US);
-        if (lower.contains("gagal kirim") || lower.contains("gagal sync")) {
-            return "belum sync";
-        }
-        if ("pending signer".equals(lower) || "pending lokal".equals(lower)) {
-            return "belum on-chain";
-        }
-        if ("pending wallet".equals(lower)) {
-            return "butuh wallet";
-        }
-        if ("lokal".equals(lower)
-                || "berhasil".equals(lower)) {
-            return "lokal tersimpan";
-        }
-        if ("dikirim".equals(lower)) {
-            return "terkirim signer";
-        }
-        return cleaned;
-    }
-
-    JSONObject toJson() throws JSONException {
-        JSONObject object = new JSONObject();
-        object.put("label", label);
-        object.put("type", type);
-        object.put("createdAtMs", createdAtMs);
-        object.put("status", status);
-        object.put("txHash", txHash);
-        return object;
-    }
-
-    static ChainHistoryEntry fromJson(JSONObject object) {
-        if (object == null) {
-            return null;
-        }
-        String label = object.optString("label", "Transaksi");
-        String type = object.optString("type", "");
-        long createdAtMs = object.optLong("createdAtMs", System.currentTimeMillis());
-        String status = object.optString("status", "");
-        String txHash = object.optString("txHash", "");
-        if (!BlockchainClient.isValidTransactionHash(txHash)) {
-            txHash = "";
-        }
-        return new ChainHistoryEntry(label, type, createdAtMs, status, txHash);
-    }
-}
-
-final class Plot {
-    final float x;
-    final float y;
-    final float w;
-    final float h;
-    boolean owned;
-    int seedIndex;
-    PlotState state = PlotState.EMPTY;
-    long plantedAtMs;
-
-    Plot(float x, float y, float w, float h) {
-        this.x = x;
-        this.y = y;
-        this.w = w;
-        this.h = h;
     }
 }
