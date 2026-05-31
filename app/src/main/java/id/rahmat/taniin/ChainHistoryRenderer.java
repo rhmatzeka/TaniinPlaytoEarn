@@ -68,19 +68,19 @@ final class ChainHistoryRenderer {
 
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(DialogUi.TITLE);
-        paint.setTextSize(32f);
+        paint.setTextSize(40f);
         paint.setFakeBoldText(true);
-        canvas.drawText("Riwayat transaksi", panel.left + 34f, panel.top + 52f, paint);
+        canvas.drawText("Riwayat transaksi", panel.left + 42f, panel.top + 66f, paint);
         paint.setFakeBoldText(false);
         paint.setColor(DialogUi.BODY_TEXT);
         String mode = hasGameApi
                 ? "Gameplay lokal + signer Sepolia"
                 : "Gameplay lokal: signer belum diset";
         float modeMaxWidth = history.isEmpty()
-                ? panel.width() - 138f
-                : dialogClearAllBounds(viewWidth, viewHeight, history.size()).left - panel.left - 46f;
-        paint.setTextSize(fitTextSize(mode, 20f, Math.max(160f, modeMaxWidth)));
-        canvas.drawText(mode, panel.left + 34f, panel.top + 86f, paint);
+                ? panel.width() - 168f
+                : dialogClearAllBounds(viewWidth, viewHeight, history.size()).left - panel.left - 56f;
+        paint.setTextSize(fitTextSize(mode, 25f, Math.max(180f, modeMaxWidth)));
+        canvas.drawText(mode, panel.left + 42f, panel.top + 104f, paint);
 
         if (!history.isEmpty()) {
             drawClearAllButton(canvas, dialogClearAllBounds(viewWidth, viewHeight, history.size()));
@@ -88,7 +88,7 @@ final class ChainHistoryRenderer {
         drawCloseButton(canvas, dialogCloseBounds(viewWidth, viewHeight, history.size()));
 
         if (history.isEmpty()) {
-            RectF empty = new RectF(panel.left + 30f, panel.top + 120f, panel.right - 30f, panel.bottom - 30f);
+            RectF empty = new RectF(panel.left + 38f, panel.top + 148f, panel.right - 38f, panel.bottom - 38f);
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(DialogUi.TEXT_BOX_FILL);
             canvas.drawRoundRect(empty, 12, 12, paint);
@@ -98,8 +98,8 @@ final class ChainHistoryRenderer {
             canvas.drawRoundRect(empty, 12, 12, paint);
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(DialogUi.BODY_TEXT);
-            paint.setTextSize(fitTextSize("Belum ada transaksi.", 22f, empty.width() - 40f));
-            drawCenteredText(canvas, "Belum ada transaksi.", empty.centerX(), empty.centerY() + 7f);
+            paint.setTextSize(fitTextSize("Belum ada transaksi.", 28f, empty.width() - 48f));
+            drawCenteredText(canvas, "Belum ada transaksi.", empty.centerX(), empty.centerY() + 9f);
             return;
         }
 
@@ -112,8 +112,8 @@ final class ChainHistoryRenderer {
             String more = "+" + (history.size() - rows) + " riwayat lain";
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(DialogUi.BODY_TEXT);
-            paint.setTextSize(18f);
-            drawCenteredText(canvas, more, panel.centerX(), panel.bottom - 22f);
+            paint.setTextSize(22f);
+            drawCenteredText(canvas, more, panel.centerX(), panel.bottom - 28f);
         }
     }
 
@@ -125,9 +125,9 @@ final class ChainHistoryRenderer {
 
     RectF dialogBounds(int viewWidth, int viewHeight, int historySize) {
         int desiredRows = Math.min(historyLimit, historySize);
-        float desiredWidth = clamp(viewWidth * 0.78f, 740f, 1060f);
+        float desiredWidth = clamp(viewWidth * 0.82f, 840f, 1180f);
         float width = Math.min(viewWidth - 40f, desiredWidth);
-        float desiredHeight = historySize == 0 ? 304f : 180f + desiredRows * 78f;
+        float desiredHeight = historySize == 0 ? 360f : 208f + desiredRows * 96f;
         float maxHeight = Math.max(220f, viewHeight - 54f);
         float height = Math.min(desiredHeight, maxHeight);
         float left = (viewWidth - width) * 0.5f;
@@ -138,20 +138,20 @@ final class ChainHistoryRenderer {
     RectF dialogCloseBounds(int viewWidth, int viewHeight, int historySize) {
         RectF panel = dialogBounds(viewWidth, viewHeight, historySize);
         float size = 64f;
-        return new RectF(panel.right - size - 28f, panel.top + 20f, panel.right - 28f, panel.top + 20f + size);
+        return new RectF(panel.right - size - 34f, panel.top + 28f, panel.right - 34f, panel.top + 28f + size);
     }
 
     RectF dialogClearAllBounds(int viewWidth, int viewHeight, int historySize) {
         RectF panel = dialogBounds(viewWidth, viewHeight, historySize);
-        float width = Math.min(158f, Math.max(122f, panel.width() * 0.23f));
-        return new RectF(panel.right - width - 112f, panel.top + 27f, panel.right - 112f, panel.top + 73f);
+        float width = Math.min(206f, Math.max(172f, panel.width() * 0.23f));
+        return new RectF(panel.right - width - 122f, panel.top + 34f, panel.right - 122f, panel.top + 92f);
     }
 
     RectF dialogRowBounds(int rowIndex, int viewWidth, int viewHeight, int historySize) {
         RectF panel = dialogBounds(viewWidth, viewHeight, historySize);
-        float left = panel.left + 30f;
-        float top = panel.top + 132f + rowIndex * 78f;
-        return new RectF(left, top, panel.right - 30f, top + 66f);
+        float left = panel.left + 38f;
+        float top = panel.top + 154f + rowIndex * 96f;
+        return new RectF(left, top, panel.right - 38f, top + 82f);
     }
 
     RectF rowDeleteBounds(int rowIndex, int viewWidth, int viewHeight, int historySize) {
@@ -163,7 +163,7 @@ final class ChainHistoryRenderer {
             return 0;
         }
         RectF panel = dialogBounds(viewWidth, viewHeight, historySize);
-        int rowsByHeight = Math.max(1, (int) ((panel.height() - 154f) / 78f));
+        int rowsByHeight = Math.max(1, (int) ((panel.height() - 184f) / 96f));
         return Math.min(Math.min(historyLimit, historySize), rowsByHeight);
     }
 
@@ -211,12 +211,12 @@ final class ChainHistoryRenderer {
         paint.setColor(Color.rgb(93, 23, 16));
         canvas.drawRoundRect(bounds, 11, 11, paint);
 
-        drawTrashIcon(canvas, bounds.left + 28f, bounds.centerY(), 0.82f, Color.WHITE);
+        drawTrashIcon(canvas, bounds.left + 34f, bounds.centerY(), 0.95f, Color.WHITE);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.WHITE);
-        paint.setTextSize(fitTextSize("Hapus semua", 18f, bounds.width() - 58f));
+        paint.setTextSize(fitTextSize("Hapus semua", 22f, bounds.width() - 70f));
         paint.setFakeBoldText(true);
-        canvas.drawText("Hapus semua", bounds.left + 52f, bounds.centerY() + 7f, paint);
+        canvas.drawText("Hapus semua", bounds.left + 64f, bounds.centerY() + 8f, paint);
         paint.setFakeBoldText(false);
     }
 
@@ -256,8 +256,8 @@ final class ChainHistoryRenderer {
                 || chainStatusContains(entry.status, "tersimpan");
         boolean failed = chainStatusContains(entry.status, "gagal");
         RectF delete = rowDeleteBounds(row);
-        float textRight = hasHash ? delete.left - 52f : delete.left - 14f;
-        float textWidth = Math.max(120f, textRight - (row.left + 50f));
+        float textRight = hasHash ? delete.left - 60f : delete.left - 18f;
+        float textWidth = Math.max(140f, textRight - (row.left + 66f));
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(rowFillColor(hasHash, sending, waitingSync, localSaved, failed));
         canvas.drawRoundRect(row, 10, 10, paint);
@@ -266,22 +266,22 @@ final class ChainHistoryRenderer {
         paint.setColor(rowStrokeColor(hasHash, sending, waitingSync, localSaved, failed));
         canvas.drawRoundRect(row, 10, 10, paint);
 
-        drawStateDot(canvas, row.left + 24f, row.top + 25f, hasHash, entry.status);
+        drawStateDot(canvas, row.left + 31f, row.top + 32f, hasHash, entry.status);
 
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(241, 252, 232));
         paint.setFakeBoldText(true);
-        paint.setTextSize(fitTextSize(entry.label, 21f, textWidth));
-        canvas.drawText(entry.label, row.left + 50f, row.top + 27f, paint);
+        paint.setTextSize(fitTextSize(entry.label, 28f, textWidth));
+        canvas.drawText(entry.label, row.left + 66f, row.top + 35f, paint);
 
         paint.setFakeBoldText(false);
         paint.setColor(hasHash ? Color.rgb(181, 248, 188) : Color.rgb(203, 219, 207));
         String status = hasHash ? "Sepolia " + BlockchainClient.shortTransactionHash(entry.txHash) : entry.status;
-        paint.setTextSize(fitTextSize(status, 16f, textWidth));
-        canvas.drawText(status, row.left + 50f, row.top + 54f, paint);
+        paint.setTextSize(fitTextSize(status, 21f, textWidth));
+        canvas.drawText(status, row.left + 66f, row.top + 68f, paint);
 
         if (hasHash) {
-            drawExternalLinkIcon(canvas, delete.left - 28f, row.centerY());
+            drawExternalLinkIcon(canvas, delete.left - 34f, row.centerY());
         }
         drawDeleteButton(canvas, delete);
     }
@@ -368,7 +368,7 @@ final class ChainHistoryRenderer {
         } else {
             paint.setColor(Color.rgb(157, 184, 165));
         }
-        canvas.drawCircle(cx, cy, 6f, paint);
+        canvas.drawCircle(cx, cy, 8f, paint);
     }
 
     private boolean hasUnsyncedHistory(List<ChainHistoryEntry> history) {
@@ -382,8 +382,8 @@ final class ChainHistoryRenderer {
     }
 
     private RectF rowDeleteBounds(RectF row) {
-        float size = 44f;
-        float left = row.right - size - 12f;
+        float size = 56f;
+        float left = row.right - size - 14f;
         float top = row.centerY() - size * 0.5f;
         return new RectF(left, top, left + size, top + size);
     }

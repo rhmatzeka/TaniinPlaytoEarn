@@ -78,19 +78,6 @@ final class HudRenderer {
         canvas.drawText(swapLine, x + 22, y + 168, paint);
     }
 
-    void drawActionButton(Canvas canvas, int viewWidth, int viewHeight) {
-        float cx = viewWidth - 92;
-        float cy = viewHeight - 86;
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(31, 100, 178));
-        canvas.drawCircle(cx, cy, 42, paint);
-        paint.setColor(Color.WHITE);
-        paint.setTextSize(28f);
-        paint.setFakeBoldText(true);
-        canvas.drawText("A", cx - 10, cy + 10, paint);
-        paint.setFakeBoldText(false);
-    }
-
     void drawContextMessage(Canvas canvas, int viewWidth, int viewHeight, String text) {
         if (text.isEmpty()) {
             return;

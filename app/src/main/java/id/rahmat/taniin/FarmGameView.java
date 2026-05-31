@@ -102,6 +102,9 @@ final class FarmGameView extends CanvasGameView {
     private static final int MENU_TAB_SETTINGS = 0;
     private static final int MENU_TAB_ABOUT = 1;
     private static final int CHAIN_HISTORY_LIMIT = 8;
+    private static final float SETTINGS_HEADER_HEIGHT = 126f;
+    private static final float SETTINGS_SIDEBAR_WIDTH = 218f;
+    private static final float BACKPACK_HEADER_HEIGHT = 122f;
     private static final float OVERLAY_CLOSE_SIZE = 64f;
     private static final float OVERLAY_CLOSE_RIGHT_MARGIN = 34f;
     private static final float DEFAULT_MASTER_VOLUME = 0.82f;
@@ -174,7 +177,7 @@ final class FarmGameView extends CanvasGameView {
     private long shopUntilMs;
     private long chainPanelUntilMs;
     private long shopNpcBubbleUntilMs;
-    private String message = "Dekati lahan atau toko, lalu tekan tombol aksi.";
+    private String message = "Dekati lahan atau toko, lalu tap objeknya.";
     private String statusPopupTitle = "";
     private String statusPopupMessage = "";
     private String walletAddress = "";
@@ -833,9 +836,9 @@ final class FarmGameView extends CanvasGameView {
         paint.setFakeBoldText(true);
         canvas.drawText("Penjual Benih", bubble.left + 24f, bubble.top + 35f, paint);
         paint.setColor(Color.WHITE);
-        paint.setTextSize(fitTextSize("SHOP: tap aku atau tekan A untuk beli benih.", 21f, bubble.width() - 48f));
+        paint.setTextSize(fitTextSize("SHOP: tap aku untuk beli benih.", 23f, bubble.width() - 48f));
         paint.setFakeBoldText(false);
-        canvas.drawText("SHOP: tap aku atau tekan A untuk beli benih.", bubble.left + 24f, bubble.top + 72f, paint);
+        canvas.drawText("SHOP: tap aku untuk beli benih.", bubble.left + 24f, bubble.top + 72f, paint);
     }
 
     private void drawPlotActionSigns(Canvas canvas, long now) {
@@ -1076,7 +1079,6 @@ final class FarmGameView extends CanvasGameView {
         drawMiniMap(canvas);
         drawTopMenu(canvas);
         drawJoystick(canvas);
-        hudRenderer.drawActionButton(canvas, getWidth(), getHeight());
         drawWalletButton(canvas);
         drawChainHistoryButton(canvas);
         drawBackpackButton(canvas);
@@ -1339,8 +1341,8 @@ final class FarmGameView extends CanvasGameView {
         canvas.drawColor(Color.argb(155, 0, 0, 0));
 
         RectF panel = settingsPanelBounds();
-        float headerH = 118f;
-        float sidebarW = 190f;
+        float headerH = SETTINGS_HEADER_HEIGHT;
+        float sidebarW = SETTINGS_SIDEBAR_WIDTH;
         float bodyTop = panel.top + headerH;
         float bodyLeft = panel.left + sidebarW;
 
@@ -1352,7 +1354,7 @@ final class FarmGameView extends CanvasGameView {
         paint.setColor(Color.rgb(112, 52, 20));
         canvas.drawRect(panel.left + 4f, bodyTop, bodyLeft, panel.bottom - 4f, paint);
 
-        drawMenuTitle(canvas, panel.left + 58f, panel.top + 61f);
+        drawMenuTitle(canvas, panel.left + 62f, panel.top + 66f);
         drawPanelCloseButton(canvas, menuCloseButtonBounds());
 
         drawBackpackSideTab(canvas, settingsAudioTabBounds(), menuTab == MENU_TAB_SETTINGS, "AUDIO", Color.rgb(105, 196, 250));
@@ -1369,7 +1371,7 @@ final class FarmGameView extends CanvasGameView {
         canvas.drawColor(Color.argb(155, 0, 0, 0));
 
         RectF panel = backpackPanelBounds();
-        float headerH = 108f;
+        float headerH = BACKPACK_HEADER_HEIGHT;
         float bodyTop = panel.top + headerH;
 
         drawOverlayPanelFrame(canvas, panel, bodyTop);
@@ -1378,7 +1380,7 @@ final class FarmGameView extends CanvasGameView {
         paint.setColor(DialogUi.PANEL_INNER_FILL);
         canvas.drawRect(panel.left + 4f, bodyTop, panel.right - 4f, panel.bottom - 4f, paint);
 
-        drawBackpackTitle(canvas, panel.left + 58f, panel.top + 56f);
+        drawBackpackTitle(canvas, panel.left + 62f, panel.top + 64f);
         drawBackpackCloseButton(canvas);
         drawBackpackInventoryContent(canvas, panel, bodyTop);
     }
@@ -1412,32 +1414,32 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void drawBackpackInventoryContent(Canvas canvas, RectF panel, float bodyTop) {
-        RectF content = new RectF(panel.left + 40f, bodyTop + 24f, panel.right - 40f, panel.bottom - 34f);
+        RectF content = new RectF(panel.left + 44f, bodyTop + 28f, panel.right - 44f, panel.bottom - 40f);
 
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(126, 58, 20));
-        canvas.drawRoundRect(content.left, content.top, content.right, content.top + 58f, 14, 14, paint);
+        canvas.drawRoundRect(content.left, content.top, content.right, content.top + 72f, 16, 16, paint);
         paint.setColor(DialogUi.TITLE);
-        paint.setTextSize(24f);
+        paint.setTextSize(30f);
         paint.setFakeBoldText(true);
-        canvas.drawText("SEEDS", content.left + 22f, content.top + 38f, paint);
+        canvas.drawText("SEEDS", content.left + 24f, content.top + 47f, paint);
         paint.setFakeBoldText(false);
 
-        drawBackpackStatChip(canvas, content.right - 334f, content.top + 7f, 152f, true, gameState.coins);
-        drawBackpackStatChip(canvas, content.right - 166f, content.top + 7f, 146f, false, gameState.harvests);
+        drawBackpackStatChip(canvas, content.right - 392f, content.top + 9f, 182f, true, gameState.coins);
+        drawBackpackStatChip(canvas, content.right - 194f, content.top + 9f, 174f, false, gameState.harvests);
 
-        float cardW = 122f;
-        float cardH = 126f;
-        float gap = 28f;
+        float cardW = 170f;
+        float cardH = 168f;
+        float gap = 36f;
         int columns = SEED_NAMES.length;
         float gridW = columns * cardW + (columns - 1) * gap;
         if (gridW > content.width()) {
             columns = 2;
-            gap = 24f;
+            gap = 30f;
             gridW = columns * cardW + (columns - 1) * gap;
         }
         float startX = content.left + Math.max(0f, (content.width() - gridW) * 0.5f);
-        float startY = content.top + 86f;
+        float startY = content.top + 110f;
         for (int i = 0; i < SEED_NAMES.length; i++) {
             int col = i % columns;
             int row = i / columns;
@@ -1455,24 +1457,24 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void drawBackpackStatChip(Canvas canvas, float left, float top, float width, boolean coin, int value) {
-        RectF chip = new RectF(left, top, left + width, top + 44f);
+        RectF chip = new RectF(left, top, left + width, top + 54f);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(96, 43, 13));
-        canvas.drawRoundRect(chip, 12, 12, paint);
+        canvas.drawRoundRect(chip, 14, 14, paint);
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(3f);
         paint.setColor(Color.rgb(170, 89, 28));
-        canvas.drawRoundRect(chip, 12, 12, paint);
+        canvas.drawRoundRect(chip, 14, 14, paint);
         if (coin) {
-            drawCoinHudIcon(canvas, chip.left + 27f, chip.centerY());
+            drawCoinHudIcon(canvas, chip.left + 33f, chip.centerY());
         } else {
-            drawHarvestHudIcon(canvas, chip.left + 27f, chip.centerY());
+            drawHarvestHudIcon(canvas, chip.left + 33f, chip.centerY());
         }
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(255, 241, 212));
-        paint.setTextSize(22f);
+        paint.setTextSize(28f);
         paint.setFakeBoldText(true);
-        canvas.drawText(String.valueOf(value), chip.left + 62f, chip.top + 30f, paint);
+        canvas.drawText(String.valueOf(value), chip.left + 74f, chip.top + 37f, paint);
         paint.setFakeBoldText(false);
     }
 
@@ -1487,27 +1489,27 @@ final class FarmGameView extends CanvasGameView {
 
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(255, 222, 35));
-        paint.setTextSize(35f);
+        paint.setTextSize(39f);
         paint.setFakeBoldText(false);
-        canvas.drawText("MENU", left + 58f, centerY + 13f, paint);
+        canvas.drawText("MENU", left + 58f, centerY + 14f, paint);
     }
 
     private void drawBackpackTitle(Canvas canvas, float left, float centerY) {
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(255, 84, 122));
-        canvas.drawRoundRect(left, centerY - 18f, left + 25f, centerY + 18f, 8, 8, paint);
+        canvas.drawRoundRect(left, centerY - 22f, left + 31f, centerY + 22f, 9, 9, paint);
         paint.setColor(Color.rgb(255, 181, 78));
-        canvas.drawRect(left + 5f, centerY - 9f, left + 20f, centerY - 3f, paint);
+        canvas.drawRect(left + 6f, centerY - 11f, left + 25f, centerY - 4f, paint);
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(4f);
         paint.setColor(Color.rgb(255, 138, 170));
-        canvas.drawArc(left + 5f, centerY - 25f, left + 20f, centerY - 6f, 200, 140, false, paint);
+        canvas.drawArc(left + 6f, centerY - 31f, left + 25f, centerY - 7f, 200, 140, false, paint);
 
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(255, 222, 35));
-        paint.setTextSize(35f);
+        paint.setTextSize(40f);
         paint.setFakeBoldText(false);
-        canvas.drawText("BACKPACK", left + 48f, centerY + 13f, paint);
+        canvas.drawText("BACKPACK", left + 56f, centerY + 15f, paint);
     }
 
     private void drawBackpackCloseButton(Canvas canvas) {
@@ -1561,9 +1563,9 @@ final class FarmGameView extends CanvasGameView {
         }
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(active ? Color.rgb(48, 29, 11) : Color.rgb(242, 228, 198));
-        paint.setTextSize(19f);
+        paint.setTextSize(22f);
         paint.setFakeBoldText(true);
-        drawCenteredText(canvas, label, cx, tab.bottom - 18f);
+        drawCenteredText(canvas, label, cx, tab.bottom - 21f);
         paint.setFakeBoldText(false);
     }
 
@@ -1654,7 +1656,7 @@ final class FarmGameView extends CanvasGameView {
         paint.setStyle(Paint.Style.FILL);
         paint.setTypeface(android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD));
         paint.setFakeBoldText(true);
-        paint.setTextSize(fitTextSize("SETTINGS", 39f, content.width() - 172f));
+        paint.setTextSize(fitTextSize("SETTINGS", 42f, content.width() - 172f));
         paint.setColor(Color.rgb(255, 224, 21));
         canvas.drawText("SETTINGS", content.left + 132f, content.top + 60f, paint);
 
@@ -1678,11 +1680,11 @@ final class FarmGameView extends CanvasGameView {
         paint.setTypeface(android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD));
         paint.setFakeBoldText(true);
         paint.setColor(Color.rgb(255, 241, 212));
-        paint.setTextSize(fitTextSize(label, 27f, card.width() * 0.58f));
+        paint.setTextSize(fitTextSize(label, 30f, card.width() * 0.58f));
         canvas.drawText(label, slider.left, labelY, paint);
 
         String percent = Math.round(value * 100f) + "%";
-        paint.setTextSize(27f);
+        paint.setTextSize(30f);
         paint.setTextAlign(Paint.Align.RIGHT);
         canvas.drawText(percent, slider.right, labelY, paint);
         paint.setTextAlign(Paint.Align.LEFT);
@@ -1691,13 +1693,13 @@ final class FarmGameView extends CanvasGameView {
         paint.setFakeBoldText(false);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(96, 43, 11));
-        canvas.drawRoundRect(slider, 8, 8, paint);
+        canvas.drawRoundRect(slider, 9, 9, paint);
 
         float knobX = slider.left + slider.width() * clamp(value, 0f, 1f);
         paint.setColor(Color.rgb(255, 141, 9));
-        canvas.drawCircle(knobX, slider.centerY(), 12f, paint);
+        canvas.drawCircle(knobX, slider.centerY(), 15f, paint);
         paint.setColor(Color.rgb(255, 186, 55));
-        canvas.drawCircle(knobX - 3f, slider.centerY() - 4f, 4f, paint);
+        canvas.drawCircle(knobX - 4f, slider.centerY() - 5f, 5f, paint);
     }
 
     private void drawAudioSettingRow(Canvas canvas, RectF row, RectF toggle, String label,
@@ -1893,39 +1895,44 @@ final class FarmGameView extends CanvasGameView {
         RectF card = new RectF(left, top, left + width, top + height);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.argb(85, 0, 0, 0));
-        canvas.drawRoundRect(card.left + 4f, card.top + 5f, card.right + 4f, card.bottom + 5f, 9, 9, paint);
+        canvas.drawRoundRect(card.left + 5f, card.top + 6f, card.right + 5f, card.bottom + 6f, 11, 11, paint);
         paint.setColor(cardColor);
-        canvas.drawRoundRect(card, 9, 9, paint);
+        canvas.drawRoundRect(card, 11, 11, paint);
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(3f);
+        paint.setStrokeWidth(4f);
         paint.setColor(Color.rgb(120, 55, 18));
-        canvas.drawRoundRect(card, 9, 9, paint);
+        canvas.drawRoundRect(card, 11, 11, paint);
 
-        drawSeedPacketIcon(canvas, left + width * 0.5f, top + 34f, iconColor);
+        drawSeedPacketIcon(canvas, left + width * 0.5f, top + height * 0.28f, iconColor, 1.42f);
 
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(255, 238, 205));
-        paint.setTextSize(14f);
+        paint.setTextSize(fitTextSize(labelTop, 20f, width - 22f));
         paint.setFakeBoldText(true);
-        drawCenteredText(canvas, labelTop, left + width * 0.5f, top + 72f);
-        drawCenteredText(canvas, labelBottom, left + width * 0.5f, top + 88f);
+        drawCenteredText(canvas, labelTop, left + width * 0.5f, top + height * 0.61f);
+        paint.setTextSize(fitTextSize(labelBottom, 20f, width - 22f));
+        drawCenteredText(canvas, labelBottom, left + width * 0.5f, top + height * 0.73f);
         paint.setColor(Color.rgb(255, 220, 28));
-        paint.setTextSize(15f);
-        drawCenteredText(canvas, "x" + count, left + width * 0.5f, top + 106f);
+        paint.setTextSize(21f);
+        drawCenteredText(canvas, "x" + count, left + width * 0.5f, top + height * 0.89f);
         paint.setFakeBoldText(false);
     }
 
     private void drawSeedPacketIcon(Canvas canvas, float cx, float cy, int accent) {
+        drawSeedPacketIcon(canvas, cx, cy, accent, 1f);
+    }
+
+    private void drawSeedPacketIcon(Canvas canvas, float cx, float cy, int accent, float scale) {
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(255, 246, 216));
-        canvas.drawRoundRect(cx - 16f, cy - 19f, cx + 16f, cy + 17f, 4, 4, paint);
+        canvas.drawRoundRect(cx - 16f * scale, cy - 19f * scale, cx + 16f * scale, cy + 17f * scale, 4f * scale, 4f * scale, paint);
         paint.setColor(accent);
-        canvas.drawRect(cx - 12f, cy - 12f, cx + 12f, cy + 7f, paint);
+        canvas.drawRect(cx - 12f * scale, cy - 12f * scale, cx + 12f * scale, cy + 7f * scale, paint);
         paint.setColor(Color.rgb(71, 44, 31));
-        canvas.drawRoundRect(cx - 8f, cy + 3f, cx + 8f, cy + 14f, 3, 3, paint);
+        canvas.drawRoundRect(cx - 8f * scale, cy + 3f * scale, cx + 8f * scale, cy + 14f * scale, 3f * scale, 3f * scale, paint);
         paint.setColor(Color.rgb(96, 210, 92));
-        canvas.drawOval(cx - 10f, cy - 4f, cx + 2f, cy + 5f, paint);
-        canvas.drawOval(cx, cy - 7f, cx + 11f, cy + 3f, paint);
+        canvas.drawOval(cx - 10f * scale, cy - 4f * scale, cx + 2f * scale, cy + 5f * scale, paint);
+        canvas.drawOval(cx, cy - 7f * scale, cx + 11f * scale, cy + 3f * scale, paint);
     }
 
     private void drawSeedSproutIcon(Canvas canvas, float cx, float cy, int leafColor) {
@@ -2095,8 +2102,8 @@ final class FarmGameView extends CanvasGameView {
     private RectF backpackPanelBounds() {
         float maxW = Math.max(320f, getWidth() - 44f);
         float maxH = Math.max(300f, getHeight() - 44f);
-        float w = Math.min(maxW, clamp(getWidth() * 0.64f, 720f, 940f));
-        float h = Math.min(maxH, clamp(getHeight() * 0.52f, 380f, 460f));
+        float w = Math.min(maxW, clamp(getWidth() * 0.72f, 840f, 1080f));
+        float h = Math.min(maxH, clamp(getHeight() * 0.64f, 480f, 560f));
         float left = (getWidth() - w) * 0.5f;
         float top = (getHeight() - h) * 0.5f;
         return new RectF(left, top, left + w, top + h);
@@ -2105,8 +2112,8 @@ final class FarmGameView extends CanvasGameView {
     private RectF settingsPanelBounds() {
         float maxW = Math.max(360f, getWidth() - 44f);
         float maxH = Math.max(380f, getHeight() - 44f);
-        float w = Math.min(maxW, clamp(getWidth() * 0.72f, 820f, 1040f));
-        float h = Math.min(maxH, clamp(getHeight() * 0.74f, 500f, 580f));
+        float w = Math.min(maxW, clamp(getWidth() * 0.76f, 900f, 1120f));
+        float h = Math.min(maxH, clamp(getHeight() * 0.80f, 560f, 660f));
         float left = (getWidth() - w) * 0.5f;
         float top = (getHeight() - h) * 0.5f;
         return new RectF(left, top, left + w, top + h);
@@ -2114,12 +2121,12 @@ final class FarmGameView extends CanvasGameView {
 
     private RectF backpackCloseButtonBounds() {
         RectF panel = backpackPanelBounds();
-        return overlayCloseButtonBounds(panel, 108f);
+        return overlayCloseButtonBounds(panel, BACKPACK_HEADER_HEIGHT);
     }
 
     private RectF menuCloseButtonBounds() {
         RectF panel = settingsPanelBounds();
-        return overlayCloseButtonBounds(panel, 118f);
+        return overlayCloseButtonBounds(panel, SETTINGS_HEADER_HEIGHT);
     }
 
     private RectF overlayCloseButtonBounds(RectF panel, float headerHeight) {
@@ -2130,20 +2137,20 @@ final class FarmGameView extends CanvasGameView {
 
     private RectF settingsAudioTabBounds() {
         RectF panel = settingsPanelBounds();
-        float bodyTop = panel.top + 118f;
-        return new RectF(panel.left + 34f, bodyTop + 30f, panel.left + 170f, bodyTop + 138f);
+        float bodyTop = panel.top + SETTINGS_HEADER_HEIGHT;
+        return new RectF(panel.left + 36f, bodyTop + 34f, panel.left + 184f, bodyTop + 158f);
     }
 
     private RectF settingsAboutTabBounds() {
         RectF panel = settingsPanelBounds();
-        float bodyTop = panel.top + 118f;
-        return new RectF(panel.left + 34f, bodyTop + 160f, panel.left + 170f, bodyTop + 268f);
+        float bodyTop = panel.top + SETTINGS_HEADER_HEIGHT;
+        return new RectF(panel.left + 36f, bodyTop + 182f, panel.left + 184f, bodyTop + 306f);
     }
 
     private RectF aboutGithubButtonBounds() {
         RectF panel = settingsPanelBounds();
-        float bodyTop = panel.top + 118f;
-        float bodyLeft = panel.left + 190f;
+        float bodyTop = panel.top + SETTINGS_HEADER_HEIGHT;
+        float bodyLeft = panel.left + SETTINGS_SIDEBAR_WIDTH;
         float left = bodyLeft + 252f;
         float top = bodyTop + 252f;
         return new RectF(left, top, Math.min(panel.right - 86f, left + 326f), top + 50f);
@@ -2151,11 +2158,11 @@ final class FarmGameView extends CanvasGameView {
 
     private RectF audioSettingsCardBounds() {
         RectF panel = settingsPanelBounds();
-        float bodyLeft = panel.left + 190f;
-        float bodyTop = panel.top + 118f;
+        float bodyLeft = panel.left + SETTINGS_SIDEBAR_WIDTH;
+        float bodyTop = panel.top + SETTINGS_HEADER_HEIGHT;
         float bodyRight = panel.right - 4f;
         float bodyBottom = panel.bottom - 4f;
-        return new RectF(bodyLeft + 42f, bodyTop + 30f, bodyRight - 42f, bodyBottom - 36f);
+        return new RectF(bodyLeft + 46f, bodyTop + 34f, bodyRight - 46f, bodyBottom - 40f);
     }
 
     private RectF audioSliderBounds(int index) {
@@ -2165,7 +2172,7 @@ final class FarmGameView extends CanvasGameView {
         float firstCenter = content.top + Math.max(154f, Math.min(172f, content.height() * 0.38f));
         float lastCenter = Math.max(firstCenter + 172f, content.bottom - 48f);
         float centerY = firstCenter + index * ((lastCenter - firstCenter) * 0.5f);
-        return new RectF(left, centerY - 6f, right, centerY + 6f);
+        return new RectF(left, centerY - 8f, right, centerY + 8f);
     }
 
     private RectF audioSliderTouchBounds(int index) {
@@ -2175,8 +2182,8 @@ final class FarmGameView extends CanvasGameView {
 
     private RectF audioBgmRowBounds() {
         RectF panel = settingsPanelBounds();
-        float bodyTop = panel.top + 118f;
-        float bodyLeft = panel.left + 190f;
+        float bodyTop = panel.top + SETTINGS_HEADER_HEIGHT;
+        float bodyLeft = panel.left + SETTINGS_SIDEBAR_WIDTH;
         return new RectF(bodyLeft + 58f, bodyTop + 94f, panel.right - 58f, bodyTop + 166f);
     }
 
@@ -2340,28 +2347,28 @@ final class FarmGameView extends CanvasGameView {
                 return "";
             case SELL_HARVEST:
                 return gameState.harvests > 0
-                        ? "A: jual " + gameState.harvests + " panen jadi Game Coin."
+                        ? "Tap rumah jual: jual " + gameState.harvests + " panen jadi Game Coin."
                         : "Rumah jual: belum ada hasil panen.";
             case SWAP_TOKEN:
                 if (selectedSwapFromAsset() == SWAP_ASSET_ETH) {
                     int maxCoins = maxEthFundingCoins();
                     return maxCoins > 0
-                            ? "A: isi Game Coin dari Sepolia ETH. Maks " + maxCoins + " coin."
+                            ? "Tap rumah swap: isi Game Coin dari Sepolia ETH. Maks " + maxCoins + " coin."
                             : "Rumah swap: sync saldo ETH Sepolia dulu.";
                 }
                 return gameState.coins > 0
-                        ? "A: pilih output, lalu swap " + gameState.coins + " coin ke Sepolia."
+                        ? "Tap rumah swap: pilih output, lalu swap " + gameState.coins + " coin ke Sepolia."
                         : "Rumah swap: coin belum ada.";
             case BUY_LAND:
-                return "A: beli lahan " + LAND_BUY_PRICE + " coin.";
+                return "Tap tanda lahan: beli " + LAND_BUY_PRICE + " coin.";
             case PLANT:
-                return "A: tanam atau jual lahan kosong.";
+                return "Tap tanda lahan: tanam atau jual lahan kosong.";
             case SELL_LAND:
-                return "A: jual lahan kosong +" + LAND_SELL_PRICE + " coin.";
+                return "Tap tanda lahan: jual lahan kosong +" + LAND_SELL_PRICE + " coin.";
             case WAIT_CROP:
                 return "Tanaman masih tumbuh.";
             case HARVEST:
-                return "A: panen tanaman.";
+                return "Tap tanda lahan: panen tanaman.";
             default:
                 return "Dekati lahan atau toko.";
         }
@@ -2612,7 +2619,7 @@ final class FarmGameView extends CanvasGameView {
         canvas.drawRoundRect(bounds, 12, 12, paint);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(textColor);
-        float preferredTextSize = activeInteractionKind == InteractionKind.SWAP_TOKEN ? 29f : 23f;
+        float preferredTextSize = activeInteractionKind == InteractionKind.SWAP_TOKEN ? 31f : 27f;
         float horizontalPadding = activeInteractionKind == InteractionKind.SWAP_TOKEN ? 42f : 24f;
         paint.setTextSize(fitTextSize(label, preferredTextSize, bounds.width() - horizontalPadding));
         paint.setFakeBoldText(true);
@@ -2690,9 +2697,9 @@ final class FarmGameView extends CanvasGameView {
         RectF panel = interactionDialogPanelBounds();
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(255, 224, 84));
-        paint.setTextSize(21f);
+        paint.setTextSize(25f);
         paint.setFakeBoldText(true);
-        canvas.drawText("Pilih Benih", panel.left + 58f, panel.top + 314f, paint);
+        canvas.drawText("Pilih Benih", panel.left + 58f, panel.top + 316f, paint);
         paint.setFakeBoldText(false);
 
         for (int i = 0; i < SEED_NAMES.length; i++) {
@@ -2713,16 +2720,16 @@ final class FarmGameView extends CanvasGameView {
 
         float iconCx = bounds.left + 34f;
         float iconCy = bounds.centerY() - 1f;
-        drawSeedPacketIcon(canvas, iconCx, iconCy, available ? SEED_ICON_COLORS[seedIndex] : Color.rgb(107, 89, 77));
+        drawSeedPacketIcon(canvas, iconCx, iconCy, available ? SEED_ICON_COLORS[seedIndex] : Color.rgb(107, 89, 77), 1.16f);
 
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(available ? Color.rgb(255, 240, 212) : Color.rgb(190, 151, 124));
-        paint.setTextSize(fitTextSize(SEED_NAMES[seedIndex], 19f, bounds.width() - 72f));
+        paint.setTextSize(fitTextSize(SEED_NAMES[seedIndex], 23f, bounds.width() - 82f));
         paint.setFakeBoldText(true);
-        canvas.drawText(SEED_NAMES[seedIndex], bounds.left + 68f, bounds.top + 34f, paint);
-        paint.setTextSize(18f);
+        canvas.drawText(SEED_NAMES[seedIndex], bounds.left + 76f, bounds.top + 39f, paint);
+        paint.setTextSize(21f);
         paint.setFakeBoldText(false);
-        canvas.drawText("Stok x" + gameState.seedCounts[seedIndex], bounds.left + 68f, bounds.top + 62f, paint);
+        canvas.drawText("Stok x" + gameState.seedCounts[seedIndex], bounds.left + 76f, bounds.top + 72f, paint);
     }
 
     private void drawSwapRouteCard(Canvas canvas, long now) {
@@ -3177,9 +3184,6 @@ final class FarmGameView extends CanvasGameView {
                 joyBaseX = joystickBaseX();
                 joyBaseY = joystickBaseY();
                 updateJoystick(x, y);
-            } else if (isInsideAction(x, y)) {
-                playClickSound();
-                performAction();
             } else if (isInsideWallet(x, y)) {
                 playClickSound();
                 performWallet();
@@ -4088,12 +4092,6 @@ final class FarmGameView extends CanvasGameView {
                 && Math.hypot(x - baseX, y - baseY) <= wideArea;
     }
 
-    private boolean isInsideAction(float x, float y) {
-        float cx = getWidth() - 92;
-        float cy = getHeight() - 86;
-        return Math.hypot(x - cx, y - cy) <= 52;
-    }
-
     private boolean isInsideWallet(float x, float y) {
         return walletButtonBounds().contains(x, y);
     }
@@ -4283,8 +4281,8 @@ final class FarmGameView extends CanvasGameView {
         float right = panel.right - 58f;
         float gap = 14f;
         float width = (right - left - gap * 3f) / 4f;
-        float top = panel.top + 332f;
-        return new RectF(left + index * (width + gap), top, left + index * (width + gap) + width, top + 78f);
+        float top = panel.top + 338f;
+        return new RectF(left + index * (width + gap), top, left + index * (width + gap) + width, top + 96f);
     }
 
     private RectF swapFromCardBounds() {
