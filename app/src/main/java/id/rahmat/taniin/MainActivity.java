@@ -1,7 +1,9 @@
 package id.rahmat.taniin;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.content.pm.ActivityInfo;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.KeyEvent;
@@ -15,6 +17,7 @@ public class MainActivity extends Activity {
     private FarmGameView gameView;
     private LoadingScreenView loadingView;
     private boolean resumed;
+    private String pendingWalletAddress = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -26,9 +29,17 @@ public class MainActivity extends Activity {
                 WindowManager.LayoutParams.FLAG_FULLSCREEN,
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
         hideSystemUi();
+        handleWalletIntent(getIntent());
         loadingView = new LoadingScreenView(this);
         setContentView(loadingView);
         loadingView.start(this::showGameView);
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleWalletIntent(intent);
     }
 
     @Override
@@ -75,9 +86,32 @@ public class MainActivity extends Activity {
         gameView = new FarmGameView(this);
         loadingView = null;
         setContentView(gameView);
+        if (!pendingWalletAddress.isEmpty()) {
+            gameView.connectWalletFromDeepLink(pendingWalletAddress);
+            pendingWalletAddress = "";
+        }
         hideSystemUi();
         if (resumed) {
             gameView.resumeAudio();
+        }
+    }
+
+    private void handleWalletIntent(Intent intent) {
+        if (intent == null || intent.getData() == null) {
+            return;
+        }
+        Uri data = intent.getData();
+        if (!"taniin".equals(data.getScheme()) || !"wallet".equals(data.getHost())) {
+            return;
+        }
+        String address = data.getQueryParameter("address");
+        if (address == null || address.trim().isEmpty()) {
+            return;
+        }
+        if (gameView != null) {
+            gameView.connectWalletFromDeepLink(address.trim());
+        } else {
+            pendingWalletAddress = address.trim();
         }
     }
 

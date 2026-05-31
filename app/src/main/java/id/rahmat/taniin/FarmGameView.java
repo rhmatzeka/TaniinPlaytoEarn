@@ -1,6 +1,9 @@
 package id.rahmat.taniin;
 
 import android.app.Activity;
+import android.content.ActivityNotFoundException;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
@@ -5554,6 +5557,50 @@ final class FarmGameView extends CanvasGameView {
         }
         root.addView(body);
 
+        TextView connectLabel = new TextView(context);
+        connectLabel.setText("Connect dari wallet app");
+        connectLabel.setTextColor(Color.rgb(255, 224, 139));
+        connectLabel.setTextSize(compactForLandscape ? 13f : 15f);
+        connectLabel.setTypeface(null, android.graphics.Typeface.BOLD);
+        connectLabel.setPadding(0, 0, 0, dp(context, 8));
+        root.addView(connectLabel);
+
+        LinearLayout walletActions = new LinearLayout(context);
+        walletActions.setOrientation(LinearLayout.HORIZONTAL);
+        walletActions.setGravity(Gravity.CENTER_VERTICAL);
+        Button connectMetaMask = walletDialogButton(context, "MetaMask", Color.rgb(38, 112, 73), Color.WHITE);
+        Button connectBrowser = walletDialogButton(context, "Browser", Color.rgb(95, 73, 132), Color.WHITE);
+        Button pasteAddress = walletDialogButton(context, "Tempel", Color.rgb(111, 78, 43), Color.rgb(255, 238, 211));
+        LinearLayout.LayoutParams walletActionParams = new LinearLayout.LayoutParams(
+                0,
+                dp(context, compactForLandscape ? 40 : 46),
+                1f);
+        walletActions.addView(connectMetaMask, walletActionParams);
+        LinearLayout.LayoutParams walletActionMidParams = new LinearLayout.LayoutParams(
+                0,
+                dp(context, compactForLandscape ? 40 : 46),
+                1f);
+        walletActionMidParams.leftMargin = dp(context, 10);
+        walletActions.addView(connectBrowser, walletActionMidParams);
+        LinearLayout.LayoutParams walletActionLastParams = new LinearLayout.LayoutParams(
+                0,
+                dp(context, compactForLandscape ? 40 : 46),
+                1f);
+        walletActionLastParams.leftMargin = dp(context, 10);
+        walletActions.addView(pasteAddress, walletActionLastParams);
+        root.addView(walletActions, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        TextView fallbackLabel = new TextView(context);
+        fallbackLabel.setText("Fallback public address");
+        fallbackLabel.setTextColor(Color.rgb(197, 178, 148));
+        fallbackLabel.setTextSize(compactForLandscape ? 12f : 13.5f);
+        fallbackLabel.setPadding(0, dp(context, compactForLandscape ? 10 : 14), 0, dp(context, 6));
+        if (!compactForLandscape) {
+            root.addView(fallbackLabel);
+        }
+
         final EditText input = new EditText(context);
         input.setSingleLine(true);
         input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
@@ -5570,16 +5617,18 @@ final class FarmGameView extends CanvasGameView {
                 dp(context, 10),
                 Color.rgb(130, 85, 43),
                 dp(context, 2)));
-        root.addView(input, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(context, compactForLandscape ? 48 : 54)));
+        if (!compactForLandscape) {
+            root.addView(input, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(context, 54)));
+        }
 
         LinearLayout actions = new LinearLayout(context);
         actions.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
         actions.setPadding(0, dp(context, compactForLandscape ? 14 : 24), 0, 0);
         Button close = walletDialogButton(context, "Tutup", Color.rgb(91, 64, 40), Color.rgb(239, 220, 191));
         Button sync = walletDialogButton(context, "Sync", Color.rgb(43, 108, 72), Color.WHITE);
-        Button save = walletDialogButton(context, connected ? "Ganti" : "Simpan", Color.rgb(214, 129, 39), Color.WHITE);
+        Button save = walletDialogButton(context, compactForLandscape ? "Manual" : connected ? "Ganti" : "Simpan", Color.rgb(214, 129, 39), Color.WHITE);
         LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(
                 dp(context, compactForLandscape ? 88 : 108),
                 dp(context, compactForLandscape ? 42 : 48));
@@ -5600,7 +5649,207 @@ final class FarmGameView extends CanvasGameView {
         root.addView(actions);
 
         close.setOnClickListener(v -> dialog.dismiss());
-        sync.setOnClickListener(v -> syncWalletFromInput(input, dialog));
+        connectMetaMask.setOnClickListener(v -> openWalletConnectPage(dialog, true));
+        connectBrowser.setOnClickListener(v -> openWalletConnectPage(dialog, false));
+        pasteAddress.setOnClickListener(v -> pasteWalletAddressFromClipboard(input, dialog, compactForLandscape));
+        sync.setOnClickListener(v -> {
+            if (compactForLandscape) {
+                syncCurrentWallet(dialog);
+            } else {
+                syncWalletFromInput(input, dialog);
+            }
+        });
+        save.setOnClickListener(v -> {
+            if (compactForLandscape) {
+                dialog.dismiss();
+                openManualWalletAddressDialog();
+            } else {
+                saveWalletFromInput(input, dialog);
+            }
+        });
+        input.setOnEditorActionListener((v, actionId, event) -> {
+            boolean enter = event != null
+                    && event.getAction() == KeyEvent.ACTION_UP
+                    && event.getKeyCode() == KeyEvent.KEYCODE_ENTER;
+            if (actionId == EditorInfo.IME_ACTION_DONE || enter) {
+                return saveWalletFromInput(input, dialog);
+            }
+            return false;
+        });
+
+        dialog.setContentView(root);
+        dialog.show();
+        Window dialogWindow = dialog.getWindow();
+        if (dialogWindow != null) {
+            dialogWindow.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            WindowManager.LayoutParams params = dialogWindow.getAttributes();
+            params.dimAmount = 0.62f;
+            dialogWindow.setAttributes(params);
+            dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            dialogWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
+                    | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+            dialogWindow.setLayout(
+                    Math.min(Math.max(1, getWidth() - dp(context, 32)), (int) clamp(getWidth() * 0.50f, 720f, compactForLandscape ? 1180f : 900f)),
+                    WindowManager.LayoutParams.WRAP_CONTENT);
+        }
+    }
+
+    private String walletDialogBodyText() {
+        if (isConnectedWalletBackendSigner()) {
+            return "Wallet ini signer backend. Connect wallet pemain lewat MetaMask atau browser wallet supaya payout ETH bisa masuk.";
+        }
+        if (!walletAddress.isEmpty()) {
+            return "Connect wallet pemain dari wallet app, atau tekan Sync untuk baca ulang saldo. Jangan masukkan private key.";
+        }
+        return "Connect wallet pemain dari MetaMask atau browser wallet. Taniin hanya membaca public address.";
+    }
+
+    void connectWalletFromDeepLink(String address) {
+        String cleaned = address == null ? "" : address.trim();
+        if (!isValidAddress(cleaned)) {
+            showErrorMessage("Wallet dari wallet app tidak valid.");
+            return;
+        }
+        storeWalletAddress(cleaned);
+        chainStatus = "Wallet tersambung dari wallet app: " + shortAddress(walletAddress) + ". Sync Sepolia...";
+        chainPanelUntilMs = System.currentTimeMillis() + 5200L;
+        showSuccessPopup("Wallet tersambung: " + shortAddress(walletAddress));
+        refreshWalletState(true);
+        invalidate();
+    }
+
+    private void openWalletConnectPage(Dialog dialog, boolean metaMask) {
+        String url = blockchainClient.walletConnectUrl();
+        if (url.isEmpty()) {
+            showErrorMessage("TANIIN_GAME_API_URL belum diset untuk connect wallet app.");
+            return;
+        }
+        Uri uri = metaMask
+                ? Uri.parse("https://metamask.app.link/dapp/" + walletConnectDappPath(url))
+                : Uri.parse(url);
+        Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+        if (!(getContext() instanceof Activity)) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        }
+        try {
+            getContext().startActivity(intent);
+            dialog.dismiss();
+            chainStatus = "Approve connect wallet, lalu Taniin akan menerima public address otomatis.";
+            chainPanelUntilMs = System.currentTimeMillis() + 5200L;
+            showMessage(metaMask ? "Membuka MetaMask connect..." : "Membuka halaman connect wallet...");
+            invalidate();
+        } catch (ActivityNotFoundException exception) {
+            showErrorMessage(metaMask ? "MetaMask belum terpasang." : "Tidak bisa membuka browser wallet.");
+        } catch (RuntimeException exception) {
+            showErrorMessage("Tidak bisa membuka connect wallet di perangkat ini.");
+        }
+    }
+
+    private String walletConnectDappPath(String url) {
+        Uri uri = Uri.parse(url);
+        String host = uri.getHost();
+        if (host == null || host.trim().isEmpty()) {
+            return url;
+        }
+        String path = uri.getEncodedPath();
+        return host + (path == null ? "" : path);
+    }
+
+    private void pasteWalletAddressFromClipboard(EditText input, Dialog dialog, boolean saveDirectly) {
+        String address = clipboardWalletAddress();
+        if (address.isEmpty()) {
+            showErrorMessage("Clipboard belum berisi public address 0x...");
+            return;
+        }
+        if (saveDirectly) {
+            dialog.dismiss();
+            connectWalletFromDeepLink(address);
+            return;
+        }
+        input.setText(address);
+        input.setSelection(input.getText().length());
+        showMessage("Address dari clipboard siap dipakai.");
+    }
+
+    private void syncCurrentWallet(Dialog dialog) {
+        if (walletAddress.isEmpty()) {
+            showErrorMessage("Connect wallet dulu untuk sync.");
+            return;
+        }
+        dialog.dismiss();
+        refreshWalletState(true);
+        showMessage("Wallet sync: " + shortAddress(walletAddress));
+    }
+
+    private void openManualWalletAddressDialog() {
+        Context context = getContext();
+        if (!(context instanceof Activity)) {
+            return;
+        }
+        Dialog dialog = new Dialog(context);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+
+        LinearLayout root = new LinearLayout(context);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(context, 24), dp(context, 22), dp(context, 24), dp(context, 20));
+        root.setBackground(roundedStrokeDrawable(
+                Color.rgb(55, 37, 24),
+                dp(context, 16),
+                Color.rgb(173, 91, 31),
+                dp(context, 3)));
+
+        TextView title = new TextView(context);
+        title.setText("Input Wallet Manual");
+        title.setTextColor(Color.rgb(255, 230, 158));
+        title.setTextSize(22f);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        root.addView(title);
+
+        TextView body = new TextView(context);
+        body.setText("Fallback saja. Pakai public address 0x, jangan private key.");
+        body.setTextColor(Color.rgb(237, 223, 200));
+        body.setTextSize(14.5f);
+        body.setPadding(0, dp(context, 10), 0, dp(context, 12));
+        root.addView(body);
+
+        final EditText input = new EditText(context);
+        input.setSingleLine(true);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        input.setImeOptions(EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
+        input.setHint("0x wallet address Sepolia");
+        input.setText(walletAddress);
+        input.setSelectAllOnFocus(false);
+        input.setTextColor(Color.WHITE);
+        input.setHintTextColor(Color.rgb(185, 164, 138));
+        input.setTextSize(16f);
+        input.setPadding(dp(context, 16), 0, dp(context, 16), 0);
+        input.setBackground(roundedStrokeDrawable(
+                Color.rgb(38, 30, 24),
+                dp(context, 10),
+                Color.rgb(130, 85, 43),
+                dp(context, 2)));
+        root.addView(input, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(context, 48)));
+
+        LinearLayout actions = new LinearLayout(context);
+        actions.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        actions.setPadding(0, dp(context, 14), 0, 0);
+        Button close = walletDialogButton(context, "Batal", Color.rgb(91, 64, 40), Color.rgb(239, 220, 191));
+        Button paste = walletDialogButton(context, "Tempel", Color.rgb(111, 78, 43), Color.rgb(255, 238, 211));
+        Button save = walletDialogButton(context, "Simpan", Color.rgb(214, 129, 39), Color.WHITE);
+        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(dp(context, 94), dp(context, 42));
+        actions.addView(close, closeParams);
+        LinearLayout.LayoutParams pasteParams = new LinearLayout.LayoutParams(dp(context, 94), dp(context, 42));
+        pasteParams.leftMargin = dp(context, 8);
+        actions.addView(paste, pasteParams);
+        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(dp(context, 108), dp(context, 42));
+        saveParams.leftMargin = dp(context, 8);
+        actions.addView(save, saveParams);
+        root.addView(actions);
+
+        close.setOnClickListener(v -> dialog.dismiss());
+        paste.setOnClickListener(v -> pasteWalletAddressFromClipboard(input, dialog, false));
         save.setOnClickListener(v -> saveWalletFromInput(input, dialog));
         input.setOnEditorActionListener((v, actionId, event) -> {
             boolean enter = event != null
@@ -5624,21 +5873,54 @@ final class FarmGameView extends CanvasGameView {
             dialogWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
                     | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
             dialogWindow.setLayout(
-                    Math.min(Math.max(1, getWidth() - dp(context, 32)), (int) clamp(getWidth() * 0.50f, 720f, compactForLandscape ? 1180f : 900f)),
+                    Math.min(Math.max(1, getWidth() - dp(context, 32)), (int) clamp(getWidth() * 0.46f, 680f, 980f)),
                     WindowManager.LayoutParams.WRAP_CONTENT);
         }
         input.requestFocus();
         input.setSelection(input.getText().length());
     }
 
-    private String walletDialogBodyText() {
-        if (isConnectedWalletBackendSigner()) {
-            return "Wallet ini signer backend. Payout ETH ke wallet yang sama diblokir. Masukkan public wallet pemain yang berbeda.";
+    private String clipboardWalletAddress() {
+        Object service = getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+        if (!(service instanceof ClipboardManager)) {
+            return "";
         }
-        if (!walletAddress.isEmpty()) {
-            return "Masukkan public wallet pemain lain, atau tekan Sync untuk baca ulang saldo Sepolia dan TANI. Jangan masukkan private key.";
+        ClipboardManager clipboard = (ClipboardManager) service;
+        ClipData clipData = clipboard.getPrimaryClip();
+        if (clipData == null) {
+            return "";
         }
-        return "Masukkan public wallet address untuk sync saldo Sepolia dan coin TANI. Jangan masukkan private key.";
+        for (int i = 0; i < clipData.getItemCount(); i++) {
+            CharSequence text = clipData.getItemAt(i).coerceToText(getContext());
+            String address = firstWalletAddressInText(text == null ? "" : text.toString());
+            if (!address.isEmpty()) {
+                return address;
+            }
+        }
+        return "";
+    }
+
+    private String firstWalletAddressInText(String text) {
+        if (text == null) {
+            return "";
+        }
+        String lower = text.toLowerCase(Locale.US);
+        int from = 0;
+        while (from < lower.length()) {
+            int start = lower.indexOf("0x", from);
+            if (start < 0) {
+                return "";
+            }
+            int end = start + 42;
+            if (end <= text.length()) {
+                String candidate = text.substring(start, end);
+                if (isValidAddress(candidate)) {
+                    return candidate;
+                }
+            }
+            from = start + 2;
+        }
+        return "";
     }
 
     private boolean syncWalletFromInput(EditText input, Dialog dialog) {

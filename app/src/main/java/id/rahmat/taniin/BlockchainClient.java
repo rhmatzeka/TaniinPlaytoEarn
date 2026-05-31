@@ -55,6 +55,10 @@ final class BlockchainClient {
         return !gameApiUrl.isEmpty();
     }
 
+    String walletConnectUrl() {
+        return hasGameApi() ? gameApiUrl + "/wallet-connect" : "";
+    }
+
     String defaultWalletAddress() {
         return defaultWalletAddress;
     }
