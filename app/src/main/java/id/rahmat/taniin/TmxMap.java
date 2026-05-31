@@ -130,7 +130,14 @@ final class TmxMap {
         map.minTileY = minY;
         map.maxTileX = maxX;
         map.maxTileY = maxY;
+        map.buildLayerIndexes();
         return map;
+    }
+
+    private void buildLayerIndexes() {
+        for (MapLayer layer : layers) {
+            layer.buildDrawIndex(minTileY, maxTileY);
+        }
     }
 
     int getWorldWidthPixels(int targetTileSize) {
@@ -204,6 +211,15 @@ final class TmxMap {
         }
     }
 
+    Bitmap createMiniMapBitmap(int width, int height, int targetTileSize) {
+        int bitmapWidth = Math.max(1, width);
+        int bitmapHeight = Math.max(1, height);
+        Bitmap bitmap = Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        drawMiniMap(canvas, new RectF(0f, 0f, bitmapWidth, bitmapHeight), targetTileSize);
+        return bitmap;
+    }
+
     private void drawLayers(
             Canvas canvas,
             float cameraX,
@@ -217,29 +233,34 @@ final class TmxMap {
         int lastTileY = Math.min(maxTileY, minTileY + (int) ((cameraY + canvas.getHeight()) / targetTileSize) + 3);
 
         for (MapLayer layer : layers) {
-            for (Tile tile : layer.tiles) {
-                if (isDrawnInForeground(layer.name, tile.gid) != foreground) {
-                    continue;
+            List<List<Tile>> rows = layer.rowsFor(foreground);
+            int firstRow = Math.max(0, firstTileY - minTileY);
+            int lastRow = Math.min(rows.size() - 1, lastTileY - minTileY);
+            for (int rowIndex = firstRow; rowIndex <= lastRow; rowIndex++) {
+                for (Tile tile : rows.get(rowIndex)) {
+                    if (tile.x < firstTileX) {
+                        continue;
+                    }
+                    if (tile.x > lastTileX) {
+                        break;
+                    }
+                    Tileset tileset = findTileset(tile.gid);
+                    if (tileset == null || tileset.bitmap == null) {
+                        continue;
+                    }
+                    int localId = tile.gid - tileset.firstGid;
+                    int sourceX = (localId % tileset.columns) * tileset.tileWidth;
+                    int sourceY = (localId / tileset.columns) * tileset.tileHeight;
+                    src.set(sourceX, sourceY, sourceX + tileset.tileWidth, sourceY + tileset.tileHeight);
+                    float screenX = (tile.x - minTileX) * targetTileSize - cameraX;
+                    float screenY = (tile.y - minTileY) * targetTileSize - cameraY;
+                    dst.set(
+                            screenX,
+                            screenY,
+                            screenX + tileset.tileWidth * scale,
+                            screenY + tileset.tileHeight * scale);
+                    canvas.drawBitmap(tileset.bitmap, src, dst, pixelPaint);
                 }
-                if (tile.x < firstTileX || tile.x > lastTileX || tile.y < firstTileY || tile.y > lastTileY) {
-                    continue;
-                }
-                Tileset tileset = findTileset(tile.gid);
-                if (tileset == null || tileset.bitmap == null) {
-                    continue;
-                }
-                int localId = tile.gid - tileset.firstGid;
-                int sourceX = (localId % tileset.columns) * tileset.tileWidth;
-                int sourceY = (localId / tileset.columns) * tileset.tileHeight;
-                src.set(sourceX, sourceY, sourceX + tileset.tileWidth, sourceY + tileset.tileHeight);
-                float screenX = (tile.x - minTileX) * targetTileSize - cameraX;
-                float screenY = (tile.y - minTileY) * targetTileSize - cameraY;
-                dst.set(
-                        screenX,
-                        screenY,
-                        screenX + tileset.tileWidth * scale,
-                        screenY + tileset.tileHeight * scale);
-                canvas.drawBitmap(tileset.bitmap, src, dst, pixelPaint);
             }
         }
     }
@@ -637,9 +658,43 @@ final class TmxMap {
     private static final class MapLayer {
         final String name;
         final List<Tile> tiles = new ArrayList<>();
+        final List<List<Tile>> backgroundRows = new ArrayList<>();
+        final List<List<Tile>> foregroundRows = new ArrayList<>();
 
         MapLayer(String name) {
             this.name = name;
+        }
+
+        void buildDrawIndex(int minTileY, int maxTileY) {
+            int rowCount = Math.max(1, maxTileY - minTileY + 1);
+            backgroundRows.clear();
+            foregroundRows.clear();
+            for (int i = 0; i < rowCount; i++) {
+                backgroundRows.add(new ArrayList<>());
+                foregroundRows.add(new ArrayList<>());
+            }
+            for (Tile tile : tiles) {
+                int row = tile.y - minTileY;
+                if (row < 0 || row >= rowCount) {
+                    continue;
+                }
+                List<Tile> target = isDrawnInForeground(name, tile.gid)
+                        ? foregroundRows.get(row)
+                        : backgroundRows.get(row);
+                target.add(tile);
+            }
+            sortRows(backgroundRows);
+            sortRows(foregroundRows);
+        }
+
+        List<List<Tile>> rowsFor(boolean foreground) {
+            return foreground ? foregroundRows : backgroundRows;
+        }
+
+        private void sortRows(List<List<Tile>> rows) {
+            for (List<Tile> row : rows) {
+                row.sort(Comparator.comparingInt(tile -> tile.x));
+            }
         }
     }
 

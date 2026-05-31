@@ -115,6 +115,7 @@ final class FarmGameView extends CanvasGameView {
     private final Paint pixelPaint = new Paint();
     private final Rect src = new Rect();
     private final RectF dst = new RectF();
+    private final RectF miniMapInnerBounds = new RectF();
     private final GameState gameState = new GameState();
     private final FarmingSystem farmingSystem = new FarmingSystem(
             LAND_BUY_PRICE,
@@ -140,6 +141,9 @@ final class FarmGameView extends CanvasGameView {
     private final SwapAmountDialogController swapAmountDialogController = new SwapAmountDialogController(this);
     private MapDecorationRenderer mapDecorationRenderer;
     private TmxMap tmxMap;
+    private Bitmap miniMapBitmap;
+    private int miniMapBitmapWidth;
+    private int miniMapBitmapHeight;
 
     private final Bitmap idleSheet;
     private final Bitmap walkSheet;
@@ -1197,7 +1201,7 @@ final class FarmGameView extends CanvasGameView {
         float left = miniMapLeft();
         float top = miniMapTop();
         float inset = 8f;
-        RectF inner = new RectF(left + inset, top + inset, left + mapW - inset, top + mapH - inset);
+        miniMapInnerBounds.set(left + inset, top + inset, left + mapW - inset, top + mapH - inset);
 
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.argb(90, 0, 0, 0));
@@ -1208,16 +1212,16 @@ final class FarmGameView extends CanvasGameView {
         canvas.drawRoundRect(left + 3f, top + 3f, left + mapW - 3f, top + mapH - 3f, 6, 6, paint);
 
         canvas.save();
-        canvas.clipRect(inner);
+        canvas.clipRect(miniMapInnerBounds);
         if (tmxMap != null) {
-            tmxMap.drawMiniMap(canvas, inner, TILE);
+            drawCachedMiniMap(canvas, miniMapInnerBounds);
         } else {
             paint.setColor(Color.rgb(105, 184, 78));
-            canvas.drawRect(inner, paint);
+            canvas.drawRect(miniMapInnerBounds, paint);
         }
 
-        float x = inner.left + playerX / worldWidthPixels * inner.width();
-        float y = inner.top + playerY / worldHeightPixels * inner.height();
+        float x = miniMapInnerBounds.left + playerX / worldWidthPixels * miniMapInnerBounds.width();
+        float y = miniMapInnerBounds.top + playerY / worldHeightPixels * miniMapInnerBounds.height();
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.WHITE);
         canvas.drawCircle(x, y, 4.4f, paint);
@@ -1230,6 +1234,17 @@ final class FarmGameView extends CanvasGameView {
         paint.setColor(Color.argb(170, 255, 241, 166));
         canvas.drawRoundRect(left + 6f, top + 6f, left + mapW - 6f, top + mapH - 6f, 4, 4, paint);
         paint.setStyle(Paint.Style.FILL);
+    }
+
+    private void drawCachedMiniMap(Canvas canvas, RectF bounds) {
+        int width = Math.max(1, Math.round(bounds.width()));
+        int height = Math.max(1, Math.round(bounds.height()));
+        if (miniMapBitmap == null || miniMapBitmapWidth != width || miniMapBitmapHeight != height) {
+            miniMapBitmap = tmxMap.createMiniMapBitmap(width, height, TILE);
+            miniMapBitmapWidth = width;
+            miniMapBitmapHeight = height;
+        }
+        canvas.drawBitmap(miniMapBitmap, null, bounds, pixelPaint);
     }
 
     private void drawTopMenu(Canvas canvas) {
