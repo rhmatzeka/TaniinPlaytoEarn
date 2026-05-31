@@ -99,9 +99,8 @@ final class FarmGameView extends CanvasGameView {
             Color.rgb(236, 70, 103),
             Color.rgb(247, 156, 88)
     };
-    private static final int MENU_TAB_INVENTORY = 0;
-    private static final int MENU_TAB_SETTINGS = 1;
-    private static final int MENU_TAB_ABOUT = 2;
+    private static final int MENU_TAB_SETTINGS = 0;
+    private static final int MENU_TAB_ABOUT = 1;
     private static final int CHAIN_HISTORY_LIMIT = 8;
     private static final float DEFAULT_MASTER_VOLUME = 0.82f;
     private static final float DEFAULT_MUSIC_VOLUME = 0.70f;
@@ -189,6 +188,7 @@ final class FarmGameView extends CanvasGameView {
     private int activeInteractionPlot = -1;
     private boolean moving;
     private boolean menuOpen;
+    private boolean backpackOpen;
     private boolean interactionDialogOpen;
     private boolean shopCatalogOpen;
     private boolean shopPurchaseConfirmOpen;
@@ -200,7 +200,7 @@ final class FarmGameView extends CanvasGameView {
     private float masterVolume = DEFAULT_MASTER_VOLUME;
     private float musicVolume = DEFAULT_MUSIC_VOLUME;
     private float sfxVolume = DEFAULT_SFX_VOLUME;
-    private int menuTab = MENU_TAB_INVENTORY;
+    private int menuTab = MENU_TAB_SETTINGS;
     private InteractionKind activeInteractionKind = InteractionKind.NONE;
     private int shopPurchaseSeedIndex = -1;
     private int audioTrackIndex;
@@ -1077,6 +1077,7 @@ final class FarmGameView extends CanvasGameView {
         hudRenderer.drawActionButton(canvas, getWidth(), getHeight());
         drawWalletButton(canvas);
         drawChainHistoryButton(canvas);
+        drawBackpackButton(canvas);
         hudRenderer.drawContextMessage(canvas, getWidth(), getHeight(), contextText(now));
         if (shopUntilMs > now) {
             drawShopPanel(canvas);
@@ -1086,6 +1087,9 @@ final class FarmGameView extends CanvasGameView {
         }
         if (menuOpen) {
             drawMenuPanel(canvas);
+        }
+        if (backpackOpen) {
+            drawBackpackPanel(canvas);
         }
         if (interactionDialogOpen) {
             drawInteractionDialog(canvas, now);
@@ -1330,18 +1334,54 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void drawMenuPanel(Canvas canvas) {
-        drawBackpackPanel(canvas);
+        canvas.drawColor(Color.argb(155, 0, 0, 0));
+
+        RectF panel = settingsPanelBounds();
+        float headerH = 118f;
+        float sidebarW = 190f;
+        float bodyTop = panel.top + headerH;
+        float bodyLeft = panel.left + sidebarW;
+
+        drawOverlayPanelFrame(canvas, panel, bodyTop);
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(DialogUi.PANEL_INNER_FILL);
+        canvas.drawRect(bodyLeft, bodyTop, panel.right - 4f, panel.bottom - 4f, paint);
+        paint.setColor(Color.rgb(112, 52, 20));
+        canvas.drawRect(panel.left + 4f, bodyTop, bodyLeft, panel.bottom - 4f, paint);
+
+        drawMenuTitle(canvas, panel.left + 58f, panel.top + 61f);
+        drawPanelCloseButton(canvas, menuCloseButtonBounds());
+
+        drawBackpackSideTab(canvas, settingsAudioTabBounds(), menuTab == MENU_TAB_SETTINGS, "AUDIO", Color.rgb(105, 196, 250));
+        drawBackpackSideTab(canvas, settingsAboutTabBounds(), menuTab == MENU_TAB_ABOUT, "ABOUT", Color.rgb(255, 151, 83));
+
+        if (menuTab == MENU_TAB_ABOUT) {
+            drawAboutPanel(canvas, panel, bodyLeft, bodyTop);
+            return;
+        }
+        drawAudioSettingsPanel(canvas, panel, bodyLeft, bodyTop);
     }
 
     private void drawBackpackPanel(Canvas canvas) {
         canvas.drawColor(Color.argb(155, 0, 0, 0));
 
-        RectF panel = inventoryPanelBounds();
-        float headerH = 118f;
-        float sidebarW = 220f;
+        RectF panel = backpackPanelBounds();
+        float headerH = 108f;
         float bodyTop = panel.top + headerH;
-        float bodyLeft = panel.left + sidebarW;
 
+        drawOverlayPanelFrame(canvas, panel, bodyTop);
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(DialogUi.PANEL_INNER_FILL);
+        canvas.drawRect(panel.left + 4f, bodyTop, panel.right - 4f, panel.bottom - 4f, paint);
+
+        drawBackpackTitle(canvas, panel.left + 58f, panel.top + 56f);
+        drawBackpackCloseButton(canvas);
+        drawBackpackInventoryContent(canvas, panel, bodyTop);
+    }
+
+    private void drawOverlayPanelFrame(Canvas canvas, RectF panel, float bodyTop) {
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.argb(120, 0, 0, 0));
         canvas.drawRoundRect(panel.left + 8f, panel.top + 10f, panel.right + 8f, panel.bottom + 10f, 26, 26, paint);
@@ -1357,10 +1397,6 @@ final class FarmGameView extends CanvasGameView {
         canvas.drawRoundRect(panel.left + 4f, panel.top + 4f, panel.right - 4f, bodyTop, 24, 24, paint);
         paint.setColor(Color.rgb(95, 43, 16));
         canvas.drawRect(panel.left + 4f, bodyTop - 4f, panel.right - 4f, bodyTop + 2f, paint);
-        paint.setColor(DialogUi.PANEL_INNER_FILL);
-        canvas.drawRect(bodyLeft, bodyTop, panel.right - 4f, panel.bottom - 4f, paint);
-        paint.setColor(Color.rgb(112, 52, 20));
-        canvas.drawRect(panel.left + 4f, bodyTop, bodyLeft, panel.bottom - 4f, paint);
 
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(3f);
@@ -1371,32 +1407,41 @@ final class FarmGameView extends CanvasGameView {
         drawPanelCorner(canvas, panel.right - 24f, panel.top + 24f, false, true);
         drawPanelCorner(canvas, panel.left + 24f, panel.bottom - 24f, true, false);
         drawPanelCorner(canvas, panel.right - 24f, panel.bottom - 24f, false, false);
+    }
 
-        drawBackpackTitle(canvas, panel.left + 58f, panel.top + 61f);
-        drawBackpackCloseButton(canvas);
+    private void drawBackpackInventoryContent(Canvas canvas, RectF panel, float bodyTop) {
+        RectF content = new RectF(panel.left + 40f, bodyTop + 24f, panel.right - 40f, panel.bottom - 34f);
 
-        drawBackpackSideTab(canvas, backpackSeedTabBounds(), menuTab == MENU_TAB_INVENTORY, "SEEDS", Color.rgb(255, 207, 14));
-        drawBackpackSideTab(canvas, backpackAudioTabBounds(), menuTab == MENU_TAB_SETTINGS, "AUDIO", Color.rgb(105, 196, 250));
-        drawBackpackSideTab(canvas, backpackAboutTabBounds(), menuTab == MENU_TAB_ABOUT, "ABOUT", Color.rgb(255, 151, 83));
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(126, 58, 20));
+        canvas.drawRoundRect(content.left, content.top, content.right, content.top + 58f, 14, 14, paint);
+        paint.setColor(DialogUi.TITLE);
+        paint.setTextSize(24f);
+        paint.setFakeBoldText(true);
+        canvas.drawText("SEEDS", content.left + 22f, content.top + 38f, paint);
+        paint.setFakeBoldText(false);
 
-        if (menuTab == MENU_TAB_SETTINGS) {
-            drawAudioSettingsPanel(canvas, panel, bodyLeft, bodyTop);
-            return;
+        drawBackpackStatChip(canvas, content.right - 334f, content.top + 7f, 152f, true, gameState.coins);
+        drawBackpackStatChip(canvas, content.right - 166f, content.top + 7f, 146f, false, gameState.harvests);
+
+        float cardW = 122f;
+        float cardH = 126f;
+        float gap = 28f;
+        int columns = SEED_NAMES.length;
+        float gridW = columns * cardW + (columns - 1) * gap;
+        if (gridW > content.width()) {
+            columns = 2;
+            gap = 24f;
+            gridW = columns * cardW + (columns - 1) * gap;
         }
-        if (menuTab == MENU_TAB_ABOUT) {
-            drawAboutPanel(canvas, panel, bodyLeft, bodyTop);
-            return;
-        }
-
-        float cardTop = bodyTop + 43f;
-        float cardLeft = bodyLeft + 42f;
-        float cardW = 116f;
-        float cardH = 118f;
-        float gap = 34f;
+        float startX = content.left + Math.max(0f, (content.width() - gridW) * 0.5f);
+        float startY = content.top + 86f;
         for (int i = 0; i < SEED_NAMES.length; i++) {
+            int col = i % columns;
+            int row = i / columns;
             drawInventoryItemCard(canvas,
-                    cardLeft + i * (cardW + gap),
-                    cardTop,
+                    startX + col * (cardW + gap),
+                    startY + row * (cardH + 22f),
                     cardW,
                     cardH,
                     SEED_CARD_COLORS[i],
@@ -1405,6 +1450,44 @@ final class FarmGameView extends CanvasGameView {
                     SEED_NAMES[i],
                     gameState.seedCounts[i]);
         }
+    }
+
+    private void drawBackpackStatChip(Canvas canvas, float left, float top, float width, boolean coin, int value) {
+        RectF chip = new RectF(left, top, left + width, top + 44f);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(96, 43, 13));
+        canvas.drawRoundRect(chip, 12, 12, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(3f);
+        paint.setColor(Color.rgb(170, 89, 28));
+        canvas.drawRoundRect(chip, 12, 12, paint);
+        if (coin) {
+            drawCoinHudIcon(canvas, chip.left + 27f, chip.centerY());
+        } else {
+            drawHarvestHudIcon(canvas, chip.left + 27f, chip.centerY());
+        }
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(255, 241, 212));
+        paint.setTextSize(22f);
+        paint.setFakeBoldText(true);
+        canvas.drawText(String.valueOf(value), chip.left + 62f, chip.top + 30f, paint);
+        paint.setFakeBoldText(false);
+    }
+
+    private void drawMenuTitle(Canvas canvas, float left, float centerY) {
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(5f);
+        paint.setColor(Color.rgb(255, 236, 190));
+        for (int i = -1; i <= 1; i++) {
+            float y = centerY + i * 12f;
+            canvas.drawLine(left + 2f, y, left + 34f, y, paint);
+        }
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(255, 222, 35));
+        paint.setTextSize(35f);
+        paint.setFakeBoldText(false);
+        canvas.drawText("MENU", left + 58f, centerY + 13f, paint);
     }
 
     private void drawBackpackTitle(Canvas canvas, float left, float centerY) {
@@ -1426,7 +1509,10 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void drawBackpackCloseButton(Canvas canvas) {
-        RectF close = inventoryCloseButtonBounds();
+        drawPanelCloseButton(canvas, backpackCloseButtonBounds());
+    }
+
+    private void drawPanelCloseButton(Canvas canvas, RectF close) {
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(148, 75, 25));
         canvas.drawRoundRect(close, 10, 10, paint);
@@ -1998,49 +2084,60 @@ final class FarmGameView extends CanvasGameView {
         return new RectF(right - w, top, right, top + h);
     }
 
-    private RectF inventoryPanelBounds() {
-        float w = clamp(getWidth() * 0.58f, 980f, 1320f);
-        float h = clamp(getHeight() * 0.58f, 520f, 640f);
+    private RectF backpackPanelBounds() {
+        float maxW = Math.max(320f, getWidth() - 44f);
+        float maxH = Math.max(300f, getHeight() - 44f);
+        float w = Math.min(maxW, clamp(getWidth() * 0.64f, 720f, 940f));
+        float h = Math.min(maxH, clamp(getHeight() * 0.52f, 380f, 460f));
         float left = (getWidth() - w) * 0.5f;
         float top = (getHeight() - h) * 0.5f;
         return new RectF(left, top, left + w, top + h);
     }
 
-    private RectF inventoryCloseButtonBounds() {
-        RectF panel = inventoryPanelBounds();
+    private RectF settingsPanelBounds() {
+        float maxW = Math.max(360f, getWidth() - 44f);
+        float maxH = Math.max(380f, getHeight() - 44f);
+        float w = Math.min(maxW, clamp(getWidth() * 0.72f, 820f, 1040f));
+        float h = Math.min(maxH, clamp(getHeight() * 0.74f, 500f, 580f));
+        float left = (getWidth() - w) * 0.5f;
+        float top = (getHeight() - h) * 0.5f;
+        return new RectF(left, top, left + w, top + h);
+    }
+
+    private RectF backpackCloseButtonBounds() {
+        RectF panel = backpackPanelBounds();
+        return new RectF(panel.right - 92f, panel.top + 32f, panel.right - 42f, panel.top + 82f);
+    }
+
+    private RectF menuCloseButtonBounds() {
+        RectF panel = settingsPanelBounds();
         return new RectF(panel.right - 92f, panel.top + 38f, panel.right - 42f, panel.top + 88f);
     }
 
-    private RectF backpackSeedTabBounds() {
-        RectF panel = inventoryPanelBounds();
+    private RectF settingsAudioTabBounds() {
+        RectF panel = settingsPanelBounds();
         float bodyTop = panel.top + 118f;
         return new RectF(panel.left + 34f, bodyTop + 30f, panel.left + 170f, bodyTop + 138f);
     }
 
-    private RectF backpackAudioTabBounds() {
-        RectF panel = inventoryPanelBounds();
+    private RectF settingsAboutTabBounds() {
+        RectF panel = settingsPanelBounds();
         float bodyTop = panel.top + 118f;
         return new RectF(panel.left + 34f, bodyTop + 160f, panel.left + 170f, bodyTop + 268f);
     }
 
-    private RectF backpackAboutTabBounds() {
-        RectF panel = inventoryPanelBounds();
-        float bodyTop = panel.top + 118f;
-        return new RectF(panel.left + 34f, bodyTop + 290f, panel.left + 170f, bodyTop + 398f);
-    }
-
     private RectF aboutGithubButtonBounds() {
-        RectF panel = inventoryPanelBounds();
+        RectF panel = settingsPanelBounds();
         float bodyTop = panel.top + 118f;
-        float bodyLeft = panel.left + 220f;
+        float bodyLeft = panel.left + 190f;
         float left = bodyLeft + 252f;
         float top = bodyTop + 252f;
         return new RectF(left, top, Math.min(panel.right - 86f, left + 326f), top + 50f);
     }
 
     private RectF audioSettingsCardBounds() {
-        RectF panel = inventoryPanelBounds();
-        float bodyLeft = panel.left + 220f;
+        RectF panel = settingsPanelBounds();
+        float bodyLeft = panel.left + 190f;
         float bodyTop = panel.top + 118f;
         float bodyRight = panel.right - 4f;
         float bodyBottom = panel.bottom - 4f;
@@ -2069,9 +2166,9 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private RectF audioBgmRowBounds() {
-        RectF panel = inventoryPanelBounds();
+        RectF panel = settingsPanelBounds();
         float bodyTop = panel.top + 118f;
-        float bodyLeft = panel.left + 220f;
+        float bodyLeft = panel.left + 190f;
         return new RectF(bodyLeft + 58f, bodyTop + 94f, panel.right - 58f, bodyTop + 166f);
     }
 
@@ -2147,12 +2244,58 @@ final class FarmGameView extends CanvasGameView {
         chainHistoryRenderer.drawButton(canvas, walletButtonBounds(), chainHistory);
     }
 
+    private void drawBackpackButton(Canvas canvas) {
+        RectF bounds = backpackButtonBounds();
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.argb(90, 0, 0, 0));
+        canvas.drawRoundRect(bounds.left + 5f, bounds.top + 6f, bounds.right + 5f, bounds.bottom + 6f, 14, 14, paint);
+        paint.setColor(backpackOpen ? Color.rgb(145, 81, 26) : Color.rgb(112, 65, 16));
+        canvas.drawRoundRect(bounds, 14, 14, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(4f);
+        paint.setColor(backpackOpen ? Color.rgb(255, 224, 38) : Color.rgb(184, 105, 35));
+        canvas.drawRoundRect(bounds, 14, 14, paint);
+
+        drawBackpackHudIcon(canvas, bounds.centerX(), bounds.centerY());
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(totalSeeds() > 0 ? Color.rgb(255, 219, 95) : Color.rgb(111, 82, 48));
+        canvas.drawCircle(bounds.right - 10f, bounds.top + 12f, 17f, paint);
+        paint.setColor(Color.rgb(44, 31, 15));
+        paint.setTextSize(16f);
+        paint.setFakeBoldText(true);
+        drawCenteredText(canvas, String.valueOf(totalSeeds()), bounds.right - 10f, bounds.top + 18f);
+        paint.setFakeBoldText(false);
+    }
+
+    private void drawBackpackHudIcon(Canvas canvas, float cx, float cy) {
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(255, 213, 71));
+        canvas.drawRoundRect(cx - 27f, cy - 12f, cx + 27f, cy + 26f, 8, 8, paint);
+        paint.setColor(Color.rgb(241, 99, 130));
+        canvas.drawRoundRect(cx - 21f, cy - 21f, cx + 21f, cy + 20f, 8, 8, paint);
+        paint.setColor(Color.rgb(255, 181, 78));
+        canvas.drawRect(cx - 13f, cy - 3f, cx + 13f, cy + 4f, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(4f);
+        paint.setColor(Color.rgb(255, 231, 172));
+        canvas.drawArc(cx - 13f, cy - 35f, cx + 13f, cy - 9f, 200, 140, false, paint);
+        paint.setStyle(Paint.Style.FILL);
+    }
+
     private void drawChainHistoryDialog(Canvas canvas) {
         chainHistoryRenderer.drawDialog(canvas, getWidth(), getHeight(), chainHistory, blockchainClient.hasGameApi());
     }
 
     private RectF chainHistoryButtonBounds() {
         return chainHistoryRenderer.buttonBounds(walletButtonBounds());
+    }
+
+    private RectF backpackButtonBounds() {
+        RectF history = chainHistoryButtonBounds();
+        float top = history.bottom + 8f;
+        return new RectF(history.left, top, history.right, top + history.height());
     }
 
     private RectF chainHistoryDialogBounds() {
@@ -2962,6 +3105,9 @@ final class FarmGameView extends CanvasGameView {
             if (chainHistoryOpen) {
                 return handleChainHistoryDialogTouch(x, y);
             }
+            if (backpackOpen) {
+                return handleBackpackTouch(x, y);
+            }
             if (shopPurchaseConfirmOpen) {
                 return handleShopPurchaseConfirmTouch(x, y);
             }
@@ -2982,6 +3128,7 @@ final class FarmGameView extends CanvasGameView {
                 }
                 playClickSound();
                 menuOpen = false;
+                finishAudioSliderDrag();
                 return true;
             }
             int tappedPlot = findTappedPlotSign(x, y);
@@ -3019,6 +3166,8 @@ final class FarmGameView extends CanvasGameView {
                 playClickSound();
                 performWallet();
             } else if (handleChainHistoryButtonTouch(x, y)) {
+                return true;
+            } else if (handleBackpackButtonTouch(x, y)) {
                 return true;
             }
             return true;
@@ -3071,6 +3220,23 @@ final class FarmGameView extends CanvasGameView {
             }
             return true;
         }
+        if (backpackOpen) {
+            if (isBackKey(keyCode) || keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_I) {
+                playClickSound();
+                backpackOpen = false;
+                invalidate();
+            }
+            return true;
+        }
+        if (menuOpen) {
+            if (isBackKey(keyCode) || keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_M) {
+                playClickSound();
+                menuOpen = false;
+                finishAudioSliderDrag();
+                invalidate();
+            }
+            return true;
+        }
         return handleHardwareKey(keyCode) || super.onKeyDown(keyCode, event);
     }
 
@@ -3087,6 +3253,11 @@ final class FarmGameView extends CanvasGameView {
         if (keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_M) {
             playClickSound();
             toggleMenuPanel();
+            return true;
+        }
+        if (keyCode == KeyEvent.KEYCODE_I) {
+            playClickSound();
+            openBackpackPanel();
             return true;
         }
         if (isPrimaryKey(keyCode)) {
@@ -3120,8 +3291,17 @@ final class FarmGameView extends CanvasGameView {
     private void toggleMenuPanel() {
         menuOpen = !menuOpen;
         if (menuOpen) {
-            menuTab = MENU_TAB_INVENTORY;
+            menuTab = MENU_TAB_SETTINGS;
+            backpackOpen = false;
+            chainHistoryOpen = false;
+            interactionDialogOpen = false;
+            shopCatalogOpen = false;
+            shopPurchaseConfirmOpen = false;
+            shopUntilMs = 0L;
+        } else {
+            finishAudioSliderDrag();
         }
+        invalidate();
     }
 
     private boolean moveWithHardwareKey(int keyCode) {
@@ -3250,26 +3430,22 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private boolean handleMenuTouch(float x, float y, int pointerId) {
-        RectF panel = inventoryPanelBounds();
+        RectF panel = settingsPanelBounds();
         if (!panel.contains(x, y)) {
             return false;
         }
-        if (inventoryCloseButtonBounds().contains(x, y)) {
+        if (menuCloseButtonBounds().contains(x, y)) {
             playClickSound();
             menuOpen = false;
+            finishAudioSliderDrag();
             return true;
         }
-        if (backpackSeedTabBounds().contains(x, y)) {
-            playClickSound();
-            menuTab = MENU_TAB_INVENTORY;
-            return true;
-        }
-        if (backpackAudioTabBounds().contains(x, y)) {
+        if (settingsAudioTabBounds().contains(x, y)) {
             playClickSound();
             menuTab = MENU_TAB_SETTINGS;
             return true;
         }
-        if (backpackAboutTabBounds().contains(x, y)) {
+        if (settingsAboutTabBounds().contains(x, y)) {
             playClickSound();
             menuTab = MENU_TAB_ABOUT;
             return true;
@@ -3278,6 +3454,7 @@ final class FarmGameView extends CanvasGameView {
             if (audioSettingsCloseButtonBounds().contains(x, y)) {
                 playClickSound();
                 menuOpen = false;
+                finishAudioSliderDrag();
                 return true;
             }
             int sliderIndex = audioSliderIndexAt(x, y);
@@ -3381,6 +3558,38 @@ final class FarmGameView extends CanvasGameView {
         }
     }
 
+    private boolean handleBackpackButtonTouch(float x, float y) {
+        if (!backpackButtonBounds().contains(x, y)) {
+            return false;
+        }
+        playClickSound();
+        openBackpackPanel();
+        return true;
+    }
+
+    private void openBackpackPanel() {
+        backpackOpen = true;
+        menuOpen = false;
+        chainHistoryOpen = false;
+        interactionDialogOpen = false;
+        shopCatalogOpen = false;
+        shopPurchaseConfirmOpen = false;
+        shopUntilMs = 0L;
+        finishAudioSliderDrag();
+        invalidate();
+    }
+
+    private boolean handleBackpackTouch(float x, float y) {
+        RectF panel = backpackPanelBounds();
+        if (backpackCloseButtonBounds().contains(x, y) || !panel.contains(x, y)) {
+            playClickSound();
+            backpackOpen = false;
+            invalidate();
+            return true;
+        }
+        return true;
+    }
+
     private boolean handleChainHistoryButtonTouch(float x, float y) {
         if (!chainHistoryButtonBounds().contains(x, y)) {
             return false;
@@ -3393,6 +3602,7 @@ final class FarmGameView extends CanvasGameView {
     private void openChainHistoryDialog() {
         chainHistoryOpen = true;
         menuOpen = false;
+        backpackOpen = false;
         interactionDialogOpen = false;
         shopCatalogOpen = false;
         shopPurchaseConfirmOpen = false;
@@ -3882,6 +4092,7 @@ final class FarmGameView extends CanvasGameView {
         interactionDialogOpen = true;
         shopCatalogOpen = false;
         menuOpen = false;
+        backpackOpen = false;
         swapAssetMenuOpen = false;
         if (kind == InteractionKind.SWAP_TOKEN) {
             if (!walletAddress.isEmpty() && walletNativeBalance.isEmpty() && !checkingChain) {
@@ -4420,6 +4631,10 @@ final class FarmGameView extends CanvasGameView {
     }
 
     void performWallet() {
+        menuOpen = false;
+        backpackOpen = false;
+        chainHistoryOpen = false;
+        finishAudioSliderDrag();
         walletDialogController.showWalletDialog();
     }
 
