@@ -121,6 +121,8 @@ final class FarmGameView extends CanvasGameView {
     private static final float DEFAULT_SFX_VOLUME = 0.90f;
     private static final String PREF_CHAIN_HISTORY = "game_chain_history";
     private static final String PREF_COIN_AUTOFILL_MIGRATION = "game_coin_wallet_autofill_migrated";
+    private static final String PREF_WALLET_ADDRESS = "wallet_address";
+    private static final String PREF_DEFAULT_WALLET_DISABLED = "wallet_default_disabled";
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint pixelPaint = new Paint();
@@ -250,15 +252,20 @@ final class FarmGameView extends CanvasGameView {
 
     private String resolveInitialWalletAddress() {
         String defaultWalletAddress = blockchainClient.defaultWalletAddress();
-        String savedWalletAddress = preferences.getString("wallet_address", "");
-        if (!defaultWalletAddress.isEmpty()) {
-            if (!defaultWalletAddress.equalsIgnoreCase(savedWalletAddress)) {
-                preferences.edit().putString("wallet_address", defaultWalletAddress).apply();
-            }
-            chainStatus = "Wallet otomatis dari .env: " + shortAddress(defaultWalletAddress);
+        String savedWalletAddress = preferences.getString(PREF_WALLET_ADDRESS, "");
+        if (isValidAddress(savedWalletAddress)) {
+            chainStatus = "Wallet pemain tersimpan: " + shortAddress(savedWalletAddress);
+            return savedWalletAddress;
+        }
+        if (savedWalletAddress != null && !savedWalletAddress.trim().isEmpty()) {
+            preferences.edit().remove(PREF_WALLET_ADDRESS).apply();
+        }
+        if (!preferences.getBoolean(PREF_DEFAULT_WALLET_DISABLED, false) && isValidAddress(defaultWalletAddress)) {
+            chainStatus = "Wallet default dari .env: " + shortAddress(defaultWalletAddress)
+                    + ". Tap panel wallet untuk ganti wallet pemain.";
             return defaultWalletAddress;
         }
-        return savedWalletAddress;
+        return "";
     }
 
     void resumeAudio() {
@@ -2512,20 +2519,21 @@ final class FarmGameView extends CanvasGameView {
     private void drawWalletButton(Canvas canvas) {
         RectF bounds = walletButtonBounds();
         boolean connected = !walletAddress.isEmpty();
+        boolean signerWallet = connected && isConnectedWalletBackendSigner();
 
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.argb(95, 0, 0, 0));
         canvas.drawRoundRect(bounds.left + 5f, bounds.top + 6f, bounds.right + 5f, bounds.bottom + 6f, 14, 14, paint);
-        paint.setColor(connected ? Color.rgb(36, 102, 68) : Color.rgb(42, 87, 62));
+        paint.setColor(signerWallet ? Color.rgb(96, 72, 34) : connected ? Color.rgb(36, 102, 68) : Color.rgb(42, 87, 62));
         canvas.drawRoundRect(bounds, 14, 14, paint);
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(4f);
-        paint.setColor(connected ? Color.rgb(105, 196, 135) : Color.rgb(91, 143, 104));
+        paint.setColor(signerWallet ? Color.rgb(255, 202, 86) : connected ? Color.rgb(105, 196, 135) : Color.rgb(91, 143, 104));
         canvas.drawRoundRect(bounds, 14, 14, paint);
 
         float iconCx = bounds.left + 40f;
         float iconCy = (bounds.top + bounds.bottom) * 0.5f;
-        drawWalletHudIcon(canvas, iconCx, iconCy, connected);
+        drawWalletHudIcon(canvas, iconCx, iconCy, connected, signerWallet);
 
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(236, 248, 226));
@@ -2536,7 +2544,7 @@ final class FarmGameView extends CanvasGameView {
         canvas.drawText(label, bounds.left + 76f, bounds.top + (connected ? 34f : 44f), paint);
         if (connected) {
             paint.setFakeBoldText(false);
-            paint.setColor(Color.rgb(177, 238, 185));
+            paint.setColor(signerWallet ? Color.rgb(255, 227, 137) : Color.rgb(177, 238, 185));
             String subtitle = walletSubtitle();
             paint.setTextSize(fitTextSize(subtitle, 15f, bounds.width() - 96f));
             canvas.drawText(subtitle, bounds.left + 76f, bounds.top + 58f, paint);
@@ -2889,21 +2897,31 @@ final class FarmGameView extends CanvasGameView {
         if (checkingChain) {
             return "sync Sepolia...";
         }
+        if (isConnectedWalletBackendSigner()) {
+            return "ganti wallet pemain";
+        }
         if (!walletNativeBalance.isEmpty()) {
             return "Sepolia ETH " + compactEth(walletNativeBalance);
         }
-        return "tap untuk sync saldo";
+        return "tap untuk ganti/sync";
     }
 
-    private void drawWalletHudIcon(Canvas canvas, float cx, float cy, boolean connected) {
+    private void drawWalletHudIcon(Canvas canvas, float cx, float cy, boolean connected, boolean signerWallet) {
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(connected ? Color.rgb(112, 224, 132) : Color.rgb(244, 208, 87));
+        paint.setColor(signerWallet ? Color.rgb(255, 225, 118) : connected ? Color.rgb(112, 224, 132) : Color.rgb(244, 208, 87));
         canvas.drawCircle(cx, cy, 23f, paint);
         paint.setColor(Color.rgb(33, 47, 32));
         canvas.drawRoundRect(cx - 15f, cy - 11f, cx + 16f, cy + 12f, 5, 5, paint);
         paint.setColor(Color.rgb(240, 246, 228));
         canvas.drawRect(cx - 10f, cy - 4f, cx + 11f, cy + 0f, paint);
-        paint.setColor(connected ? Color.rgb(69, 170, 83) : Color.rgb(193, 138, 36));
+        if (signerWallet) {
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(4f);
+            paint.setColor(Color.rgb(111, 61, 23));
+            canvas.drawLine(cx - 12f, cy + 14f, cx + 12f, cy + 14f, paint);
+            paint.setStyle(Paint.Style.FILL);
+        }
+        paint.setColor(signerWallet ? Color.rgb(207, 126, 35) : connected ? Color.rgb(69, 170, 83) : Color.rgb(193, 138, 36));
         canvas.drawCircle(cx + 15f, cy - 15f, 6f, paint);
     }
 
@@ -3010,38 +3028,49 @@ final class FarmGameView extends CanvasGameView {
 
     private void drawChainPanel(Canvas canvas, long now) {
         RectF panel = chainPanelBounds(now);
+        boolean signerWallet = isConnectedWalletBackendSigner();
         float w = panel.width();
         float x = panel.left;
         float y = panel.top;
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.argb(235, 18, 34, 30));
         canvas.drawRoundRect(panel, 10, 10, paint);
-        paint.setColor(Color.rgb(152, 239, 176));
+        paint.setColor(signerWallet ? Color.rgb(255, 218, 98) : Color.rgb(152, 239, 176));
         paint.setTextSize(23f);
         paint.setFakeBoldText(true);
-        canvas.drawText("Sepolia Blockchain", x + 22, y + 38, paint);
+        canvas.drawText(signerWallet ? "Sepolia Blockchain - Wallet Signer" : "Sepolia Blockchain", x + 22, y + 38, paint);
         paint.setFakeBoldText(false);
         paint.setColor(Color.WHITE);
         paint.setTextSize(18f);
         paint.setTextSize(fitTextSize(chainStatus, 18f, w - 44f));
         canvas.drawText(chainStatus, x + 22, y + 72, paint);
         paint.setTextSize(18f);
-        canvas.drawText("Wallet: " + (walletAddress.isEmpty() ? "belum diset" : shortAddress(walletAddress)), x + 22, y + 102, paint);
+        String walletLine = "Wallet: " + (walletAddress.isEmpty() ? "belum diset" : shortAddress(walletAddress))
+                + (signerWallet ? " (signer backend)" : "");
+        paint.setTextSize(fitTextSize(walletLine, 18f, w - 44f));
+        canvas.drawText(walletLine, x + 22, y + 102, paint);
         String balanceLine = "Game Coin " + gameState.coins
                 + (walletNativeBalance.isEmpty() ? "" : " | Sepolia ETH " + compactEth(walletNativeBalance))
                 + (walletTaniBalanceAvailable ? " | TANI " + walletTaniBalance : "");
+        paint.setTextSize(fitTextSize(balanceLine, 18f, w - 44f));
         canvas.drawText(balanceLine, x + 22, y + 132, paint);
         paint.setTextSize(fitTextSize(chainModeText(), 17f, w - 44f));
         canvas.drawText(chainModeText(), x + 22, y + 162, paint);
 
-        paint.setColor(Color.rgb(255, 219, 95));
-        String nextAction = pendingChainActions.isEmpty()
+        paint.setColor(signerWallet ? Color.rgb(255, 198, 91) : Color.rgb(255, 219, 95));
+        String nextAction = signerWallet
+                ? "Payout ETH diblokir. Tap wallet untuk ganti wallet pemain."
+                : pendingChainActions.isEmpty()
                 ? "Tidak ada sync chain berjalan."
                 : "Sync berikutnya: " + pendingChainActions.get(0).label();
-        paint.setTextSize(18f);
+        paint.setTextSize(fitTextSize(nextAction, 18f, w - 44f));
         canvas.drawText(nextAction, x + 22, y + 194, paint);
         paint.setColor(Color.rgb(210, 225, 216));
-        canvas.drawText("Gameplay tetap tersimpan lokal saat signer tidak reachable.", x + 22, y + 220, paint);
+        String footnote = signerWallet
+                ? "Gunakan public wallet pemain, bukan wallet deployer/backend."
+                : "Gameplay tetap tersimpan lokal saat signer tidak reachable.";
+        paint.setTextSize(fitTextSize(footnote, 18f, w - 44f));
+        canvas.drawText(footnote, x + 22, y + 220, paint);
     }
 
     private RectF chainPanelBounds(long now) {
@@ -4157,7 +4186,10 @@ final class FarmGameView extends CanvasGameView {
         walletNativeBalance = "";
         walletTaniBalance = 0;
         walletTaniBalanceAvailable = false;
-        preferences.edit().remove("wallet_address").apply();
+        preferences.edit()
+                .remove(PREF_WALLET_ADDRESS)
+                .putBoolean(PREF_DEFAULT_WALLET_DISABLED, true)
+                .apply();
         chainStatus = "Wallet logout. Mode lokal aktif.";
         chainPanelUntilMs = System.currentTimeMillis() + 3600L;
         showMessage("Wallet logout. Mode lokal aktif.");
@@ -4538,6 +4570,14 @@ final class FarmGameView extends CanvasGameView {
         }
         if (activeInteractionKind == InteractionKind.SWAP_TOKEN) {
             interactionDialogOpen = false;
+            if (selectedSwapFromAsset() == SWAP_ASSET_COIN
+                    && gameState.swapTarget == SWAP_TARGET_ETH
+                    && isConnectedWalletBackendSigner()) {
+                chainStatus = "Wallet ini signer backend. Ganti wallet pemain supaya payout ETH bisa bertambah.";
+                chainPanelUntilMs = System.currentTimeMillis() + 5200L;
+                performWallet();
+                return;
+            }
             performSwapToken();
             return;
         }
@@ -4717,6 +4757,11 @@ final class FarmGameView extends CanvasGameView {
                 if (walletAddress.isEmpty()) {
                     return "Connect wallet dulu supaya saldo Sepolia bisa dicek.";
                 }
+                if (selectedSwapFromAsset() == SWAP_ASSET_COIN
+                        && gameState.swapTarget == SWAP_TARGET_ETH
+                        && isConnectedWalletBackendSigner()) {
+                    return "Wallet ini signer backend. Ganti wallet pemain supaya payout ETH bisa masuk.";
+                }
                 int swapAmount = selectedSwapInputAmount();
                 if (selectedSwapFromAsset() == SWAP_ASSET_ETH) {
                     if (walletNativeBalance.isEmpty()) {
@@ -4761,6 +4806,11 @@ final class FarmGameView extends CanvasGameView {
             case SWAP_TOKEN:
                 if (walletAddress.isEmpty()) {
                     return "Connect wallet";
+                }
+                if (selectedSwapFromAsset() == SWAP_ASSET_COIN
+                        && gameState.swapTarget == SWAP_TARGET_ETH
+                        && isConnectedWalletBackendSigner()) {
+                    return "Ganti Wallet";
                 }
                 if (selectedSwapFromAsset() == SWAP_ASSET_ETH) {
                     return selectedSwapInputAmount() > 0 ? "Isi Game Coin" : "Sync wallet";
@@ -5439,27 +5489,28 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void performWallet() {
-        if (!walletAddress.isEmpty()) {
-            refreshWalletState(true);
-            showMessage("Wallet sync: " + shortAddress(walletAddress));
-            return;
-        }
-        checkSepolia(false);
         Context context = getContext();
         if (!(context instanceof Activity)) {
             return;
         }
+        boolean connected = !walletAddress.isEmpty();
+        boolean signerWallet = isConnectedWalletBackendSigner();
+        boolean compactForLandscape = getWidth() > getHeight();
 
         Dialog dialog = new Dialog(context);
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
 
         LinearLayout root = new LinearLayout(context);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(context, 30), dp(context, 28), dp(context, 30), dp(context, 24));
+        root.setPadding(
+                dp(context, compactForLandscape ? 24 : 30),
+                dp(context, compactForLandscape ? 18 : 28),
+                dp(context, compactForLandscape ? 24 : 30),
+                dp(context, compactForLandscape ? 18 : 24));
         root.setBackground(roundedStrokeDrawable(
-                Color.rgb(55, 37, 24),
+                signerWallet ? Color.rgb(64, 46, 26) : Color.rgb(55, 37, 24),
                 dp(context, 18),
-                Color.rgb(173, 91, 31),
+                signerWallet ? Color.rgb(255, 192, 82) : Color.rgb(173, 91, 31),
                 dp(context, 3)));
 
         LinearLayout header = new LinearLayout(context);
@@ -5471,7 +5522,7 @@ final class FarmGameView extends CanvasGameView {
         icon.setTextSize(18f);
         icon.setGravity(Gravity.CENTER);
         icon.setTypeface(null, android.graphics.Typeface.BOLD);
-        icon.setBackground(roundedDrawable(Color.rgb(244, 204, 72), dp(context, 11)));
+        icon.setBackground(roundedDrawable(signerWallet ? Color.rgb(255, 222, 112) : Color.rgb(244, 204, 72), dp(context, 11)));
         LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(context, 38), dp(context, 38));
         header.addView(icon, iconParams);
 
@@ -5479,34 +5530,40 @@ final class FarmGameView extends CanvasGameView {
         titleBlock.setOrientation(LinearLayout.VERTICAL);
         titleBlock.setPadding(dp(context, 14), 0, 0, 0);
         TextView title = new TextView(context);
-        title.setText("Connect Wallet");
-        title.setTextColor(Color.rgb(255, 230, 158));
-        title.setTextSize(26f);
+        title.setText(connected ? "Ganti Wallet" : "Connect Wallet");
+        title.setTextColor(signerWallet ? Color.rgb(255, 226, 117) : Color.rgb(255, 230, 158));
+        title.setTextSize(compactForLandscape ? 24f : 26f);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
         TextView network = new TextView(context);
-        network.setText("Sepolia network");
-        network.setTextColor(Color.rgb(155, 220, 164));
-        network.setTextSize(15f);
+        network.setText(signerWallet ? "Wallet signer backend" : connected ? "Sepolia wallet aktif" : "Sepolia network");
+        network.setTextColor(signerWallet ? Color.rgb(255, 197, 105) : Color.rgb(155, 220, 164));
+        network.setTextSize(compactForLandscape ? 14f : 15f);
         titleBlock.addView(title);
         titleBlock.addView(network);
         header.addView(titleBlock, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         root.addView(header);
 
         TextView body = new TextView(context);
-        body.setText("Masukkan public wallet address untuk sync saldo Sepolia dan coin TANI. Jangan masukkan private key.");
+        body.setText(walletDialogBodyText());
         body.setTextColor(Color.rgb(237, 223, 200));
-        body.setTextSize(17f);
-        body.setPadding(0, dp(context, 20), 0, dp(context, 18));
+        body.setTextSize(compactForLandscape ? 14.5f : 17f);
+        body.setPadding(0, dp(context, compactForLandscape ? 14 : 20), 0, dp(context, compactForLandscape ? 12 : 18));
+        if (compactForLandscape) {
+            body.setMaxLines(4);
+            body.setEllipsize(TextUtils.TruncateAt.END);
+        }
         root.addView(body);
 
         final EditText input = new EditText(context);
         input.setSingleLine(true);
-        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        input.setImeOptions(EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
         input.setHint("0x wallet address Sepolia");
         input.setText(walletAddress);
+        input.setSelectAllOnFocus(false);
         input.setTextColor(Color.WHITE);
         input.setHintTextColor(Color.rgb(185, 164, 138));
-        input.setTextSize(18f);
+        input.setTextSize(compactForLandscape ? 16f : 18f);
         input.setPadding(dp(context, 16), 0, dp(context, 16), 0);
         input.setBackground(roundedStrokeDrawable(
                 Color.rgb(38, 30, 24),
@@ -5515,33 +5572,44 @@ final class FarmGameView extends CanvasGameView {
                 dp(context, 2)));
         root.addView(input, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(context, 54)));
+                dp(context, compactForLandscape ? 48 : 54)));
 
         LinearLayout actions = new LinearLayout(context);
         actions.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-        actions.setPadding(0, dp(context, 24), 0, 0);
+        actions.setPadding(0, dp(context, compactForLandscape ? 14 : 24), 0, 0);
         Button close = walletDialogButton(context, "Tutup", Color.rgb(91, 64, 40), Color.rgb(239, 220, 191));
-        Button save = walletDialogButton(context, "Simpan", Color.rgb(214, 129, 39), Color.WHITE);
-        LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(dp(context, 118), dp(context, 48));
-        buttonParams.leftMargin = dp(context, 14);
-        actions.addView(close, buttonParams);
-        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(dp(context, 126), dp(context, 48));
-        saveParams.leftMargin = dp(context, 14);
+        Button sync = walletDialogButton(context, "Sync", Color.rgb(43, 108, 72), Color.WHITE);
+        Button save = walletDialogButton(context, connected ? "Ganti" : "Simpan", Color.rgb(214, 129, 39), Color.WHITE);
+        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(
+                dp(context, compactForLandscape ? 88 : 108),
+                dp(context, compactForLandscape ? 42 : 48));
+        closeParams.leftMargin = dp(context, compactForLandscape ? 8 : 10);
+        actions.addView(close, closeParams);
+        if (connected) {
+            LinearLayout.LayoutParams syncParams = new LinearLayout.LayoutParams(
+                    dp(context, compactForLandscape ? 92 : 108),
+                    dp(context, compactForLandscape ? 42 : 48));
+            syncParams.leftMargin = dp(context, compactForLandscape ? 8 : 10);
+            actions.addView(sync, syncParams);
+        }
+        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(
+                dp(context, compactForLandscape ? 100 : 126),
+                dp(context, compactForLandscape ? 42 : 48));
+        saveParams.leftMargin = dp(context, compactForLandscape ? 8 : 10);
         actions.addView(save, saveParams);
         root.addView(actions);
 
         close.setOnClickListener(v -> dialog.dismiss());
-        save.setOnClickListener(v -> {
-            String address = input.getText().toString().trim();
-            if (!isValidAddress(address)) {
-                showErrorMessage("Wallet address tidak valid.");
-                return;
+        sync.setOnClickListener(v -> syncWalletFromInput(input, dialog));
+        save.setOnClickListener(v -> saveWalletFromInput(input, dialog));
+        input.setOnEditorActionListener((v, actionId, event) -> {
+            boolean enter = event != null
+                    && event.getAction() == KeyEvent.ACTION_UP
+                    && event.getKeyCode() == KeyEvent.KEYCODE_ENTER;
+            if (actionId == EditorInfo.IME_ACTION_DONE || enter) {
+                return saveWalletFromInput(input, dialog);
             }
-            walletAddress = address;
-            preferences.edit().putString("wallet_address", walletAddress).apply();
-            showMessage("Wallet tersimpan: " + shortAddress(walletAddress));
-            dialog.dismiss();
-            refreshWalletState(true);
+            return false;
         });
 
         dialog.setContentView(root);
@@ -5553,10 +5621,75 @@ final class FarmGameView extends CanvasGameView {
             params.dimAmount = 0.62f;
             dialogWindow.setAttributes(params);
             dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            dialogWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
+                    | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
             dialogWindow.setLayout(
-                    (int) clamp(getWidth() * 0.42f, 650f, 880f),
+                    Math.min(Math.max(1, getWidth() - dp(context, 32)), (int) clamp(getWidth() * 0.50f, 720f, compactForLandscape ? 1180f : 900f)),
                     WindowManager.LayoutParams.WRAP_CONTENT);
         }
+        input.requestFocus();
+        input.setSelection(input.getText().length());
+    }
+
+    private String walletDialogBodyText() {
+        if (isConnectedWalletBackendSigner()) {
+            return "Wallet ini signer backend. Payout ETH ke wallet yang sama diblokir. Masukkan public wallet pemain yang berbeda.";
+        }
+        if (!walletAddress.isEmpty()) {
+            return "Masukkan public wallet pemain lain, atau tekan Sync untuk baca ulang saldo Sepolia dan TANI. Jangan masukkan private key.";
+        }
+        return "Masukkan public wallet address untuk sync saldo Sepolia dan coin TANI. Jangan masukkan private key.";
+    }
+
+    private boolean syncWalletFromInput(EditText input, Dialog dialog) {
+        String address = input.getText().toString().trim();
+        if (!address.isEmpty()) {
+            if (!isValidAddress(address)) {
+                showErrorMessage("Wallet address tidak valid.");
+                return true;
+            }
+            storeWalletAddress(address);
+        }
+        if (walletAddress.isEmpty()) {
+            showErrorMessage("Isi wallet address dulu untuk sync.");
+            return true;
+        }
+        dialog.dismiss();
+        refreshWalletState(true);
+        showMessage("Wallet sync: " + shortAddress(walletAddress));
+        return true;
+    }
+
+    private boolean saveWalletFromInput(EditText input, Dialog dialog) {
+        String address = input.getText().toString().trim();
+        if (!isValidAddress(address)) {
+            showErrorMessage("Wallet address tidak valid.");
+            return true;
+        }
+        boolean changed = storeWalletAddress(address);
+        showMessage((changed ? "Wallet diganti: " : "Wallet tersimpan: ") + shortAddress(walletAddress));
+        dialog.dismiss();
+        refreshWalletState(true);
+        invalidate();
+        return true;
+    }
+
+    private boolean storeWalletAddress(String address) {
+        String cleaned = address.trim();
+        boolean changed = !cleaned.equalsIgnoreCase(walletAddress);
+        walletAddress = cleaned;
+        if (changed) {
+            walletNativeBalance = "";
+            walletTaniBalance = 0;
+            walletTaniBalanceAvailable = false;
+            chainStatus = "Wallet pemain diganti: " + shortAddress(walletAddress) + ". Sync Sepolia...";
+            chainPanelUntilMs = System.currentTimeMillis() + 4200L;
+        }
+        preferences.edit()
+                .putString(PREF_WALLET_ADDRESS, walletAddress)
+                .remove(PREF_DEFAULT_WALLET_DISABLED)
+                .apply();
+        return changed;
     }
 
     private static Button walletDialogButton(Context context, String label, int background, int textColor) {

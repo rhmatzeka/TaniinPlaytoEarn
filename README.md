@@ -49,7 +49,7 @@ TANIIN_DEFAULT_WALLET_ADDRESS=
 DEPLOYER_PRIVATE_KEY=replace_with_new_private_key_do_not_commit
 ```
 
-The Android build reads the public values into `BuildConfig`. `TANIIN_DEFAULT_WALLET_ADDRESS` is optional and lets the debug app auto-connect without typing a wallet address. For USB device testing, run `adb reverse tcp:8787 tcp:8787` and use `TANIIN_GAME_API_URL=http://127.0.0.1:8787`. For WiFi ADB, use the computer LAN IP, for example `http://192.168.1.9:8787`. For an emulator without `adb reverse`, use `http://10.0.2.2:8787`; the app also tries the matching local fallback. Only public values should be shipped in the APK. Never put a real private key in Android source, Gradle config, screenshots, commits, or APK assets. If a private key has been pasted into chat or git, treat it as compromised and move funds/assets to a new wallet.
+The Android build reads the public values into `BuildConfig`. `TANIIN_DEFAULT_WALLET_ADDRESS` is optional and lets the debug app auto-connect without typing a wallet address when no player wallet has been saved yet. A saved in-app wallet always wins, and tapping the wallet HUD opens the change/sync dialog. For USB device testing, run `adb reverse tcp:8787 tcp:8787` and use `TANIIN_GAME_API_URL=http://127.0.0.1:8787`. For WiFi ADB, use the computer LAN IP, for example `http://192.168.1.9:8787`. For an emulator without `adb reverse`, use `http://10.0.2.2:8787`; the app also tries the matching local fallback. Only public values should be shipped in the APK. Never put a real private key in Android source, Gradle config, screenshots, commits, or APK assets. If a private key has been pasted into chat or git, treat it as compromised and move funds/assets to a new wallet.
 
 ## Build And Run
 
@@ -76,11 +76,11 @@ cmd.exe /c gradlew.bat :app:assembleDebug --console=plain
 1. Deploy the contracts from `contracts/`.
 2. Put the deployed public addresses into the root `.env`.
 3. Rebuild the Android app so Gradle writes the addresses into `BuildConfig`.
-4. Optionally set `TANIIN_DEFAULT_WALLET_ADDRESS` to a public Sepolia wallet address before building. The app will auto-connect that wallet and tapping the wallet button will sync balances.
+4. Optionally set `TANIIN_DEFAULT_WALLET_ADDRESS` to a public Sepolia wallet address before building. The app will auto-connect that wallet only until a player wallet is saved in-app; tapping the wallet button opens the change/sync dialog.
 5. The shop coin display uses the ERC-20 TANI balance when `TANIIN_COIN_CONTRACT_ADDRESS` is set. Otherwise it falls back to local prototype coins saved on the device.
 6. Start the local backend signer with `cd contracts && npm run game-api`. It listens on port `8787` and signs `/game-actions` with the deployer wallet from the root `.env`. On a USB device, also run `adb reverse tcp:8787 tcp:8787`.
 7. Gameplay actions are recorded in the local history. When `TANIIN_GAME_API_URL` is set, the app posts each action to `/game-actions` for the backend signer to process. If the backend returns a transaction hash, the app saves it in the transaction history and opens Sepolia Etherscan when tapped. Without that signer URL, the history marks actions as not yet on-chain instead of leaving them pending forever.
-8. The swap house can fund local Game Coin from Sepolia ETH through a signer receipt transaction, and can swap game coins to either TANI or native Sepolia ETH. ETH payout is sent from the backend signer wallet, so keep the signer funded, connect a player wallet that is different from the signer, and configure `TANIIN_ETH_WEI_PER_COIN` plus `TANIIN_MAX_ETH_PAYOUT_WEI` deliberately before using this on a public deployment.
+8. The swap house can fund local Game Coin from Sepolia ETH through a signer receipt transaction, and can swap game coins to either TANI or native Sepolia ETH. ETH payout is sent from the backend signer wallet, so keep the signer funded, connect a player wallet that is different from the signer, and configure `TANIIN_ETH_WEI_PER_COIN` plus `TANIIN_MAX_ETH_PAYOUT_WEI` deliberately before using this on a public deployment. If the connected wallet equals the backend signer, the app marks it as a signer wallet and asks the player to change wallets before ETH payout.
 
 For non-local testing, deploy the signer in `contracts/api/` to Vercel with the Vercel project root set to `contracts`. Set `TANIIN_GAME_API_URL=https://your-project.vercel.app` in the Android root `.env` and rebuild the APK. The Vercel rewrites keep the Android endpoint as `/game-actions`, so do not add `/api` to the URL.
 
