@@ -137,13 +137,14 @@ final class ChainHistoryRenderer {
 
     RectF dialogCloseBounds(int viewWidth, int viewHeight, int historySize) {
         RectF panel = dialogBounds(viewWidth, viewHeight, historySize);
-        return new RectF(panel.right - 82f, panel.top + 24f, panel.right - 30f, panel.top + 76f);
+        float size = 64f;
+        return new RectF(panel.right - size - 28f, panel.top + 20f, panel.right - 28f, panel.top + 20f + size);
     }
 
     RectF dialogClearAllBounds(int viewWidth, int viewHeight, int historySize) {
         RectF panel = dialogBounds(viewWidth, viewHeight, historySize);
         float width = Math.min(158f, Math.max(122f, panel.width() * 0.23f));
-        return new RectF(panel.right - width - 98f, panel.top + 27f, panel.right - 98f, panel.top + 73f);
+        return new RectF(panel.right - width - 112f, panel.top + 27f, panel.right - 112f, panel.top + 73f);
     }
 
     RectF dialogRowBounds(int rowIndex, int viewWidth, int viewHeight, int historySize) {
@@ -175,17 +176,27 @@ final class ChainHistoryRenderer {
     }
 
     private void drawCloseButton(Canvas canvas, RectF close) {
+        float radius = close.width() * 0.22f;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.argb(82, 0, 0, 0));
+        canvas.drawRoundRect(close.left + 4f, close.top + 5f, close.right + 4f, close.bottom + 5f, radius, radius, paint);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(108, 53, 12));
-        canvas.drawRoundRect(close, 12, 12, paint);
+        canvas.drawRoundRect(close, radius, radius, paint);
+        paint.setColor(Color.rgb(164, 78, 23));
+        canvas.drawRoundRect(close.left + 6f, close.top + 6f, close.right - 6f, close.top + close.height() * 0.40f,
+                radius * 0.72f, radius * 0.72f, paint);
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(3f);
-        paint.setColor(Color.rgb(137, 68, 20));
-        canvas.drawRoundRect(close, 12, 12, paint);
         paint.setStrokeWidth(5f);
+        paint.setColor(Color.rgb(188, 100, 31));
+        canvas.drawRoundRect(close, radius, radius, paint);
+        paint.setStrokeWidth(7f);
+        paint.setStrokeCap(Paint.Cap.ROUND);
         paint.setColor(DialogUi.BODY_TEXT);
-        canvas.drawLine(close.left + 17f, close.top + 17f, close.right - 17f, close.bottom - 17f, paint);
-        canvas.drawLine(close.right - 17f, close.top + 17f, close.left + 17f, close.bottom - 17f, paint);
+        float pad = close.width() * 0.32f;
+        canvas.drawLine(close.left + pad, close.top + pad, close.right - pad, close.bottom - pad, paint);
+        canvas.drawLine(close.right - pad, close.top + pad, close.left + pad, close.bottom - pad, paint);
+        paint.setStrokeCap(Paint.Cap.BUTT);
         paint.setStyle(Paint.Style.FILL);
     }
 

@@ -102,6 +102,8 @@ final class FarmGameView extends CanvasGameView {
     private static final int MENU_TAB_SETTINGS = 0;
     private static final int MENU_TAB_ABOUT = 1;
     private static final int CHAIN_HISTORY_LIMIT = 8;
+    private static final float OVERLAY_CLOSE_SIZE = 64f;
+    private static final float OVERLAY_CLOSE_RIGHT_MARGIN = 34f;
     private static final float DEFAULT_MASTER_VOLUME = 0.82f;
     private static final float DEFAULT_MUSIC_VOLUME = 0.70f;
     private static final float DEFAULT_SFX_VOLUME = 0.90f;
@@ -1513,17 +1515,27 @@ final class FarmGameView extends CanvasGameView {
     }
 
     private void drawPanelCloseButton(Canvas canvas, RectF close) {
+        float radius = close.width() * 0.22f;
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(148, 75, 25));
-        canvas.drawRoundRect(close, 10, 10, paint);
+        paint.setColor(Color.argb(92, 0, 0, 0));
+        canvas.drawRoundRect(close.left + 4f, close.top + 5f, close.right + 4f, close.bottom + 5f, radius, radius, paint);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.rgb(130, 57, 18));
+        canvas.drawRoundRect(close, radius, radius, paint);
+        paint.setColor(Color.rgb(177, 88, 28));
+        canvas.drawRoundRect(close.left + 6f, close.top + 6f, close.right - 6f, close.top + close.height() * 0.40f,
+                radius * 0.74f, radius * 0.74f, paint);
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(4f);
-        paint.setColor(Color.rgb(183, 100, 35));
-        canvas.drawRoundRect(close, 10, 10, paint);
         paint.setStrokeWidth(5f);
+        paint.setColor(Color.rgb(216, 126, 42));
+        canvas.drawRoundRect(close, radius, radius, paint);
+        paint.setStrokeWidth(7f);
+        paint.setStrokeCap(Paint.Cap.ROUND);
         paint.setColor(Color.rgb(255, 236, 190));
-        canvas.drawLine(close.left + 16f, close.top + 16f, close.right - 16f, close.bottom - 16f, paint);
-        canvas.drawLine(close.right - 16f, close.top + 16f, close.left + 16f, close.bottom - 16f, paint);
+        float pad = close.width() * 0.32f;
+        canvas.drawLine(close.left + pad, close.top + pad, close.right - pad, close.bottom - pad, paint);
+        canvas.drawLine(close.right - pad, close.top + pad, close.left + pad, close.bottom - pad, paint);
+        paint.setStrokeCap(Paint.Cap.BUTT);
         paint.setStyle(Paint.Style.FILL);
     }
 
@@ -1626,19 +1638,31 @@ final class FarmGameView extends CanvasGameView {
         RectF content = audioSettingsCardBounds();
 
         paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.argb(78, 0, 0, 0));
+        canvas.drawRoundRect(content.left + 5f, content.top + 6f, content.right + 5f, content.bottom + 6f, 18, 18, paint);
+        paint.setColor(Color.rgb(146, 65, 22));
+        canvas.drawRoundRect(content, 18, 18, paint);
+        paint.setColor(Color.rgb(118, 52, 16));
+        canvas.drawRoundRect(content.left + 10f, content.top + 10f, content.right - 10f, content.top + 86f, 14, 14, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(3f);
+        paint.setColor(Color.rgb(202, 104, 36));
+        canvas.drawRoundRect(content, 18, 18, paint);
+
+        drawSpeakerIcon(canvas, content.left + 48f, content.top + 48f, Color.rgb(93, 202, 250));
+
+        paint.setStyle(Paint.Style.FILL);
         paint.setTypeface(android.graphics.Typeface.create(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD));
         paint.setFakeBoldText(true);
-        paint.setTextSize(fitTextSize("SETTINGS", 39f, content.width() - 118f));
+        paint.setTextSize(fitTextSize("SETTINGS", 39f, content.width() - 172f));
         paint.setColor(Color.rgb(255, 224, 21));
-        canvas.drawText("SETTINGS", content.left, content.top + 58f, paint);
-
-        drawAudioSettingsCloseButton(canvas);
+        canvas.drawText("SETTINGS", content.left + 132f, content.top + 60f, paint);
 
         paint.setTypeface(null);
         paint.setFakeBoldText(false);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(96, 43, 11));
-        canvas.drawRect(content.left, content.top + 88f, content.right, content.top + 93f, paint);
+        canvas.drawRect(content.left + 28f, content.top + 100f, content.right - 28f, content.top + 105f, paint);
 
         drawVolumeSlider(canvas, "MASTER VOLUME", masterVolume, 0);
         drawVolumeSlider(canvas, "MUSIC VOLUME", musicVolume, 1);
@@ -1674,22 +1698,6 @@ final class FarmGameView extends CanvasGameView {
         canvas.drawCircle(knobX, slider.centerY(), 12f, paint);
         paint.setColor(Color.rgb(255, 186, 55));
         canvas.drawCircle(knobX - 3f, slider.centerY() - 4f, 4f, paint);
-    }
-
-    private void drawAudioSettingsCloseButton(Canvas canvas) {
-        RectF close = audioSettingsCloseButtonBounds();
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(112, 52, 14));
-        canvas.drawRoundRect(close, 10, 10, paint);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(4f);
-        paint.setColor(Color.rgb(183, 100, 35));
-        canvas.drawRoundRect(close, 10, 10, paint);
-        paint.setStrokeWidth(4f);
-        paint.setColor(Color.rgb(255, 235, 196));
-        canvas.drawLine(close.left + 15f, close.top + 15f, close.right - 15f, close.bottom - 15f, paint);
-        canvas.drawLine(close.right - 15f, close.top + 15f, close.left + 15f, close.bottom - 15f, paint);
-        paint.setStyle(Paint.Style.FILL);
     }
 
     private void drawAudioSettingRow(Canvas canvas, RectF row, RectF toggle, String label,
@@ -2106,12 +2114,18 @@ final class FarmGameView extends CanvasGameView {
 
     private RectF backpackCloseButtonBounds() {
         RectF panel = backpackPanelBounds();
-        return new RectF(panel.right - 92f, panel.top + 32f, panel.right - 42f, panel.top + 82f);
+        return overlayCloseButtonBounds(panel, 108f);
     }
 
     private RectF menuCloseButtonBounds() {
         RectF panel = settingsPanelBounds();
-        return new RectF(panel.right - 92f, panel.top + 38f, panel.right - 42f, panel.top + 88f);
+        return overlayCloseButtonBounds(panel, 118f);
+    }
+
+    private RectF overlayCloseButtonBounds(RectF panel, float headerHeight) {
+        float top = panel.top + (headerHeight - OVERLAY_CLOSE_SIZE) * 0.5f;
+        float right = panel.right - OVERLAY_CLOSE_RIGHT_MARGIN;
+        return new RectF(right - OVERLAY_CLOSE_SIZE, top, right, top + OVERLAY_CLOSE_SIZE);
     }
 
     private RectF settingsAudioTabBounds() {
@@ -2141,20 +2155,14 @@ final class FarmGameView extends CanvasGameView {
         float bodyTop = panel.top + 118f;
         float bodyRight = panel.right - 4f;
         float bodyBottom = panel.bottom - 4f;
-        return new RectF(bodyLeft + 58f, bodyTop + 34f, bodyRight - 58f, bodyBottom - 42f);
-    }
-
-    private RectF audioSettingsCloseButtonBounds() {
-        RectF content = audioSettingsCardBounds();
-        float size = 54f;
-        return new RectF(content.right - size - 2f, content.top + 12f, content.right - 2f, content.top + 12f + size);
+        return new RectF(bodyLeft + 42f, bodyTop + 30f, bodyRight - 42f, bodyBottom - 36f);
     }
 
     private RectF audioSliderBounds(int index) {
         RectF content = audioSettingsCardBounds();
-        float left = content.left;
-        float right = content.right;
-        float firstCenter = content.top + Math.max(140f, Math.min(162f, content.height() * 0.35f));
+        float left = content.left + 38f;
+        float right = content.right - 38f;
+        float firstCenter = content.top + Math.max(154f, Math.min(172f, content.height() * 0.38f));
         float lastCenter = Math.max(firstCenter + 172f, content.bottom - 48f);
         float centerY = firstCenter + index * ((lastCenter - firstCenter) * 0.5f);
         return new RectF(left, centerY - 6f, right, centerY + 6f);
@@ -3064,17 +3072,27 @@ final class FarmGameView extends CanvasGameView {
 
     private void drawShopCloseButton(Canvas canvas) {
         RectF close = shopCloseButtonBounds();
+        float radius = close.width() * 0.20f;
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.argb(82, 0, 0, 0));
+        canvas.drawRoundRect(close.left + 4f, close.top + 5f, close.right + 4f, close.bottom + 5f, radius, radius, paint);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.rgb(108, 53, 12));
-        canvas.drawRoundRect(close, 12, 12, paint);
+        canvas.drawRoundRect(close, radius, radius, paint);
+        paint.setColor(Color.rgb(164, 78, 23));
+        canvas.drawRoundRect(close.left + 8f, close.top + 8f, close.right - 8f, close.top + close.height() * 0.38f,
+                radius * 0.72f, radius * 0.72f, paint);
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(3f);
-        paint.setColor(Color.rgb(137, 68, 20));
-        canvas.drawRoundRect(close, 12, 12, paint);
-        paint.setStrokeWidth(6f);
+        paint.setStrokeWidth(5f);
+        paint.setColor(Color.rgb(188, 100, 31));
+        canvas.drawRoundRect(close, radius, radius, paint);
+        paint.setStrokeWidth(8f);
+        paint.setStrokeCap(Paint.Cap.ROUND);
         paint.setColor(Color.rgb(255, 238, 211));
-        canvas.drawLine(close.left + 25f, close.top + 25f, close.right - 25f, close.bottom - 25f, paint);
-        canvas.drawLine(close.right - 25f, close.top + 25f, close.left + 25f, close.bottom - 25f, paint);
+        float pad = close.width() * 0.32f;
+        canvas.drawLine(close.left + pad, close.top + pad, close.right - pad, close.bottom - pad, paint);
+        canvas.drawLine(close.right - pad, close.top + pad, close.left + pad, close.bottom - pad, paint);
+        paint.setStrokeCap(Paint.Cap.BUTT);
         paint.setStyle(Paint.Style.FILL);
     }
 
@@ -3451,12 +3469,6 @@ final class FarmGameView extends CanvasGameView {
             return true;
         }
         if (menuTab == MENU_TAB_SETTINGS) {
-            if (audioSettingsCloseButtonBounds().contains(x, y)) {
-                playClickSound();
-                menuOpen = false;
-                finishAudioSliderDrag();
-                return true;
-            }
             int sliderIndex = audioSliderIndexAt(x, y);
             if (sliderIndex >= 0) {
                 activeAudioSlider = sliderIndex;
@@ -4412,7 +4424,8 @@ final class FarmGameView extends CanvasGameView {
 
     private RectF shopCloseButtonBounds() {
         RectF panel = shopCatalogPanelBounds();
-        return new RectF(panel.right - 118f, panel.top + 50f, panel.right - 38f, panel.top + 130f);
+        float size = 88f;
+        return new RectF(panel.right - size - 36f, panel.top + 44f, panel.right - 36f, panel.top + 44f + size);
     }
 
     private RectF shopQuantityMinusBounds() {
