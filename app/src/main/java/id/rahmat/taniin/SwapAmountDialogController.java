@@ -9,6 +9,7 @@ import android.text.InputType;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.KeyEvent;
+import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
@@ -58,20 +59,16 @@ final class SwapAmountDialogController {
         LinearLayout root = new LinearLayout(context);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(
-                DialogUi.dp(context, compactForKeyboard ? 10 : 30),
-                DialogUi.dp(context, compactForKeyboard ? 8 : 26),
-                DialogUi.dp(context, compactForKeyboard ? 10 : 30),
-                DialogUi.dp(context, compactForKeyboard ? 8 : 24));
-        root.setBackground(DialogUi.roundedStrokeDrawable(
-                Color.rgb(116, 55, 22),
-                DialogUi.dp(context, 18),
-                Color.rgb(70, 39, 13),
-                DialogUi.dp(context, 4)));
+                DialogUi.dp(context, compactForKeyboard ? 28 : 44),
+                DialogUi.dp(context, compactForKeyboard ? 22 : 38),
+                DialogUi.dp(context, compactForKeyboard ? 36 : 52),
+                DialogUi.dp(context, compactForKeyboard ? 28 : 44));
+        root.setBackground(DialogUi.pixelPanelDrawable(context));
 
         TextView title = new TextView(context);
         title.setText("Jumlah Swap");
-        title.setTextColor(Color.rgb(255, 224, 84));
-        title.setTextSize(compactForKeyboard ? 18f : 24f);
+        title.setTextColor(DialogUi.TITLE);
+        title.setTextSize(compactForKeyboard ? 20f : 27f);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
 
         TextView body = new TextView(context);
@@ -79,7 +76,7 @@ final class SwapAmountDialogController {
                 ? "Saldo ETH Sepolia: " + FarmGameView.compactEth(view.walletNativeBalance()) + " ETH"
                 : "Saldo Game Coin: " + view.coinBalance() + " coin";
         body.setText(balanceText);
-        body.setTextColor(Color.rgb(255, 238, 211));
+        body.setTextColor(DialogUi.BODY_TEXT);
         body.setTextSize(compactForKeyboard ? 11f : 16f);
 
         TextView route = new TextView(context);
@@ -87,16 +84,16 @@ final class SwapAmountDialogController {
                 ? "Isi Game Coin: " + view.selectedSwapOutputText()
                 : "Estimasi: " + view.selectedSwapOutputText();
         route.setText(routeText);
-        route.setTextColor(Color.rgb(245, 194, 124));
+        route.setTextColor(DialogUi.BODY_TEXT);
         route.setTextSize(compactForKeyboard ? 11f : 14f);
         route.setPadding(DialogUi.dp(context, compactForKeyboard ? 10 : 16), 0, DialogUi.dp(context, compactForKeyboard ? 10 : 16), 0);
         route.setGravity(Gravity.CENTER);
         route.setSingleLine(true);
         route.setEllipsize(TextUtils.TruncateAt.END);
         route.setBackground(DialogUi.roundedStrokeDrawable(
-                Color.rgb(82, 39, 17),
+                DialogUi.TEXT_BOX_FILL,
                 DialogUi.dp(context, 11),
-                Color.rgb(145, 77, 30),
+                DialogUi.TEXT_BOX_STROKE,
                 DialogUi.dp(context, 2)));
 
         final EditText input = new EditText(context);
@@ -105,16 +102,16 @@ final class SwapAmountDialogController {
         input.setImeOptions(EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
         input.setText(String.valueOf(view.selectedSwapInputAmount()));
         input.setSelectAllOnFocus(false);
-        input.setTextColor(Color.rgb(255, 240, 212));
+        input.setTextColor(DialogUi.BODY_TEXT);
         input.setHint("Jumlah Game Coin");
-        input.setHintTextColor(Color.rgb(190, 151, 124));
+        input.setHintTextColor(Color.rgb(210, 170, 125));
         input.setTextSize(compactForKeyboard ? 18f : 24f);
         input.setGravity(Gravity.CENTER);
         input.setPadding(DialogUi.dp(context, compactForKeyboard ? 12 : 16), 0, DialogUi.dp(context, compactForKeyboard ? 12 : 16), 0);
         input.setBackground(DialogUi.roundedStrokeDrawable(
-                Color.rgb(60, 32, 18),
+                Color.rgb(122, 55, 19),
                 DialogUi.dp(context, 12),
-                Color.rgb(255, 200, 65),
+                DialogUi.CORNER,
                 DialogUi.dp(context, 3)));
 
         LinearLayout actions = new LinearLayout(context);
@@ -146,7 +143,7 @@ final class SwapAmountDialogController {
 
             TextView summary = new TextView(context);
             summary.setText(balanceText + " | " + routeText);
-            summary.setTextColor(Color.rgb(255, 238, 211));
+            summary.setTextColor(DialogUi.BODY_TEXT);
             summary.setTextSize(10.5f);
             summary.setSingleLine(true);
             summary.setEllipsize(TextUtils.TruncateAt.END);
@@ -187,6 +184,13 @@ final class SwapAmountDialogController {
                     LinearLayout.LayoutParams.WRAP_CONTENT));
         } else {
             root.addView(title);
+            View divider = new View(context);
+            divider.setBackgroundColor(Color.rgb(89, 42, 13));
+            LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    DialogUi.dp(context, 3));
+            dividerParams.setMargins(0, DialogUi.dp(context, 18), 0, DialogUi.dp(context, 18));
+            root.addView(divider, dividerParams);
             body.setPadding(0, DialogUi.dp(context, 12), 0, DialogUi.dp(context, 10));
             root.addView(body);
             LinearLayout.LayoutParams routeParams = new LinearLayout.LayoutParams(

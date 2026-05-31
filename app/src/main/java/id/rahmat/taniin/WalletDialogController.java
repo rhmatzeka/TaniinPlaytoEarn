@@ -14,6 +14,7 @@ import android.text.InputType;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.KeyEvent;
+import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
@@ -46,27 +47,24 @@ final class WalletDialogController {
         LinearLayout root = new LinearLayout(context);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(
-                DialogUi.dp(context, compactForLandscape ? 24 : 30),
-                DialogUi.dp(context, compactForLandscape ? 18 : 28),
-                DialogUi.dp(context, compactForLandscape ? 24 : 30),
-                DialogUi.dp(context, compactForLandscape ? 18 : 24));
-        root.setBackground(DialogUi.roundedStrokeDrawable(
-                signerWallet ? Color.rgb(64, 46, 26) : Color.rgb(55, 37, 24),
-                DialogUi.dp(context, 18),
-                signerWallet ? Color.rgb(255, 192, 82) : Color.rgb(173, 91, 31),
-                DialogUi.dp(context, 3)));
+                DialogUi.dp(context, compactForLandscape ? 42 : 44),
+                DialogUi.dp(context, compactForLandscape ? 24 : 40),
+                DialogUi.dp(context, compactForLandscape ? 50 : 52),
+                DialogUi.dp(context, compactForLandscape ? 26 : 46));
+        root.setBackground(DialogUi.pixelPanelDrawable(context));
 
         LinearLayout header = new LinearLayout(context);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
         TextView icon = new TextView(context);
         icon.setText("W");
-        icon.setTextColor(Color.rgb(52, 42, 23));
-        icon.setTextSize(18f);
+        icon.setTextColor(Color.rgb(72, 43, 12));
+        icon.setTextSize(compactForLandscape ? 17f : 18f);
         icon.setGravity(Gravity.CENTER);
         icon.setTypeface(null, android.graphics.Typeface.BOLD);
-        icon.setBackground(DialogUi.roundedDrawable(signerWallet ? Color.rgb(255, 222, 112) : Color.rgb(244, 204, 72), DialogUi.dp(context, 11)));
-        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(DialogUi.dp(context, 38), DialogUi.dp(context, 38));
+        icon.setIncludeFontPadding(false);
+        icon.setBackground(DialogUi.roundedDrawable(DialogUi.CORNER, DialogUi.dp(context, 8)));
+        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(DialogUi.dp(context, 36), DialogUi.dp(context, 36));
         header.addView(icon, iconParams);
 
         LinearLayout titleBlock = new LinearLayout(context);
@@ -74,32 +72,49 @@ final class WalletDialogController {
         titleBlock.setPadding(DialogUi.dp(context, 14), 0, 0, 0);
         TextView title = new TextView(context);
         title.setText(connected ? "Ganti Wallet" : "Connect Wallet");
-        title.setTextColor(signerWallet ? Color.rgb(255, 226, 117) : Color.rgb(255, 230, 158));
-        title.setTextSize(compactForLandscape ? 24f : 26f);
+        title.setTextColor(DialogUi.TITLE);
+        title.setTextSize(compactForLandscape ? 25f : 28f);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
         TextView network = new TextView(context);
         network.setText(signerWallet ? "Wallet signer backend" : connected ? "Sepolia wallet aktif" : "Sepolia network");
-        network.setTextColor(signerWallet ? Color.rgb(255, 197, 105) : Color.rgb(155, 220, 164));
+        network.setTextColor(signerWallet ? Color.rgb(255, 225, 132) : Color.rgb(170, 235, 165));
         network.setTextSize(compactForLandscape ? 14f : 15f);
         titleBlock.addView(title);
         titleBlock.addView(network);
         header.addView(titleBlock, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         root.addView(header);
 
+        View divider = new View(context);
+        divider.setBackgroundColor(Color.rgb(89, 42, 13));
+        LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                DialogUi.dp(context, 3));
+        dividerParams.setMargins(0, DialogUi.dp(context, compactForLandscape ? 12 : 22), 0, 0);
+        root.addView(divider, dividerParams);
+
         TextView body = new TextView(context);
         body.setText(walletDialogBodyText());
-        body.setTextColor(Color.rgb(237, 223, 200));
+        body.setTextColor(DialogUi.BODY_TEXT);
         body.setTextSize(compactForLandscape ? 14.5f : 17f);
-        body.setPadding(0, DialogUi.dp(context, compactForLandscape ? 14 : 20), 0, DialogUi.dp(context, compactForLandscape ? 12 : 18));
+        body.setPadding(
+                DialogUi.dp(context, 16),
+                DialogUi.dp(context, compactForLandscape ? 9 : 15),
+                DialogUi.dp(context, 16),
+                DialogUi.dp(context, compactForLandscape ? 9 : 15));
+        body.setBackground(DialogUi.textBoxDrawable(context));
         if (compactForLandscape) {
             body.setMaxLines(4);
             body.setEllipsize(TextUtils.TruncateAt.END);
         }
-        root.addView(body);
+        LinearLayout.LayoutParams bodyParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        bodyParams.setMargins(0, DialogUi.dp(context, compactForLandscape ? 12 : 22), 0, DialogUi.dp(context, compactForLandscape ? 10 : 18));
+        root.addView(body, bodyParams);
 
         TextView connectLabel = new TextView(context);
         connectLabel.setText("Connect dari wallet app");
-        connectLabel.setTextColor(Color.rgb(255, 224, 139));
+        connectLabel.setTextColor(Color.rgb(255, 230, 139));
         connectLabel.setTextSize(compactForLandscape ? 13f : 15f);
         connectLabel.setTypeface(null, android.graphics.Typeface.BOLD);
         connectLabel.setPadding(0, 0, 0, DialogUi.dp(context, 8));
@@ -113,18 +128,18 @@ final class WalletDialogController {
         Button pasteAddress = DialogUi.walletButton(context, "Tempel", Color.rgb(111, 78, 43), Color.rgb(255, 238, 211));
         LinearLayout.LayoutParams walletActionParams = new LinearLayout.LayoutParams(
                 0,
-                DialogUi.dp(context, compactForLandscape ? 40 : 46),
+                DialogUi.dp(context, compactForLandscape ? 36 : 46),
                 1f);
         walletActions.addView(connectMetaMask, walletActionParams);
         LinearLayout.LayoutParams walletActionMidParams = new LinearLayout.LayoutParams(
                 0,
-                DialogUi.dp(context, compactForLandscape ? 40 : 46),
+                DialogUi.dp(context, compactForLandscape ? 36 : 46),
                 1f);
         walletActionMidParams.leftMargin = DialogUi.dp(context, 10);
         walletActions.addView(connectBrowser, walletActionMidParams);
         LinearLayout.LayoutParams walletActionLastParams = new LinearLayout.LayoutParams(
                 0,
-                DialogUi.dp(context, compactForLandscape ? 40 : 46),
+                DialogUi.dp(context, compactForLandscape ? 36 : 46),
                 1f);
         walletActionLastParams.leftMargin = DialogUi.dp(context, 10);
         walletActions.addView(pasteAddress, walletActionLastParams);
@@ -134,7 +149,7 @@ final class WalletDialogController {
 
         TextView fallbackLabel = new TextView(context);
         fallbackLabel.setText("Fallback public address");
-        fallbackLabel.setTextColor(Color.rgb(197, 178, 148));
+        fallbackLabel.setTextColor(DialogUi.MUTED_TEXT);
         fallbackLabel.setTextSize(compactForLandscape ? 12f : 13.5f);
         fallbackLabel.setPadding(0, DialogUi.dp(context, compactForLandscape ? 10 : 14), 0, DialogUi.dp(context, 6));
         if (!compactForLandscape) {
@@ -148,14 +163,14 @@ final class WalletDialogController {
         input.setHint("0x wallet address Sepolia");
         input.setText(view.walletAddress());
         input.setSelectAllOnFocus(false);
-        input.setTextColor(Color.WHITE);
-        input.setHintTextColor(Color.rgb(185, 164, 138));
+        input.setTextColor(DialogUi.BODY_TEXT);
+        input.setHintTextColor(Color.rgb(210, 170, 125));
         input.setTextSize(compactForLandscape ? 16f : 18f);
         input.setPadding(DialogUi.dp(context, 16), 0, DialogUi.dp(context, 16), 0);
         input.setBackground(DialogUi.roundedStrokeDrawable(
-                Color.rgb(38, 30, 24),
+                Color.rgb(122, 55, 19),
                 DialogUi.dp(context, 10),
-                Color.rgb(130, 85, 43),
+                DialogUi.TEXT_BOX_STROKE,
                 DialogUi.dp(context, 2)));
         if (!compactForLandscape) {
             root.addView(input, new LinearLayout.LayoutParams(
@@ -165,25 +180,25 @@ final class WalletDialogController {
 
         LinearLayout actions = new LinearLayout(context);
         actions.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-        actions.setPadding(0, DialogUi.dp(context, compactForLandscape ? 14 : 24), 0, 0);
+        actions.setPadding(0, DialogUi.dp(context, compactForLandscape ? 8 : 24), 0, 0);
         Button close = DialogUi.walletButton(context, "Tutup", Color.rgb(91, 64, 40), Color.rgb(239, 220, 191));
         Button sync = DialogUi.walletButton(context, "Sync", Color.rgb(43, 108, 72), Color.WHITE);
         Button save = DialogUi.walletButton(context, compactForLandscape ? "Manual" : connected ? "Ganti" : "Simpan", Color.rgb(214, 129, 39), Color.WHITE);
         LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(
                 DialogUi.dp(context, compactForLandscape ? 88 : 108),
-                DialogUi.dp(context, compactForLandscape ? 42 : 48));
+                DialogUi.dp(context, compactForLandscape ? 38 : 48));
         closeParams.leftMargin = DialogUi.dp(context, compactForLandscape ? 8 : 10);
         actions.addView(close, closeParams);
         if (connected) {
             LinearLayout.LayoutParams syncParams = new LinearLayout.LayoutParams(
                     DialogUi.dp(context, compactForLandscape ? 92 : 108),
-                    DialogUi.dp(context, compactForLandscape ? 42 : 48));
+                    DialogUi.dp(context, compactForLandscape ? 38 : 48));
             syncParams.leftMargin = DialogUi.dp(context, compactForLandscape ? 8 : 10);
             actions.addView(sync, syncParams);
         }
         LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(
                 DialogUi.dp(context, compactForLandscape ? 100 : 126),
-                DialogUi.dp(context, compactForLandscape ? 42 : 48));
+                DialogUi.dp(context, compactForLandscape ? 38 : 48));
         saveParams.leftMargin = DialogUi.dp(context, compactForLandscape ? 8 : 10);
         actions.addView(save, saveParams);
         root.addView(actions);

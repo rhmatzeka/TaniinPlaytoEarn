@@ -1345,22 +1345,32 @@ final class FarmGameView extends CanvasGameView {
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.argb(120, 0, 0, 0));
         canvas.drawRoundRect(panel.left + 8f, panel.top + 10f, panel.right + 8f, panel.bottom + 10f, 26, 26, paint);
-        paint.setColor(Color.rgb(134, 70, 25));
+        paint.setColor(DialogUi.PANEL_FILL);
         canvas.drawRoundRect(panel, 26, 26, paint);
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(6f);
-        paint.setColor(Color.rgb(83, 43, 18));
+        paint.setColor(DialogUi.PANEL_STROKE);
         canvas.drawRoundRect(panel, 26, 26, paint);
 
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(128, 61, 23));
+        paint.setColor(DialogUi.PANEL_FILL);
         canvas.drawRoundRect(panel.left + 4f, panel.top + 4f, panel.right - 4f, bodyTop, 24, 24, paint);
         paint.setColor(Color.rgb(95, 43, 16));
         canvas.drawRect(panel.left + 4f, bodyTop - 4f, panel.right - 4f, bodyTop + 2f, paint);
-        paint.setColor(Color.rgb(161, 81, 33));
+        paint.setColor(DialogUi.PANEL_INNER_FILL);
         canvas.drawRect(bodyLeft, bodyTop, panel.right - 4f, panel.bottom - 4f, paint);
         paint.setColor(Color.rgb(112, 52, 20));
         canvas.drawRect(panel.left + 4f, bodyTop, bodyLeft, panel.bottom - 4f, paint);
+
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(3f);
+        paint.setColor(DialogUi.PANEL_INNER_STROKE);
+        canvas.drawRoundRect(panel.left + 10f, panel.top + 10f, panel.right - 10f, panel.bottom - 10f, 19, 19, paint);
+
+        drawPanelCorner(canvas, panel.left + 24f, panel.top + 24f, true, true);
+        drawPanelCorner(canvas, panel.right - 24f, panel.top + 24f, false, true);
+        drawPanelCorner(canvas, panel.left + 24f, panel.bottom - 24f, true, false);
+        drawPanelCorner(canvas, panel.right - 24f, panel.bottom - 24f, false, false);
 
         drawBackpackTitle(canvas, panel.left + 58f, panel.top + 61f);
         drawBackpackCloseButton(canvas);

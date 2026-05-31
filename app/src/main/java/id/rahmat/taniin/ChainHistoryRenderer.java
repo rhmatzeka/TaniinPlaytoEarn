@@ -50,21 +50,29 @@ final class ChainHistoryRenderer {
         RectF panel = dialogBounds(viewWidth, viewHeight, history.size());
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.argb(135, 0, 0, 0));
-        canvas.drawRoundRect(panel.left + 7f, panel.top + 9f, panel.right + 7f, panel.bottom + 9f, 18, 18, paint);
-        paint.setColor(Color.rgb(23, 45, 39));
-        canvas.drawRoundRect(panel, 18, 18, paint);
+        canvas.drawRoundRect(panel.left + 8f, panel.top + 10f, panel.right + 8f, panel.bottom + 10f, 22, 22, paint);
+        paint.setColor(DialogUi.PANEL_FILL);
+        canvas.drawRoundRect(panel, 22, 22, paint);
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(4f);
-        paint.setColor(Color.rgb(92, 178, 114));
-        canvas.drawRoundRect(panel, 18, 18, paint);
+        paint.setStrokeWidth(6f);
+        paint.setColor(DialogUi.PANEL_STROKE);
+        canvas.drawRoundRect(panel, 22, 22, paint);
+        paint.setStrokeWidth(3f);
+        paint.setColor(DialogUi.PANEL_INNER_STROKE);
+        canvas.drawRoundRect(panel.left + 10f, panel.top + 10f, panel.right - 10f, panel.bottom - 10f, 16, 16, paint);
+
+        drawPanelCorner(canvas, panel.left + 24f, panel.top + 24f, true, true);
+        drawPanelCorner(canvas, panel.right - 24f, panel.top + 24f, false, true);
+        drawPanelCorner(canvas, panel.left + 24f, panel.bottom - 24f, true, false);
+        drawPanelCorner(canvas, panel.right - 24f, panel.bottom - 24f, false, false);
 
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(190, 248, 188));
+        paint.setColor(DialogUi.TITLE);
         paint.setTextSize(32f);
         paint.setFakeBoldText(true);
         canvas.drawText("Riwayat transaksi", panel.left + 34f, panel.top + 52f, paint);
         paint.setFakeBoldText(false);
-        paint.setColor(Color.rgb(202, 223, 207));
+        paint.setColor(DialogUi.BODY_TEXT);
         String mode = hasGameApi
                 ? "Gameplay lokal + signer Sepolia"
                 : "Gameplay lokal: signer belum diset";
@@ -82,9 +90,14 @@ final class ChainHistoryRenderer {
         if (history.isEmpty()) {
             RectF empty = new RectF(panel.left + 30f, panel.top + 120f, panel.right - 30f, panel.bottom - 30f);
             paint.setStyle(Paint.Style.FILL);
-            paint.setColor(Color.rgb(34, 61, 51));
+            paint.setColor(DialogUi.TEXT_BOX_FILL);
             canvas.drawRoundRect(empty, 12, 12, paint);
-            paint.setColor(Color.rgb(211, 228, 211));
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(3f);
+            paint.setColor(DialogUi.TEXT_BOX_STROKE);
+            canvas.drawRoundRect(empty, 12, 12, paint);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(DialogUi.BODY_TEXT);
             paint.setTextSize(fitTextSize("Belum ada transaksi.", 22f, empty.width() - 40f));
             drawCenteredText(canvas, "Belum ada transaksi.", empty.centerX(), empty.centerY() + 7f);
             return;
@@ -98,7 +111,7 @@ final class ChainHistoryRenderer {
         if (history.size() > rows) {
             String more = "+" + (history.size() - rows) + " riwayat lain";
             paint.setStyle(Paint.Style.FILL);
-            paint.setColor(Color.rgb(197, 218, 201));
+            paint.setColor(DialogUi.BODY_TEXT);
             paint.setTextSize(18f);
             drawCenteredText(canvas, more, panel.centerX(), panel.bottom - 22f);
         }
@@ -153,13 +166,24 @@ final class ChainHistoryRenderer {
         return Math.min(Math.min(historyLimit, historySize), rowsByHeight);
     }
 
+    private void drawPanelCorner(Canvas canvas, float x, float y, boolean left, boolean top) {
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(DialogUi.CORNER);
+        float cornerLeft = left ? x : x - 18f;
+        float cornerTop = top ? y : y - 18f;
+        canvas.drawRoundRect(cornerLeft, cornerTop, cornerLeft + 18f, cornerTop + 18f, 5, 5, paint);
+    }
+
     private void drawCloseButton(Canvas canvas, RectF close) {
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(43, 78, 61));
+        paint.setColor(Color.rgb(108, 53, 12));
         canvas.drawRoundRect(close, 12, 12, paint);
         paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(3f);
+        paint.setColor(Color.rgb(137, 68, 20));
+        canvas.drawRoundRect(close, 12, 12, paint);
         paint.setStrokeWidth(5f);
-        paint.setColor(Color.rgb(213, 248, 211));
+        paint.setColor(DialogUi.BODY_TEXT);
         canvas.drawLine(close.left + 17f, close.top + 17f, close.right - 17f, close.bottom - 17f, paint);
         canvas.drawLine(close.right - 17f, close.top + 17f, close.left + 17f, close.bottom - 17f, paint);
         paint.setStyle(Paint.Style.FILL);
@@ -169,16 +193,16 @@ final class ChainHistoryRenderer {
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.argb(72, 0, 0, 0));
         canvas.drawRoundRect(bounds.left + 3f, bounds.top + 4f, bounds.right + 3f, bounds.bottom + 4f, 11, 11, paint);
-        paint.setColor(Color.rgb(105, 50, 42));
+        paint.setColor(Color.rgb(151, 47, 29));
         canvas.drawRoundRect(bounds, 11, 11, paint);
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeWidth(3f);
-        paint.setColor(Color.rgb(229, 143, 117));
+        paint.setColor(Color.rgb(93, 23, 16));
         canvas.drawRoundRect(bounds, 11, 11, paint);
 
-        drawTrashIcon(canvas, bounds.left + 28f, bounds.centerY(), 0.82f, Color.rgb(255, 225, 200));
+        drawTrashIcon(canvas, bounds.left + 28f, bounds.centerY(), 0.82f, Color.WHITE);
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(Color.rgb(255, 238, 218));
+        paint.setColor(Color.WHITE);
         paint.setTextSize(fitTextSize("Hapus semua", 18f, bounds.width() - 58f));
         paint.setFakeBoldText(true);
         canvas.drawText("Hapus semua", bounds.left + 52f, bounds.centerY() + 7f, paint);
@@ -282,21 +306,21 @@ final class ChainHistoryRenderer {
 
     private int rowFillColor(boolean hasHash, boolean sending, boolean waitingSync, boolean localSaved, boolean failed) {
         if (hasHash) {
-            return Color.rgb(33, 78, 58);
+            return Color.rgb(73, 91, 48);
         }
         if (failed) {
-            return Color.rgb(74, 49, 45);
+            return Color.rgb(102, 47, 34);
         }
         if (sending) {
-            return Color.rgb(61, 66, 42);
+            return Color.rgb(102, 72, 30);
         }
         if (waitingSync) {
-            return Color.rgb(67, 58, 39);
+            return Color.rgb(114, 62, 24);
         }
         if (localSaved) {
-            return Color.rgb(39, 70, 61);
+            return Color.rgb(83, 74, 38);
         }
-        return Color.rgb(44, 63, 53);
+        return Color.rgb(109, 52, 21);
     }
 
     private int rowStrokeColor(boolean hasHash, boolean sending, boolean waitingSync, boolean localSaved, boolean failed) {
