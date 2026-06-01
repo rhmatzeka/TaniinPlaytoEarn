@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../chain/chain_client.dart';
 
@@ -19,6 +21,24 @@ enum GameInteraction {
   sellLand,
   waitCrop,
   harvest,
+}
+
+enum SwapAsset { gameCoin, taniSepolia }
+
+extension SwapAssetText on SwapAsset {
+  String get label {
+    return switch (this) {
+      SwapAsset.gameCoin => 'GAME COIN',
+      SwapAsset.taniSepolia => 'TANI SEPOLIA',
+    };
+  }
+
+  String get shortLabel {
+    return switch (this) {
+      SwapAsset.gameCoin => 'coin',
+      SwapAsset.taniSepolia => 'TANI',
+    };
+  }
 }
 
 class SeedStack {
@@ -144,12 +164,16 @@ class FarmStateController extends ChangeNotifier {
   static const int harvestSellPrice = 35;
   static const int seedBundleAmount = 3;
   static const int maxShopBundleQuantity = 9;
+  static const String _saveKey = 'taniin.farmState.v1';
+  static const int _saveVersion = 1;
 
   int coins = 620;
   int tani = 86;
   int ownedLand = 1;
   int shopBundleQuantity = 1;
   int swapAmount = 0;
+  SwapAsset swapFromAsset = SwapAsset.gameCoin;
+  SwapAsset swapToAsset = SwapAsset.taniSepolia;
   int selectedSellCropIndex = 0;
   bool walletConnected = false;
   String walletAddress = '';
@@ -160,6 +184,9 @@ class FarmStateController extends ChangeNotifier {
   ChainConfig chainConfig = const ChainConfig();
   late ChainClient _chainClient = ChainClient(chainConfig);
   int _nextHistoryId = 1;
+  Timer? _saveDebounce;
+  bool _persistenceReady = false;
+  bool _restoringPersistence = false;
   String chainStatus =
       'Mode lokal: aksi tersimpan di game sampai wallet disambungkan.';
   String statusTitle = 'Info';
@@ -264,8 +291,30 @@ class FarmStateController extends ChangeNotifier {
 
   int get selectedSellCropValue => selectedSellCrop.quantity * harvestSellPrice;
 
-  int get selectedSwapAmount =>
-      coins <= 0 ? 0 : swapAmount.clamp(0, coins).toInt();
+  int get selectedSwapAmount => swapSourceBalance <= 0
+      ? 0
+      : swapAmount.clamp(0, swapSourceBalance).toInt();
+
+  int get swapSourceBalance => balanceForSwapAsset(swapFromAsset);
+
+  int get swapTargetBalance => balanceForSwapAsset(swapToAsset);
+
+  bool get swappingGameCoinToTani =>
+      swapFromAsset == SwapAsset.gameCoin &&
+      swapToAsset == SwapAsset.taniSepolia;
+
+  bool get swappingTaniToGameCoin =>
+      swapFromAsset == SwapAsset.taniSepolia &&
+      swapToAsset == SwapAsset.gameCoin;
+
+  String get swapVerb => swappingTaniToGameCoin ? 'Deposit' : 'Swap';
+
+  int balanceForSwapAsset(SwapAsset asset) {
+    return switch (asset) {
+      SwapAsset.gameCoin => coins,
+      SwapAsset.taniSepolia => tani,
+    };
+  }
 
   int get growingPlotCount =>
       plots.where((plot) => plot.status == PlotStatus.growing).length;
@@ -294,6 +343,356 @@ class FarmStateController extends ChangeNotifier {
         statusMessage.isNotEmpty;
   }
 
+  Future<void> loadSavedState() async {
+    if (_persistenceReady) {
+      return;
+    }
+    var restored = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_saveKey);
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw);
+        final data = _mapValue(decoded);
+        if (data != null) {
+          _restoreFromSave(data);
+          restored = true;
+        }
+      }
+    } on Object {
+      restored = false;
+    } finally {
+      _persistenceReady = true;
+    }
+    if (restored) {
+      notifyListeners();
+    }
+  }
+
+  Future<void> saveNow() async {
+    if (!_persistenceReady || _restoringPersistence) {
+      return;
+    }
+    _saveDebounce?.cancel();
+    _saveDebounce = null;
+    await _writeSavedState();
+  }
+
+  void _commitState() {
+    _scheduleSave();
+    notifyListeners();
+  }
+
+  void _scheduleSave() {
+    if (!_persistenceReady || _restoringPersistence) {
+      return;
+    }
+    _saveDebounce?.cancel();
+    _saveDebounce = Timer(const Duration(milliseconds: 250), () {
+      _saveDebounce = null;
+      unawaited(_writeSavedState());
+    });
+  }
+
+  Future<void> _writeSavedState() async {
+    if (!_persistenceReady || _restoringPersistence) {
+      return;
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_saveKey, jsonEncode(_toSaveJson()));
+    } on Object {
+      // Keep gameplay responsive even if Android storage is temporarily busy.
+    }
+  }
+
+  Map<String, Object?> _toSaveJson() {
+    return <String, Object?>{
+      'version': _saveVersion,
+      'savedAt': DateTime.now().millisecondsSinceEpoch,
+      'coins': coins,
+      'tani': tani,
+      'ownedLand': ownedLand,
+      'shopBundleQuantity': shopBundleQuantity,
+      'swapAmount': swapAmount,
+      'swapFromAsset': swapFromAsset.name,
+      'swapToAsset': swapToAsset.name,
+      'selectedSeedIndex': selectedSeedIndex,
+      'selectedSellCropIndex': selectedSellCropIndex,
+      'walletConnected': walletConnected,
+      'walletAddress': walletAddress,
+      'musicVolume': musicVolume,
+      'sfxVolume': sfxVolume,
+      'musicEnabled': musicEnabled,
+      'sfxEnabled': sfxEnabled,
+      'seedQuantities': seeds.map((seed) => seed.quantity).toList(),
+      'cropQuantities': crops.map((crop) => crop.quantity).toList(),
+      'plots': plots
+          .map(
+            (plot) => <String, Object?>{
+              'owned': plot.owned,
+              'seedIndex': plot.seedIndex,
+              'status': plot.status.name,
+              'plantedAt': plot.plantedAt?.millisecondsSinceEpoch,
+            },
+          )
+          .toList(),
+      'nextHistoryId': _nextHistoryId,
+      'history': history
+          .map(
+            (record) => <String, Object?>{
+              'id': record.id,
+              'title': record.title,
+              'status': record.status,
+              'timeLabel': record.timeLabel,
+              'valueLabel': record.valueLabel,
+              'txHash': record.txHash,
+            },
+          )
+          .toList(),
+    };
+  }
+
+  void _restoreFromSave(Map<String, Object?> data) {
+    _restoringPersistence = true;
+    try {
+      coins = _readInt(data['coins'], coins).clamp(0, 0x7fffffff).toInt();
+      tani = _readInt(data['tani'], tani).clamp(0, 0x7fffffff).toInt();
+      shopBundleQuantity = _readInt(
+        data['shopBundleQuantity'],
+        shopBundleQuantity,
+      ).clamp(1, maxShopBundleQuantity).toInt();
+      selectedSeedIndex = _readIndex(data['selectedSeedIndex'], seeds.length);
+      selectedSellCropIndex = _readIndex(
+        data['selectedSellCropIndex'],
+        crops.length,
+      );
+      swapFromAsset = _readSwapAsset(data['swapFromAsset'], SwapAsset.gameCoin);
+      swapToAsset = _readSwapAsset(data['swapToAsset'], SwapAsset.taniSepolia);
+      _normalizeSwapAssets();
+
+      final savedWalletAddress = _readString(data['walletAddress'], '');
+      walletConnected =
+          _readBool(data['walletConnected'], false) &&
+          isValidAddress(savedWalletAddress);
+      walletAddress = walletConnected ? savedWalletAddress : '';
+      walletNativeBalance = '';
+      chainSignerAddress = '';
+      walletTaniBalanceAvailable = false;
+      checkingChain = false;
+
+      musicVolume = _readDouble(
+        data['musicVolume'],
+        musicVolume,
+      ).clamp(0, 1).toDouble();
+      sfxVolume = _readDouble(
+        data['sfxVolume'],
+        sfxVolume,
+      ).clamp(0, 1).toDouble();
+      musicEnabled = _readBool(data['musicEnabled'], musicEnabled);
+      sfxEnabled = _readBool(data['sfxEnabled'], sfxEnabled);
+
+      final seedQuantities = _listValue(data['seedQuantities']);
+      if (seedQuantities != null) {
+        for (
+          var i = 0;
+          i < math.min(seeds.length, seedQuantities.length);
+          i++
+        ) {
+          seeds[i] = seeds[i].copyWith(
+            quantity: math.max(
+              0,
+              _readInt(seedQuantities[i], seeds[i].quantity),
+            ),
+          );
+        }
+      }
+
+      final cropQuantities = _listValue(data['cropQuantities']);
+      if (cropQuantities != null) {
+        for (
+          var i = 0;
+          i < math.min(crops.length, cropQuantities.length);
+          i++
+        ) {
+          crops[i] = crops[i].copyWith(
+            quantity: math.max(
+              0,
+              _readInt(cropQuantities[i], crops[i].quantity),
+            ),
+          );
+        }
+      }
+
+      final savedPlots = _listValue(data['plots']);
+      if (savedPlots != null) {
+        for (var i = 0; i < math.min(plots.length, savedPlots.length); i++) {
+          final savedPlot = _mapValue(savedPlots[i]);
+          if (savedPlot == null) {
+            continue;
+          }
+          final plot = plots[i];
+          final status = _readPlotStatus(savedPlot['status'], plot.status);
+          final plantedAtMs = _readNullableInt(savedPlot['plantedAt']);
+          plot
+            ..owned = _readBool(savedPlot['owned'], plot.owned)
+            ..seedIndex = _readIndex(savedPlot['seedIndex'], seeds.length)
+            ..status = status
+            ..plantedAt = status == PlotStatus.growing && plantedAtMs != null
+                ? DateTime.fromMillisecondsSinceEpoch(plantedAtMs)
+                : null;
+        }
+      }
+      ownedLand = _ownedLandCount();
+      swapAmount = _readInt(
+        data['swapAmount'],
+        swapAmount,
+      ).clamp(0, math.max(0, swapSourceBalance)).toInt();
+
+      final savedHistory = _listValue(data['history']);
+      if (savedHistory != null) {
+        final parsedHistory = <HistoryRecord>[];
+        var maxHistoryId = 0;
+        for (final item in savedHistory.take(8)) {
+          final record = _mapValue(item);
+          if (record == null) {
+            continue;
+          }
+          final id = _readInt(record['id'], 0);
+          maxHistoryId = math.max(maxHistoryId, id);
+          parsedHistory.add(
+            HistoryRecord(
+              id: id,
+              title: _readString(record['title'], 'Aksi tersimpan'),
+              status: _normalizeHistoryStatus(
+                _readString(record['status'], 'lokal tersimpan'),
+              ),
+              timeLabel: _readString(record['timeLabel'], 'now'),
+              valueLabel: _readString(record['valueLabel'], ''),
+              txHash: _readString(record['txHash'], ''),
+            ),
+          );
+        }
+        if (parsedHistory.isNotEmpty) {
+          history
+            ..clear()
+            ..addAll(parsedHistory);
+          _nextHistoryId = math.max(
+            _readInt(data['nextHistoryId'], maxHistoryId + 1),
+            maxHistoryId + 1,
+          );
+        }
+      }
+    } finally {
+      _restoringPersistence = false;
+    }
+  }
+
+  Map<String, Object?>? _mapValue(Object? value) {
+    if (value is Map<String, Object?>) {
+      return value;
+    }
+    if (value is Map) {
+      return Map<String, Object?>.from(value);
+    }
+    return null;
+  }
+
+  List<Object?>? _listValue(Object? value) {
+    if (value is List) {
+      return List<Object?>.from(value);
+    }
+    return null;
+  }
+
+  int _readInt(Object? value, int fallback) {
+    if (value is int) {
+      return value;
+    }
+    if (value is num) {
+      return value.round();
+    }
+    if (value is String) {
+      return int.tryParse(value.trim()) ?? fallback;
+    }
+    return fallback;
+  }
+
+  int? _readNullableInt(Object? value) {
+    if (value == null) {
+      return null;
+    }
+    return _readInt(value, 0);
+  }
+
+  int _readIndex(Object? value, int length) {
+    if (length <= 0) {
+      return 0;
+    }
+    return _readInt(value, 0).clamp(0, length - 1).toInt();
+  }
+
+  double _readDouble(Object? value, double fallback) {
+    if (value is num) {
+      return value.toDouble();
+    }
+    if (value is String) {
+      return double.tryParse(value.trim()) ?? fallback;
+    }
+    return fallback;
+  }
+
+  bool _readBool(Object? value, bool fallback) {
+    if (value is bool) {
+      return value;
+    }
+    if (value is String) {
+      final lower = value.trim().toLowerCase();
+      if (lower == 'true') {
+        return true;
+      }
+      if (lower == 'false') {
+        return false;
+      }
+    }
+    return fallback;
+  }
+
+  String _readString(Object? value, String fallback) {
+    if (value is String) {
+      return value;
+    }
+    return fallback;
+  }
+
+  PlotStatus _readPlotStatus(Object? value, PlotStatus fallback) {
+    if (value is String) {
+      for (final status in PlotStatus.values) {
+        if (status.name == value) {
+          return status;
+        }
+      }
+    }
+    if (value is int && value >= 0 && value < PlotStatus.values.length) {
+      return PlotStatus.values[value];
+    }
+    return fallback;
+  }
+
+  SwapAsset _readSwapAsset(Object? value, SwapAsset fallback) {
+    if (value is String) {
+      for (final asset in SwapAsset.values) {
+        if (asset.name == value) {
+          return asset;
+        }
+      }
+    }
+    if (value is int && value >= 0 && value < SwapAsset.values.length) {
+      return SwapAsset.values[value];
+    }
+    return fallback;
+  }
+
   void refreshGrowth() {
     final now = DateTime.now();
     var changed = false;
@@ -314,7 +713,7 @@ class FarmStateController extends ChangeNotifier {
     playClick();
     selectedSeedIndex = index;
     showMessage('Benih dipilih: ${seeds[index].name}', notify: false);
-    notifyListeners();
+    _commitState();
   }
 
   void selectSellCrop(int index) {
@@ -324,7 +723,7 @@ class FarmStateController extends ChangeNotifier {
     playClick();
     selectedSellCropIndex = index;
     showMessage('Panen dipilih: ${crops[index].name}', notify: false);
-    notifyListeners();
+    _commitState();
   }
 
   void selectFirstSellableCrop() {
@@ -339,14 +738,14 @@ class FarmStateController extends ChangeNotifier {
       _storeWalletAddress(config.defaultWalletAddress);
       chainStatus =
           'Wallet default tersambung: ${shortAddress(walletAddress)}. Sync Sepolia...';
-      notifyListeners();
+      _commitState();
       refreshWalletState(revealMessage: false);
       return;
     }
     chainStatus = config.hasGameApi
         ? 'Signer Sepolia siap. Connect wallet supaya aksi punya tx hash.'
         : 'Mode lokal: signer backend belum diset.';
-    notifyListeners();
+    _commitState();
   }
 
   Future<void> connectWallet(String address) async {
@@ -386,7 +785,7 @@ class FarmStateController extends ChangeNotifier {
         ? 'Wallet dilepas. Connect lagi supaya aksi terkirim on-chain.'
         : 'Mode lokal: signer backend belum diset.';
     showMessage('Wallet dilepas.');
-    notifyListeners();
+    _commitState();
   }
 
   Future<void> refreshWalletState({bool revealMessage = true}) async {
@@ -441,7 +840,7 @@ class FarmStateController extends ChangeNotifier {
         notify: false,
       );
     }
-    notifyListeners();
+    _commitState();
   }
 
   void setShopBundleQuantity(int quantity) {
@@ -451,7 +850,7 @@ class FarmStateController extends ChangeNotifier {
       'Jumlah paket: x$shopBundleQuantity (${seedBundleAmount * shopBundleQuantity} benih)',
       notify: false,
     );
-    notifyListeners();
+    _commitState();
   }
 
   void adjustShopBundleQuantity(int delta) {
@@ -501,9 +900,7 @@ class FarmStateController extends ChangeNotifier {
             ? 'Pilih tanaman yang mau dijual. ${selectedSellCrop.name} x${selectedSellCrop.quantity} bernilai $selectedSellCropValue coin.'
             : 'Belum ada hasil panen untuk dijual.',
       GameInteraction.swapToken =>
-        coins > 0
-            ? 'Pilih jumlah Game Coin yang mau ditukar ke TANI Sepolia.'
-            : 'Coin belum ada untuk diswap.',
+        'Pilih aset dan jumlah swap antara Game Coin dan TANI Sepolia.',
       GameInteraction.buyLand =>
         'Lahan ini bisa dibeli seharga $landBuyPrice coin.',
       GameInteraction.plant =>
@@ -530,15 +927,13 @@ class FarmStateController extends ChangeNotifier {
             ? 'Tap rumah jual: pilih panen untuk dijual jadi Game Coin.'
             : 'Rumah jual: belum ada hasil panen.',
       GameInteraction.swapToken =>
-        coins > 0
-            ? 'Tap rumah swap: tukar coin ke TANI.'
-            : 'Rumah swap: coin belum ada.',
-      GameInteraction.buyLand => 'Tap tanda lahan: beli $landBuyPrice coin.',
-      GameInteraction.plant => 'Tap tanda lahan: tanam atau jual lahan kosong.',
+        'Tap rumah swap: tukar Game Coin dan TANI Sepolia.',
+      GameInteraction.buyLand => 'Tap tanda BELI: beli $landBuyPrice coin.',
+      GameInteraction.plant => 'Tap lahan: tanam atau jual lahan kosong.',
       GameInteraction.sellLand =>
-        'Tap tanda lahan: jual lahan kosong +$landSellPrice coin.',
+        'Tap lahan kosong: jual +$landSellPrice coin.',
       GameInteraction.waitCrop => 'Tanaman masih tumbuh.',
-      GameInteraction.harvest => 'Tap tanda lahan: panen tanaman.',
+      GameInteraction.harvest => 'Tap lahan: panen tanaman.',
       _ => 'Dekati lahan atau toko.',
     };
   }
@@ -565,7 +960,7 @@ class FarmStateController extends ChangeNotifier {
           valueLabel: '-$landBuyPrice coin',
         );
         showMessage('Tanah berhasil dibeli.');
-        notifyListeners();
+        _commitState();
         return true;
       case GameInteraction.plant:
         final seed = selectedSeed;
@@ -591,7 +986,7 @@ class FarmStateController extends ChangeNotifier {
           valueLabel: 'plot ${plotIndex + 1}',
         );
         showMessage('Benih ${seed.name} berhasil ditanam.');
-        notifyListeners();
+        _commitState();
         return true;
       case GameInteraction.harvest:
         final seedIndex = plot.seedIndex.clamp(0, harvestYields.length - 1);
@@ -609,7 +1004,7 @@ class FarmStateController extends ChangeNotifier {
           valueLabel: '+$amount panen',
         );
         showMessage('Panen ${seeds[seedIndex].name} +$amount masuk inventory.');
-        notifyListeners();
+        _commitState();
         return true;
       case GameInteraction.waitCrop:
         showMessage('Tanaman belum siap panen.', success: false);
@@ -649,7 +1044,7 @@ class FarmStateController extends ChangeNotifier {
       valueLabel: '+$landSellPrice coin',
     );
     showMessage('Lahan terjual. Coin +$landSellPrice.');
-    notifyListeners();
+    _commitState();
     return true;
   }
 
@@ -685,7 +1080,7 @@ class FarmStateController extends ChangeNotifier {
       valueLabel: '-$price coin',
     );
     showMessage('Berhasil membeli $total benih ${seeds[seedIndex].name}.');
-    notifyListeners();
+    _commitState();
     return true;
   }
 
@@ -716,32 +1111,52 @@ class FarmStateController extends ChangeNotifier {
     );
     selectFirstSellableCrop();
     showMessage('Terjual $sold ${crop.name}. Coin +$earned.');
-    notifyListeners();
+    _commitState();
     return true;
   }
 
-  bool swapCoinsToTani() {
+  bool swapSelectedAssets() {
     playClick();
+    _normalizeSwapAssets();
+    final fromAsset = swapFromAsset;
+    final toAsset = swapToAsset;
     final amount = selectedSwapAmount;
-    if (amount <= 0) {
-      showMessage('Masukkan jumlah coin yang mau diswap.', success: false);
+    if (fromAsset == toAsset) {
+      showMessage('Pilih dua aset yang berbeda untuk swap.', success: false);
       return false;
     }
-    if (chainConfig.hasGameApi && !walletConnected) {
+    if (amount <= 0) {
       showMessage(
-        'Connect wallet dulu sebelum swap ke Sepolia.',
+        'Saldo ${fromAsset.label} belum cukup untuk swap.',
         success: false,
       );
       return false;
     }
+    if (chainConfig.hasGameApi && !walletConnected) {
+      showMessage('Connect wallet dulu sebelum swap Sepolia.', success: false);
+      return false;
+    }
+    if (swappingGameCoinToTani) {
+      return _swapGameCoinToTani(amount);
+    }
+    if (swappingTaniToGameCoin) {
+      return _swapTaniToGameCoin(amount);
+    }
+    showMessage('Pasangan swap belum tersedia.', success: false);
+    return false;
+  }
+
+  bool swapCoinsToTani() => swapSelectedAssets();
+
+  bool _swapGameCoinToTani(int amount) {
     coins -= amount;
     if (!chainConfig.hasGameApi) {
       tani += amount;
     }
-    swapAmount = coins;
+    _clampSwapAmountToSource();
     _queueChainAction(
       ChainAction(type: 'SWAP_COIN', plotId: 0, amount: amount),
-      title: 'Swap coin ke TANI',
+      title: 'Swap Game Coin ke TANI',
       valueLabel: '-$amount coin',
       refundCoinsOnFailure: amount,
       requiresTxHash: true,
@@ -751,24 +1166,119 @@ class FarmStateController extends ChangeNotifier {
           ? 'Mengirim swap $amount coin ke Sepolia.'
           : 'Swap $amount coin ke TANI tersimpan lokal.',
     );
-    notifyListeners();
+    _commitState();
     return true;
   }
 
+  bool _swapTaniToGameCoin(int amount) {
+    tani -= amount;
+    if (!chainConfig.hasGameApi) {
+      coins += amount;
+    }
+    _clampSwapAmountToSource();
+    _queueChainAction(
+      ChainAction(type: 'SWAP_TANI_COIN', plotId: 0, amount: amount),
+      title: 'Deposit TANI ke Game Coin',
+      valueLabel: '+$amount coin',
+      refundTaniOnFailure: amount,
+      requiresTxHash: true,
+    );
+    showMessage(
+      chainConfig.hasGameApi
+          ? 'Mengirim deposit $amount TANI ke Game Coin.'
+          : 'Deposit $amount TANI jadi Game Coin tersimpan lokal.',
+    );
+    _commitState();
+    return true;
+  }
+
+  void setSwapFromAsset(SwapAsset asset) {
+    if (asset == swapFromAsset) {
+      return;
+    }
+    playClick();
+    final previousFrom = swapFromAsset;
+    swapFromAsset = asset;
+    if (swapToAsset == asset) {
+      swapToAsset = previousFrom;
+    }
+    _normalizeSwapAssets();
+    _clampSwapAmountToSource();
+    showMessage(
+      'Swap ${swapFromAsset.label} ke ${swapToAsset.label}.',
+      notify: false,
+    );
+    _commitState();
+  }
+
+  void setSwapToAsset(SwapAsset asset) {
+    if (asset == swapToAsset) {
+      return;
+    }
+    playClick();
+    final previousTo = swapToAsset;
+    swapToAsset = asset;
+    if (swapFromAsset == asset) {
+      swapFromAsset = previousTo;
+    }
+    _normalizeSwapAssets();
+    _clampSwapAmountToSource();
+    showMessage(
+      'Swap ${swapFromAsset.label} ke ${swapToAsset.label}.',
+      notify: false,
+    );
+    _commitState();
+  }
+
+  void reverseSwapAssets() {
+    playClick();
+    final previousFrom = swapFromAsset;
+    swapFromAsset = swapToAsset;
+    swapToAsset = previousFrom;
+    _normalizeSwapAssets();
+    _clampSwapAmountToSource();
+    showMessage(
+      'Swap dibalik: ${swapFromAsset.label} ke ${swapToAsset.label}.',
+      notify: false,
+    );
+    _commitState();
+  }
+
   void setSwapAmount(int amount) {
-    swapAmount = amount.clamp(0, math.max(0, coins)).toInt();
-    notifyListeners();
+    swapAmount = amount.clamp(0, math.max(0, swapSourceBalance)).toInt();
+    _commitState();
   }
 
   void prepareSwapAmount() {
-    final nextAmount = coins <= 0
+    _normalizeSwapAssets();
+    final sourceBalance = swapSourceBalance;
+    final nextAmount = sourceBalance <= 0
         ? 0
-        : (swapAmount <= 0 || swapAmount > coins ? coins : swapAmount);
+        : (swapAmount <= 0 || swapAmount > sourceBalance
+              ? sourceBalance
+              : swapAmount);
     if (swapAmount == nextAmount) {
       return;
     }
     swapAmount = nextAmount;
-    notifyListeners();
+    _commitState();
+  }
+
+  void _normalizeSwapAssets() {
+    if (swapFromAsset == swapToAsset) {
+      swapToAsset = _oppositeSwapAsset(swapFromAsset);
+    }
+  }
+
+  SwapAsset _oppositeSwapAsset(SwapAsset asset) {
+    return switch (asset) {
+      SwapAsset.gameCoin => SwapAsset.taniSepolia,
+      SwapAsset.taniSepolia => SwapAsset.gameCoin,
+    };
+  }
+
+  void _clampSwapAmountToSource() {
+    swapAmount = swapAmount.clamp(0, math.max(0, swapSourceBalance)).toInt();
   }
 
   void showMessage(String text, {bool success = true, bool notify = true}) {
@@ -783,29 +1293,38 @@ class FarmStateController extends ChangeNotifier {
   void setMusicEnabled(bool value) {
     playClick();
     musicEnabled = value;
-    notifyListeners();
+    _commitState();
   }
 
   void setSfxEnabled(bool value) {
     playClick();
     sfxEnabled = value;
-    notifyListeners();
+    _commitState();
   }
 
   void setMusicVolume(double value) {
     musicVolume = value;
-    notifyListeners();
+    _commitState();
   }
 
   void setSfxVolume(double value) {
     sfxVolume = value;
-    notifyListeners();
+    _commitState();
   }
 
   void playClick() {
     if (sfxEnabled) {
       onSfx?.call();
     }
+  }
+
+  @override
+  void dispose() {
+    _saveDebounce?.cancel();
+    if (_persistenceReady && !_restoringPersistence) {
+      unawaited(_writeSavedState());
+    }
+    super.dispose();
   }
 
   int _ownedLandCount() => plots.where((plot) => plot.owned).length;
@@ -827,6 +1346,7 @@ class FarmStateController extends ChangeNotifier {
     required String valueLabel,
     String? title,
     int refundCoinsOnFailure = 0,
+    int refundTaniOnFailure = 0,
     bool requiresTxHash = false,
   }) {
     final entryId = _addHistory(
@@ -843,6 +1363,7 @@ class FarmStateController extends ChangeNotifier {
         entryId,
         action,
         refundCoinsOnFailure: refundCoinsOnFailure,
+        refundTaniOnFailure: refundTaniOnFailure,
         requiresTxHash: requiresTxHash,
       ),
     );
@@ -852,6 +1373,7 @@ class FarmStateController extends ChangeNotifier {
     int entryId,
     ChainAction action, {
     required int refundCoinsOnFailure,
+    required int refundTaniOnFailure,
     required bool requiresTxHash,
   }) async {
     final result = await _chainClient.submitGameAction(walletAddress, action);
@@ -861,6 +1383,7 @@ class FarmStateController extends ChangeNotifier {
           entryId,
           action,
           refundCoinsOnFailure,
+          refundTaniOnFailure,
           'Backend tidak mengembalikan tx hash.',
         );
         return;
@@ -874,16 +1397,21 @@ class FarmStateController extends ChangeNotifier {
       if (action.type == 'SWAP_COIN' && isValidTransactionHash(result.txHash)) {
         tani += action.amount;
       }
+      if (action.type == 'SWAP_TANI_COIN' &&
+          isValidTransactionHash(result.txHash)) {
+        coins = math.min(0x7fffffff, coins + action.amount);
+      }
       if (_actionUpdatesCoinBalance(action)) {
         unawaited(refreshWalletState(revealMessage: false));
       }
-      notifyListeners();
+      _commitState();
       return;
     }
     _handleChainActionFailure(
       entryId,
       action,
       refundCoinsOnFailure,
+      refundTaniOnFailure,
       result.message,
     );
   }
@@ -892,21 +1420,35 @@ class FarmStateController extends ChangeNotifier {
     int entryId,
     ChainAction action,
     int refundCoinsOnFailure,
+    int refundTaniOnFailure,
     String reason,
   ) {
-    if (refundCoinsOnFailure > 0) {
-      coins = math.min(0x7fffffff, coins + refundCoinsOnFailure);
-      swapAmount = coins;
-      _updateHistory(entryId, status: 'gagal; coin kembali');
+    if (refundCoinsOnFailure > 0 || refundTaniOnFailure > 0) {
+      if (refundCoinsOnFailure > 0) {
+        coins = math.min(0x7fffffff, coins + refundCoinsOnFailure);
+      }
+      if (refundTaniOnFailure > 0) {
+        tani = math.min(0x7fffffff, tani + refundTaniOnFailure);
+      }
+      _clampSwapAmountToSource();
+      _updateHistory(entryId, status: 'gagal; saldo kembali');
+      final returned = refundCoinsOnFailure > 0
+          ? '+$refundCoinsOnFailure coin'
+          : '+$refundTaniOnFailure TANI';
       chainStatus =
-          '${action.label} gagal; coin dikembalikan +$refundCoinsOnFailure: ${_conciseChainError(reason)}';
-      showMessage('Swap gagal, coin dikembalikan.', success: false);
+          '${action.label} gagal; saldo dikembalikan $returned: ${_conciseChainError(reason)}';
+      showMessage(
+        'Swap gagal, saldo dikembalikan.',
+        success: false,
+        notify: false,
+      );
+      _commitState();
       return;
     }
     _updateHistory(entryId, status: 'belum sync');
     chainStatus =
         '${action.label} tersimpan lokal. ${_conciseChainError(reason)}';
-    notifyListeners();
+    _commitState();
   }
 
   int _addHistory(String title, String valueLabel, {required String status}) {
@@ -968,6 +1510,7 @@ class FarmStateController extends ChangeNotifier {
         action.type == 'SELL_CROP' ||
         action.type == 'SWAP_CROP' ||
         action.type == 'SWAP_COIN' ||
+        action.type == 'SWAP_TANI_COIN' ||
         action.type == 'SWAP_ETH_COIN' ||
         action.type == 'SWAP_COIN_ETH';
   }

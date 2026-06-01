@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
@@ -39,15 +41,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     PlatformBridge.setWalletAddressHandler(
       _farmState.connectWalletFromDeepLink,
     );
-    _loadChainConfig();
     _game = TaniinGame(_farmState);
     _game.walkingNotifier.addListener(_syncWalkAudio);
     _syncAudio();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        setState(() => _gameMounted = true);
-      }
-    });
+    unawaited(_restoreStartupState());
   }
 
   @override
@@ -61,8 +58,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _game.hudNotifier.dispose();
     _game.miniMapNotifier.dispose();
     _audio.release();
+    unawaited(_farmState.saveNow());
     _farmState.dispose();
     super.dispose();
+  }
+
+  Future<void> _restoreStartupState() async {
+    await _farmState.loadSavedState();
+    if (!mounted) {
+      return;
+    }
+    setState(() => _gameMounted = true);
+    unawaited(_loadChainConfig());
   }
 
   Future<void> _loadChainConfig() async {
@@ -86,6 +93,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.detached) {
       _appInForeground = false;
+      unawaited(_farmState.saveNow());
       if (_audioStarted) {
         _audio.stopWalk();
         _audio.pause();

@@ -10,7 +10,8 @@ const DEFAULT_ETH_WEI_PER_COIN = "10000000000";
 const DEFAULT_MAX_ETH_PAYOUT_WEI = "10000000000000000";
 
 const coinAbi = [
-  "function mint(address to, uint256 amount) external"
+  "function mint(address to, uint256 amount) external",
+  "function gameSpend(address from, uint256 amount) external"
 ];
 
 const landAbi = [
@@ -85,6 +86,7 @@ async function submitGameAction(body) {
     allowZero: type === "SELL_CROP"
       || type === "SWAP_CROP"
       || type === "SWAP_COIN"
+      || type === "SWAP_TANI_COIN"
       || type === "SWAP_COIN_ETH"
       || type === "SWAP_ETH_COIN"
   });
@@ -127,6 +129,10 @@ async function submitGameAction(body) {
     }
     case "SWAP_COIN": {
       txHashes.push(await sendTransaction("coin swap", coin.mint(walletAddress, toTani(BigInt(amount) * BigInt(COIN_SWAP_RATE)))));
+      break;
+    }
+    case "SWAP_TANI_COIN": {
+      txHashes.push(await sendTransaction("TANI deposit burn", coin.gameSpend(walletAddress, toTani(BigInt(amount) * BigInt(COIN_SWAP_RATE)))));
       break;
     }
     case "SWAP_ETH_COIN": {

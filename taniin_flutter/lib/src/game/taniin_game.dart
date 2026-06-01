@@ -630,27 +630,23 @@ class TaniinGame extends FlameGame {
         plot.tileWidth * _tile,
         plot.tileHeight * _tile,
       );
-      _paint
-        ..style = PaintingStyle.fill
-        ..color = plot.owned
-            ? const Color(0xC1A76431)
-            : const Color(0xA04C3325);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, const Radius.circular(8)),
-        _paint,
-      );
-      _paint
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = selected == i ? 5 : 3
-        ..color = selected == i
-            ? const Color(0xFFFFE652)
-            : plot.owned
-            ? const Color(0x88316F3E)
-            : const Color(0x995B3923);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, const Radius.circular(8)),
-        _paint,
-      );
+      if (!plot.owned) {
+        final lockedPlot = RRect.fromRectAndRadius(
+          rect,
+          const Radius.circular(8),
+        );
+        _paint
+          ..style = PaintingStyle.fill
+          ..color = const Color(0x704C3325);
+        canvas.drawRRect(lockedPlot, _paint);
+        _paint
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = selected == i ? 4 : 3
+          ..color = selected == i
+              ? const Color(0xE6FFE652)
+              : const Color(0x885B3923);
+        canvas.drawRRect(lockedPlot, _paint);
+      }
       if (plot.status == PlotStatus.growing && cropSheet != null) {
         _drawPlotCrops(canvas, plot, cropSheet, now);
       }
@@ -708,30 +704,30 @@ class TaniinGame extends FlameGame {
   }
 
   void _drawPlotActionMarkers(Canvas canvas) {
-    final plotIndex = selectedPlotIndex;
-    if (plotIndex == null) {
-      return;
+    final selected = selectedPlotIndex;
+    for (var i = 0; i < farmState.plots.length; i++) {
+      final plot = farmState.plots[i];
+      final interaction = farmState.plotInteraction(i);
+      final label = switch (interaction) {
+        GameInteraction.buyLand => 'BELI',
+        GameInteraction.harvest => 'PANEN',
+        _ => '',
+      };
+      if (label.isEmpty) {
+        continue;
+      }
+      final centerX = (plot.tileX + plot.tileWidth * 0.5) * _tile - _cameraX;
+      final centerY = (plot.tileY - 0.34) * _tile - _cameraY;
+      final sign = Rect.fromCenter(
+        center: Offset(centerX, centerY),
+        width: label == 'PANEN' ? 164 : 148,
+        height: 58,
+      );
+      final highlighted =
+          selected == i || interaction == GameInteraction.harvest;
+      _drawSignPosts(canvas, sign, highlighted ? 22 : 18);
+      _drawWoodSignBoard(canvas, sign, label, 29, highlighted);
     }
-    final plot = farmState.plots[plotIndex];
-    final label = switch (farmState.plotInteraction(plotIndex)) {
-      GameInteraction.buyLand => 'BELI',
-      GameInteraction.plant => 'TANAM',
-      GameInteraction.waitCrop => 'TUNGGU',
-      GameInteraction.harvest => 'PANEN',
-      _ => '',
-    };
-    if (label.isEmpty) {
-      return;
-    }
-    final centerX = (plot.tileX + plot.tileWidth * 0.5) * _tile - _cameraX;
-    final centerY = (plot.tileY - 0.34) * _tile - _cameraY;
-    final sign = Rect.fromCenter(
-      center: Offset(centerX, centerY),
-      width: label == 'TUNGGU' ? 172 : 148,
-      height: 58,
-    );
-    _drawSignPosts(canvas, sign, 20);
-    _drawWoodSignBoard(canvas, sign, label, label == 'TUNGGU' ? 25 : 29, true);
   }
 
   void _drawShopPenAnimals(Canvas canvas, int now) {

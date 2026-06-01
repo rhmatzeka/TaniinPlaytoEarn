@@ -907,7 +907,7 @@ class _InteractionButtons extends StatelessWidget {
             : 'Pilih panen',
       GameInteraction.swapToken =>
         farmState.selectedSwapAmount > 0
-            ? 'Swap ${farmState.selectedSwapAmount}'
+            ? '${farmState.swapVerb} ${farmState.selectedSwapAmount}'
             : 'Oke',
       GameInteraction.buyLand => 'Ya, beli lahan',
       GameInteraction.plant =>
@@ -928,7 +928,7 @@ class _InteractionButtons extends StatelessWidget {
         }
         return;
       case GameInteraction.swapToken:
-        if (farmState.swapCoinsToTani()) {
+        if (farmState.swapSelectedAssets()) {
           onClose();
         }
         return;
@@ -1155,7 +1155,7 @@ class _SwapControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final maxCoins = math.max(0, farmState.coins);
+    final sourceBalance = math.max(0, farmState.swapSourceBalance);
     final amount = farmState.selectedSwapAmount;
     final value = amount.toDouble();
     return DecoratedBox(
@@ -1171,33 +1171,45 @@ class _SwapControl extends StatelessWidget {
             final vertical = constraints.maxWidth < 760;
             final fromCard = _SwapAssetCard(
               label: 'DARI',
-              asset: 'GAME COIN',
-              amount: '$amount',
-              balance: 'Saldo ${farmState.coins}',
-              icon: Icons.paid,
-              color: const Color(0xFF6C3915),
+              selectedAsset: farmState.swapFromAsset,
+              amount: amount > 0 ? '-$amount' : '0',
+              balance: 'Saldo ${farmState.swapSourceBalance}',
+              icon: _swapAssetIcon(farmState.swapFromAsset),
+              color: _swapAssetColor(farmState.swapFromAsset),
+              onAssetChanged: farmState.setSwapFromAsset,
             );
             final toCard = _SwapAssetCard(
               label: 'KE',
-              asset: 'TANI SEPOLIA',
-              amount: '+$amount',
-              balance: 'Saldo ${farmState.tani}',
-              icon: Icons.token,
-              color: const Color(0xFF22543B),
+              selectedAsset: farmState.swapToAsset,
+              amount: amount > 0 ? '+$amount' : '0',
+              balance: 'Saldo ${farmState.swapTargetBalance}',
+              icon: _swapAssetIcon(farmState.swapToAsset),
+              color: _swapAssetColor(farmState.swapToAsset),
+              onAssetChanged: farmState.setSwapToAsset,
             );
             final arrow = Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: vertical ? 0 : 14,
                 vertical: vertical ? 10 : 0,
               ),
-              child: _SwapArrow(vertical: vertical),
+              child: _SwapArrow(
+                vertical: vertical,
+                onTap: farmState.reverseSwapAssets,
+              ),
             );
             return Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 vertical
-                    ? Column(children: [fromCard, arrow, toCard])
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          fromCard,
+                          Center(child: arrow),
+                          toCard,
+                        ],
+                      )
                     : Row(
                         children: [
                           Expanded(child: fromCard),
@@ -1210,7 +1222,7 @@ class _SwapControl extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        'Jumlah swap',
+                        'Jumlah ${farmState.swapFromAsset.shortLabel}',
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(
                               color: const Color(0xFFFFF0D4),
@@ -1219,7 +1231,7 @@ class _SwapControl extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '$amount / $maxCoins coin',
+                      '$amount / $sourceBalance ${farmState.swapFromAsset.shortLabel}',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: const Color(0xFFFFDE19),
                         fontSize: 22,
@@ -1240,9 +1252,11 @@ class _SwapControl extends StatelessWidget {
                   child: Slider(
                     value: value,
                     min: 0,
-                    max: math.max(1, maxCoins).toDouble(),
-                    divisions: math.max(1, maxCoins),
-                    onChanged: maxCoins == 0
+                    max: math.max(1, sourceBalance).toDouble(),
+                    divisions: sourceBalance <= 1000
+                        ? math.max(1, sourceBalance)
+                        : null,
+                    onChanged: sourceBalance == 0
                         ? null
                         : (newValue) =>
                               farmState.setSwapAmount(newValue.round()),
@@ -1254,22 +1268,22 @@ class _SwapControl extends StatelessWidget {
                   children: [
                     _SwapPresetButton(
                       label: '25%',
-                      enabled: maxCoins > 0,
+                      enabled: sourceBalance > 0,
                       onTap: () => farmState.setSwapAmount(
-                        math.max(1, (maxCoins * 0.25).round()),
+                        math.max(1, (sourceBalance * 0.25).round()),
                       ),
                     ),
                     _SwapPresetButton(
                       label: '50%',
-                      enabled: maxCoins > 0,
+                      enabled: sourceBalance > 0,
                       onTap: () => farmState.setSwapAmount(
-                        math.max(1, (maxCoins * 0.50).round()),
+                        math.max(1, (sourceBalance * 0.50).round()),
                       ),
                     ),
                     _SwapPresetButton(
                       label: 'MAX',
-                      enabled: maxCoins > 0,
-                      onTap: () => farmState.setSwapAmount(maxCoins),
+                      enabled: sourceBalance > 0,
+                      onTap: () => farmState.setSwapAmount(sourceBalance),
                     ),
                     _SwapPresetButton(
                       label: farmState.walletConnected
@@ -1295,25 +1309,45 @@ class _SwapControl extends StatelessWidget {
   }
 }
 
+IconData _swapAssetIcon(SwapAsset asset) {
+  return switch (asset) {
+    SwapAsset.gameCoin => Icons.paid,
+    SwapAsset.taniSepolia => Icons.token,
+  };
+}
+
+Color _swapAssetColor(SwapAsset asset) {
+  return switch (asset) {
+    SwapAsset.gameCoin => const Color(0xFF6C3915),
+    SwapAsset.taniSepolia => const Color(0xFF22543B),
+  };
+}
+
 class _SwapAssetCard extends StatelessWidget {
   const _SwapAssetCard({
     required this.label,
-    required this.asset,
+    required this.selectedAsset,
     required this.amount,
     required this.balance,
     required this.icon,
     required this.color,
+    required this.onAssetChanged,
   });
 
   final String label;
-  final String asset;
+  final SwapAsset selectedAsset;
   final String amount;
   final String balance;
   final IconData icon;
   final Color color;
+  final ValueChanged<SwapAsset> onAssetChanged;
 
   @override
   Widget build(BuildContext context) {
+    final titleStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
+      color: const Color(0xFFFFF0D4),
+      fontSize: 20,
+    );
     return DecoratedBox(
       decoration: BoxDecoration(
         color: color,
@@ -1322,41 +1356,70 @@ class _SwapAssetCard extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: const Color(0x33FFFFFF),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: SizedBox.square(
-                dimension: 54,
-                child: Icon(icon, color: const Color(0xFFFFF0D4), size: 34),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: const Color(0xFFE9C692),
+                fontSize: 14,
               ),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    label,
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: const Color(0xFFE9C692),
-                      fontSize: 14,
-                    ),
+            const SizedBox(height: 7),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: const Color(0x33241008),
+                borderRadius: BorderRadius.circular(7),
+                border: Border.all(color: const Color(0x66FFF0D4), width: 2),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<SwapAsset>(
+                    value: selectedAsset,
+                    isExpanded: true,
+                    dropdownColor: const Color(0xFF5E2C0D),
+                    iconEnabledColor: const Color(0xFFFFDE19),
+                    style: titleStyle,
+                    items: SwapAsset.values
+                        .map(
+                          (asset) => DropdownMenuItem<SwapAsset>(
+                            value: asset,
+                            child: Text(
+                              asset.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (asset) {
+                      if (asset != null) {
+                        onAssetChanged(asset);
+                      }
+                    },
                   ),
-                  Text(
-                    asset,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: const Color(0xFFFFF0D4),
-                      fontSize: 21,
-                    ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: const Color(0x33FFFFFF),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  Text(
+                  child: SizedBox.square(
+                    dimension: 54,
+                    child: Icon(icon, color: const Color(0xFFFFF0D4), size: 34),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
                     balance,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -1365,16 +1428,23 @@ class _SwapAssetCard extends StatelessWidget {
                       fontSize: 16,
                     ),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              amount,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: const Color(0xFFFFDE19),
-                fontSize: 32,
-              ),
+                ),
+                const SizedBox(width: 12),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 130),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      amount,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: const Color(0xFFFFDE19),
+                        fontSize: 32,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -1384,24 +1454,32 @@ class _SwapAssetCard extends StatelessWidget {
 }
 
 class _SwapArrow extends StatelessWidget {
-  const _SwapArrow({required this.vertical});
+  const _SwapArrow({required this.vertical, required this.onTap});
 
   final bool vertical;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFF5E2C0D),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFFFD900), width: 3),
-      ),
-      child: SizedBox.square(
-        dimension: 48,
-        child: Icon(
-          vertical ? Icons.keyboard_arrow_down : Icons.arrow_forward,
-          color: const Color(0xFFFFF0D4),
-          size: 32,
+    return Semantics(
+      button: true,
+      label: 'Balik arah swap',
+      child: GestureDetector(
+        onTap: onTap,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: const Color(0xFF5E2C0D),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFFFD900), width: 3),
+          ),
+          child: SizedBox.square(
+            dimension: 54,
+            child: Icon(
+              vertical ? Icons.swap_vert : Icons.swap_horiz,
+              color: const Color(0xFFFFF0D4),
+              size: 34,
+            ),
+          ),
         ),
       ),
     );

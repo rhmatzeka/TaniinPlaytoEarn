@@ -73,6 +73,7 @@ class ChainAction {
       'SELL_CROP' => 'Jual panen $amount',
       'SWAP_CROP' => 'Swap panen $amount',
       'SWAP_COIN' => 'Swap coin $amount',
+      'SWAP_TANI_COIN' => 'Deposit TANI ke Game Coin $amount',
       'SWAP_COIN_ETH' => 'Swap coin ke ETH $amount',
       'SWAP_ETH_COIN' => 'Isi Game Coin dari ETH $amount',
       'BUY_SEED' => 'Beli bibit $amount',
