@@ -94,7 +94,7 @@ class GameHud extends StatelessWidget {
                     ),
                     Positioned(
                       right: 20,
-                      top: compact ? 166 : 174,
+                      top: compact ? 196 : 204,
                       child: Column(
                         children: [
                           _HudIconButton(
@@ -297,7 +297,9 @@ class _TopCluster extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final barWidth = compact ? 282.0 : 322.0;
+    final barWidth = compact ? 304.0 : 344.0;
+    final walletWidth = compact ? 350.0 : 390.0;
+    final walletHeight = compact ? 90.0 : 94.0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
@@ -317,7 +319,8 @@ class _TopCluster extends StatelessWidget {
         const SizedBox(height: 12),
         _WalletButton(
           farmState: farmState,
-          width: compact ? 292 : 350,
+          width: walletWidth,
+          height: walletHeight,
           onPressed: onWalletPressed,
         ),
       ],
@@ -391,11 +394,13 @@ class _WalletButton extends StatelessWidget {
   const _WalletButton({
     required this.farmState,
     required this.width,
+    required this.height,
     required this.onPressed,
   });
 
   final FarmStateController farmState;
   final double width;
+  final double height;
   final VoidCallback onPressed;
 
   @override
@@ -404,16 +409,18 @@ class _WalletButton extends StatelessWidget {
     return Tooltip(
       message: connected ? 'Wallet tersambung' : 'Connect wallet',
       child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onPressed,
         child: _HudFrame(
           width: width,
-          height: 72,
+          height: height,
           color: connected ? const Color(0xFF246644) : const Color(0xFF2A573E),
           border: connected ? const Color(0xFF69C487) : const Color(0xFF5B8F68),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           child: Row(
             children: [
               _WalletIcon(connected: connected),
-              const SizedBox(width: 14),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -425,7 +432,8 @@ class _WalletButton extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: const Color(0xFFECF8E2),
-                        fontSize: connected ? 20 : 21,
+                        fontSize: connected ? 22 : 23,
+                        height: 1.0,
                       ),
                     ),
                     Text(
@@ -436,7 +444,8 @@ class _WalletButton extends StatelessWidget {
                         color: connected
                             ? const Color(0xFFB1EEB9)
                             : const Color(0xFFD9EBCB),
-                        fontSize: 15,
+                        fontSize: 16,
+                        height: 1.05,
                       ),
                     ),
                   ],
@@ -1927,7 +1936,7 @@ class _WalletIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox.square(
-      dimension: 52,
+      dimension: 60,
       child: CustomPaint(painter: _WalletPainter(connected)),
     );
   }

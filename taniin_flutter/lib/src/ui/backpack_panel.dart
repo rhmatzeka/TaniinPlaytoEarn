@@ -118,8 +118,8 @@ class _PanelHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 108,
-      padding: const EdgeInsets.fromLTRB(22, 16, 20, 16),
+      height: 118,
+      padding: const EdgeInsets.fromLTRB(22, 14, 20, 14),
       decoration: const BoxDecoration(
         color: Color(0xFFA94F1E),
         border: Border(bottom: BorderSide(color: Color(0xFF633010), width: 5)),
@@ -151,30 +151,37 @@ class _PanelHeader extends StatelessWidget {
           ),
           const SizedBox(width: 20),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'BACKPACK',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: const Color(0xFFFFDE19),
-                    fontSize: 40,
-                  ),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'BACKPACK',
+                      maxLines: 1,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: const Color(0xFFFFDE19),
+                        fontSize: 38,
+                        height: 0.95,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      'BENIH DAN HASIL PANEN',
+                      maxLines: 1,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: const Color(0xFFFFF0CE),
+                        fontSize: 16,
+                        height: 1.0,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  'BENIH DAN HASIL PANEN',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: const Color(0xFFFFF0CE),
-                    fontSize: 17,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
           PanelCloseButton(onPressed: onClose, dimension: 66, iconSize: 46),
@@ -253,9 +260,9 @@ class _SummaryTile extends StatelessWidget {
         ],
       ),
       child: SizedBox(
-        height: 78,
+        height: 88,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
             children: [
               DecoratedBox(
@@ -271,32 +278,39 @@ class _SummaryTile extends StatelessWidget {
               ),
               const SizedBox(width: 14),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      label.toUpperCase(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: const Color(0xFF6A3A15),
-                        fontSize: 15,
-                      ),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          label.toUpperCase(),
+                          maxLines: 1,
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(
+                                color: const Color(0xFF6A3A15),
+                                fontSize: 15,
+                                height: 1.0,
+                              ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          value,
+                          maxLines: 1,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: const Color(0xFF2E1B0B),
+                                fontSize: 30,
+                                height: 0.95,
+                              ),
+                        ),
+                      ],
                     ),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        value,
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(
-                              color: const Color(0xFF2E1B0B),
-                              fontSize: 28,
-                            ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ],
