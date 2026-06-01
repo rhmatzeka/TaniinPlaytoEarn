@@ -16,8 +16,11 @@ class TmxMap {
     ..isAntiAlias = false
     ..filterQuality = FilterQuality.none;
   final Paint _miniPaint = Paint()
-    ..isAntiAlias = false
+    ..isAntiAlias = true
     ..style = PaintingStyle.fill;
+  final Paint _miniTilePaint = Paint()
+    ..isAntiAlias = true
+    ..filterQuality = FilterQuality.high;
 
   int tileWidth = 16;
   int tileHeight = 16;
@@ -192,7 +195,7 @@ class TmxMap {
         final x = bounds.left + (tile.x - minTileX) * targetTileSize * scaleX;
         final y = bounds.top + (tile.y - minTileY) * targetTileSize * scaleY;
         final dst = Rect.fromLTWH(x, y, tileW, tileH);
-        canvas.drawImageRect(tileset.image, src, dst, _pixelPaint);
+        canvas.drawImageRect(tileset.image, src, dst, _miniTilePaint);
       }
     }
   }

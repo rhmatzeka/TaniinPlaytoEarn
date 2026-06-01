@@ -468,16 +468,47 @@ class _MiniMap extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {},
-      child: _HudFrame(
-        width: mapWidth,
-        height: mapHeight,
-        color: const Color(0xFF4E3F1E),
-        border: const Color(0xFF936C2D),
-        padding: const EdgeInsets.all(8),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(5),
-          child: SizedBox.expand(
-            child: CustomPaint(painter: _MiniMapPainter(game)),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: const Color(0x62000000),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.only(right: 4, bottom: 5),
+          child: SizedBox(
+            width: mapWidth,
+            height: mapHeight,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: const Color(0xFF5A3F1F),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF2D2110), width: 3),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF77B858),
+                    borderRadius: BorderRadius.circular(7),
+                    border: Border.all(
+                      color: const Color(0xFFB18845),
+                      width: 2,
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(5),
+                    clipBehavior: Clip.antiAlias,
+                    child: RepaintBoundary(
+                      child: CustomPaint(
+                        isComplex: true,
+                        willChange: false,
+                        painter: _MiniMapPainter(game),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -665,82 +696,102 @@ class _InteractionPanel extends StatelessWidget {
     final media = MediaQuery.sizeOf(context);
     final wide = interaction == GameInteraction.swapToken;
     final tall = wide || interaction == GameInteraction.sellHarvest;
+    final compact = media.height < 620 || media.width < 760;
+    final availableWidth = math.max(300.0, media.width - (compact ? 28 : 44));
     final panelWidth = math.max(
-      360.0,
-      math.min(media.width - 44, wide ? 980.0 : 820.0),
+      compact ? 320.0 : 360.0,
+      math.min(availableWidth, wide ? 980.0 : 820.0),
+    );
+    final maxPanelHeight = math.min(
+      math.max(280.0, media.height - (compact ? 24 : 44)),
+      tall ? 760.0 : 560.0,
     );
     return ConstrainedBox(
       constraints: BoxConstraints(
         maxWidth: panelWidth,
-        maxHeight: math.min(media.height - 44, tall ? 760 : 560),
+        maxHeight: maxPanelHeight,
       ),
       child: SizedBox(
         width: panelWidth,
         child: PixelPanel(
           color: const Color(0xFF9E4E20),
           borderColor: const Color(0xFF4D2A0E),
-          padding: const EdgeInsets.fromLTRB(28, 24, 28, 26),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      farmState.interactionTitle(interaction),
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: const Color(0xFFFFDE19),
-                        fontSize: 38,
+          padding: compact
+              ? const EdgeInsets.fromLTRB(18, 16, 18, 18)
+              : const EdgeInsets.fromLTRB(28, 24, 28, 26),
+          child: SingleChildScrollView(
+            physics: const ClampingScrollPhysics(),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        farmState.interactionTitle(interaction),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: const Color(0xFFFFDE19),
+                          fontSize: compact ? 30 : 38,
+                          height: 1,
+                        ),
                       ),
                     ),
+                    PanelCloseButton(
+                      onPressed: onClose,
+                      dimension: compact ? 58 : 72,
+                      iconSize: compact ? 42 : 52,
+                    ),
+                  ],
+                ),
+                SizedBox(height: compact ? 12 : 18),
+                _DialogBody(
+                  text: farmState.interactionBody(
+                    interaction,
+                    plotIndex: plotIndex,
                   ),
-                  PanelCloseButton(onPressed: onClose),
+                  compact: compact,
+                ),
+                if (interaction == GameInteraction.plant) ...[
+                  SizedBox(height: compact ? 12 : 18),
+                  Text(
+                    'Pilih Benih',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: const Color(0xFFFFE054),
+                      fontSize: compact ? 21 : null,
+                    ),
+                  ),
+                  SizedBox(height: compact ? 8 : 12),
+                  _PlantSeedSelector(farmState: farmState, compact: compact),
                 ],
-              ),
-              const SizedBox(height: 18),
-              _DialogBody(
-                text: farmState.interactionBody(
-                  interaction,
+                if (interaction == GameInteraction.sellHarvest &&
+                    farmState.harvests > 0) ...[
+                  SizedBox(height: compact ? 12 : 18),
+                  Text(
+                    'Pilih Panen',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: const Color(0xFFFFE054),
+                      fontSize: compact ? 21 : null,
+                    ),
+                  ),
+                  SizedBox(height: compact ? 8 : 12),
+                  _SellHarvestSelector(farmState: farmState, compact: compact),
+                ],
+                if (interaction == GameInteraction.swapToken) ...[
+                  SizedBox(height: compact ? 12 : 18),
+                  _SwapControl(farmState: farmState),
+                ],
+                SizedBox(height: compact ? 16 : 24),
+                _InteractionButtons(
+                  farmState: farmState,
+                  interaction: interaction,
                   plotIndex: plotIndex,
+                  onClose: onClose,
+                  onOpenShop: onOpenShop,
+                  compact: compact,
                 ),
-              ),
-              if (interaction == GameInteraction.plant) ...[
-                const SizedBox(height: 18),
-                Text(
-                  'Pilih Benih',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: const Color(0xFFFFE054),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _PlantSeedSelector(farmState: farmState),
               ],
-              if (interaction == GameInteraction.sellHarvest &&
-                  farmState.harvests > 0) ...[
-                const SizedBox(height: 18),
-                Text(
-                  'Pilih Panen',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: const Color(0xFFFFE054),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _SellHarvestSelector(farmState: farmState),
-              ],
-              if (interaction == GameInteraction.swapToken) ...[
-                const SizedBox(height: 18),
-                _SwapControl(farmState: farmState),
-              ],
-              const SizedBox(height: 24),
-              _InteractionButtons(
-                farmState: farmState,
-                interaction: interaction,
-                plotIndex: plotIndex,
-                onClose: onClose,
-                onOpenShop: onOpenShop,
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -749,9 +800,10 @@ class _InteractionPanel extends StatelessWidget {
 }
 
 class _DialogBody extends StatelessWidget {
-  const _DialogBody({required this.text});
+  const _DialogBody({required this.text, this.compact = false});
 
   final String text;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -762,14 +814,17 @@ class _DialogBody extends StatelessWidget {
         border: Border.all(color: const Color(0xFF5C2A0C), width: 4),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 16 : 24,
+          vertical: compact ? 12 : 20,
+        ),
         child: Text(
           text,
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             color: const Color(0xFFFFF0D4),
-            fontSize: 26,
-            height: 1.12,
+            fontSize: compact ? 21 : 26,
+            height: compact ? 1.08 : 1.12,
           ),
         ),
       ),
@@ -784,6 +839,7 @@ class _InteractionButtons extends StatelessWidget {
     required this.plotIndex,
     required this.onClose,
     required this.onOpenShop,
+    required this.compact,
   });
 
   final FarmStateController farmState;
@@ -791,18 +847,20 @@ class _InteractionButtons extends StatelessWidget {
   final int? plotIndex;
   final VoidCallback onClose;
   final VoidCallback onOpenShop;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return Wrap(
       alignment: WrapAlignment.center,
-      runSpacing: 14,
-      spacing: 18,
+      runSpacing: compact ? 10 : 14,
+      spacing: compact ? 12 : 18,
       children: [
         _DialogButton(
           label: _primaryLabel(),
           color: const Color(0xFF61320C),
           border: const Color(0xFFFFD900),
+          compact: compact,
           onPressed: () => _performPrimary(context),
         ),
         if (interaction == GameInteraction.plant) ...[
@@ -810,6 +868,7 @@ class _InteractionButtons extends StatelessWidget {
             label: 'Jual lahan',
             color: const Color(0xFF724718),
             border: const Color(0xFFFFB23F),
+            compact: compact,
             onPressed: () {
               final index = plotIndex;
               if (index != null) {
@@ -823,6 +882,7 @@ class _InteractionButtons extends StatelessWidget {
           label: 'Batal',
           color: const Color(0xFFA00500),
           border: const Color(0xFF5C0000),
+          compact: compact,
           onPressed: onClose,
         ),
       ],
@@ -889,9 +949,10 @@ class _InteractionButtons extends StatelessWidget {
 }
 
 class _PlantSeedSelector extends StatelessWidget {
-  const _PlantSeedSelector({required this.farmState});
+  const _PlantSeedSelector({required this.farmState, required this.compact});
 
   final FarmStateController farmState;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -902,10 +963,12 @@ class _PlantSeedSelector extends StatelessWidget {
             child: _SeedOption(
               seed: farmState.seeds[i],
               selected: farmState.selectedSeedIndex == i,
+              compact: compact,
               onTap: () => farmState.selectSeed(i),
             ),
           ),
-          if (i != farmState.seeds.length - 1) const SizedBox(width: 12),
+          if (i != farmState.seeds.length - 1)
+            SizedBox(width: compact ? 8 : 12),
         ],
       ],
     );
@@ -916,11 +979,13 @@ class _SeedOption extends StatelessWidget {
   const _SeedOption({
     required this.seed,
     required this.selected,
+    required this.compact,
     required this.onTap,
   });
 
   final SeedStack seed;
   final bool selected;
+  final bool compact;
   final VoidCallback onTap;
 
   @override
@@ -938,15 +1003,15 @@ class _SeedOption extends StatelessWidget {
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: EdgeInsets.all(compact ? 8 : 12),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               _SeedPacket(
                 color: available ? seed.color : const Color(0xFF6B594D),
-                size: 44,
+                size: compact ? 34 : 44,
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: compact ? 5 : 8),
               Text(
                 seed.name,
                 maxLines: 1,
@@ -955,7 +1020,7 @@ class _SeedOption extends StatelessWidget {
                   color: available
                       ? const Color(0xFFFFF0D4)
                       : const Color(0xFFBE977C),
-                  fontSize: 20,
+                  fontSize: compact ? 17 : 20,
                 ),
               ),
               Text(
@@ -964,7 +1029,7 @@ class _SeedOption extends StatelessWidget {
                   color: available
                       ? const Color(0xFFFFF0D4)
                       : const Color(0xFFBE977C),
-                  fontSize: 17,
+                  fontSize: compact ? 14 : 17,
                 ),
               ),
             ],
@@ -976,9 +1041,10 @@ class _SeedOption extends StatelessWidget {
 }
 
 class _SellHarvestSelector extends StatelessWidget {
-  const _SellHarvestSelector({required this.farmState});
+  const _SellHarvestSelector({required this.farmState, required this.compact});
 
   final FarmStateController farmState;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -990,10 +1056,12 @@ class _SellHarvestSelector extends StatelessWidget {
               crop: farmState.crops[i],
               selected: farmState.selectedSellCropIndex == i,
               price: FarmStateController.harvestSellPrice,
+              compact: compact,
               onTap: () => farmState.selectSellCrop(i),
             ),
           ),
-          if (i != farmState.crops.length - 1) const SizedBox(width: 12),
+          if (i != farmState.crops.length - 1)
+            SizedBox(width: compact ? 8 : 12),
         ],
       ],
     );
@@ -1005,12 +1073,14 @@ class _CropOption extends StatelessWidget {
     required this.crop,
     required this.selected,
     required this.price,
+    required this.compact,
     required this.onTap,
   });
 
   final CropStack crop;
   final bool selected;
   final int price;
+  final bool compact;
   final VoidCallback onTap;
 
   @override
@@ -1029,15 +1099,15 @@ class _CropOption extends StatelessWidget {
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: EdgeInsets.all(compact ? 8 : 12),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               _SeedPacket(
                 color: available ? crop.color : const Color(0xFF6B594D),
-                size: 44,
+                size: compact ? 34 : 44,
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: compact ? 5 : 8),
               Text(
                 crop.name,
                 maxLines: 1,
@@ -1046,7 +1116,7 @@ class _CropOption extends StatelessWidget {
                   color: available
                       ? const Color(0xFFFFF0D4)
                       : const Color(0xFFBE977C),
-                  fontSize: 20,
+                  fontSize: compact ? 17 : 20,
                 ),
               ),
               Text(
@@ -1057,7 +1127,7 @@ class _CropOption extends StatelessWidget {
                   color: available
                       ? const Color(0xFFFFF0D4)
                       : const Color(0xFFBE977C),
-                  fontSize: 16,
+                  fontSize: compact ? 13 : 16,
                 ),
               ),
             ],
@@ -1689,12 +1759,14 @@ class _DialogButton extends StatelessWidget {
     required this.color,
     required this.border,
     required this.onPressed,
+    this.compact = false,
   });
 
   final String label;
   final Color color;
   final Color border;
   final VoidCallback onPressed;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -1714,9 +1786,15 @@ class _DialogButton extends StatelessWidget {
           ],
         ),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 150, minHeight: 62),
+          constraints: BoxConstraints(
+            minWidth: compact ? 132 : 150,
+            minHeight: compact ? 52 : 62,
+          ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            padding: EdgeInsets.symmetric(
+              horizontal: compact ? 16 : 20,
+              vertical: compact ? 9 : 12,
+            ),
             child: Center(
               child: Text(
                 label,
@@ -1724,7 +1802,7 @@ class _DialogButton extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: const Color(0xFFFFEDCD),
-                  fontSize: 24,
+                  fontSize: compact ? 20 : 24,
                 ),
               ),
             ),

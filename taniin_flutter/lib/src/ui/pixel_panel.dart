@@ -117,14 +117,21 @@ class SquareIconButton extends StatelessWidget {
 }
 
 class PanelCloseButton extends StatelessWidget {
-  const PanelCloseButton({required this.onPressed, super.key});
+  const PanelCloseButton({
+    required this.onPressed,
+    this.dimension = 72,
+    this.iconSize = 52,
+    super.key,
+  });
 
   final VoidCallback onPressed;
+  final double dimension;
+  final double iconSize;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox.square(
-      dimension: 72,
+      dimension: dimension,
       child: Material(
         color: const Color(0xFF9B4A1C),
         shape: RoundedRectangleBorder(
@@ -134,7 +141,11 @@ class PanelCloseButton extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
           onTap: onPressed,
-          child: const Icon(Icons.close, size: 52, color: Color(0xFFFFF0CE)),
+          child: Icon(
+            Icons.close,
+            size: iconSize,
+            color: const Color(0xFFFFF0CE),
+          ),
         ),
       ),
     );

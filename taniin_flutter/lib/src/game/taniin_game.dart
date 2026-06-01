@@ -34,6 +34,7 @@ class TaniinGame extends FlameGame {
   static const double _swapBottomTile = 16.5;
   static const double _swapSignXTile = 10.85;
   static const double _swapSignYTile = 13.15;
+  static const double _miniMapCacheScale = 3.0;
   static const int _dirRight = 0;
   static const int _dirUp = 1;
   static const int _dirDown = 2;
@@ -47,6 +48,9 @@ class TaniinGame extends FlameGame {
   final Paint _pixelPaint = Paint()
     ..isAntiAlias = false
     ..filterQuality = FilterQuality.none;
+  final Paint _miniMapPaint = Paint()
+    ..isAntiAlias = true
+    ..filterQuality = FilterQuality.high;
   final List<Rect> _collisionRects = <Rect>[];
 
   TmxMap? _tmxMap;
@@ -175,8 +179,14 @@ class TaniinGame extends FlameGame {
         ..color = const Color(0xFF69B84E);
       canvas.drawRect(bounds, _paint);
     } else {
-      final cacheWidth = math.max(1, bounds.width.round());
-      final cacheHeight = math.max(1, bounds.height.round());
+      final cacheWidth = math.max(
+        1,
+        (bounds.width * _miniMapCacheScale).round(),
+      );
+      final cacheHeight = math.max(
+        1,
+        (bounds.height * _miniMapCacheScale).round(),
+      );
       final cached = _miniMapImage;
       if (cached != null &&
           _miniMapImageSize.width == cacheWidth &&
@@ -190,7 +200,7 @@ class TaniinGame extends FlameGame {
             cached.height.toDouble(),
           ),
           bounds,
-          _pixelPaint,
+          _miniMapPaint,
         );
       } else {
         map.drawMiniMap(canvas, bounds, _tile);
