@@ -1,0 +1,2035 @@
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+
+import '../game/taniin_game.dart';
+import '../state/farm_state.dart';
+import 'physical_viewport.dart';
+import 'pixel_panel.dart';
+import 'wallet_panel.dart';
+
+class GameHud extends StatelessWidget {
+  const GameHud({
+    required this.game,
+    required this.farmState,
+    required this.activePanel,
+    required this.onPanelSelected,
+    super.key,
+  });
+
+  final TaniinGame game;
+  final FarmStateController farmState;
+  final GamePanel? activePanel;
+  final ValueChanged<GamePanel> onPanelSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: game.hudNotifier,
+      builder: (context, _) {
+        final interaction = game.currentInteraction;
+        final selectedPlot = game.selectedPlotIndex;
+        final contextText = farmState.contextText(
+          interaction,
+          plotIndex: selectedPlot,
+        );
+        return SafeArea(
+          child: PhysicalViewport(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 980;
+                final miniMapWidth = (constraints.maxWidth * 0.112)
+                    .clamp(236.0, 286.0)
+                    .toDouble();
+                final joystickSize = _joystickSize(compact);
+                final joystickBaseX = (constraints.maxWidth * 0.145)
+                    .clamp(compact ? 270.0 : 320.0, compact ? 340.0 : 390.0)
+                    .toDouble();
+                final joystickBaseY =
+                    constraints.maxHeight -
+                    (constraints.maxHeight * 0.31)
+                        .clamp(compact ? 270.0 : 300.0, compact ? 320.0 : 350.0)
+                        .toDouble();
+                final joystickLeft = (joystickBaseX - joystickSize * 0.5)
+                    .clamp(
+                      16.0,
+                      math.max(16.0, constraints.maxWidth - joystickSize - 16),
+                    )
+                    .toDouble();
+                final joystickTop = (joystickBaseY - joystickSize * 0.5)
+                    .clamp(
+                      16.0,
+                      math.max(16.0, constraints.maxHeight - joystickSize - 16),
+                    )
+                    .toDouble();
+                return Stack(
+                  children: [
+                    Positioned.fill(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.translucent,
+                        onTapUp: (details) =>
+                            _handleWorldTap(context, details.localPosition),
+                      ),
+                    ),
+                    Positioned(
+                      left: 32,
+                      top: 26,
+                      child: _MiniMap(
+                        game: game,
+                        width: miniMapWidth,
+                        height: miniMapWidth * game.miniMapAspectRatio,
+                      ),
+                    ),
+                    Positioned(
+                      right: 20,
+                      top: 10,
+                      child: _TopCluster(
+                        farmState: farmState,
+                        compact: compact,
+                        menuActive: activePanel == GamePanel.settings,
+                        onMenuPressed: () =>
+                            onPanelSelected(GamePanel.settings),
+                        onWalletPressed: () => _showWalletDialog(context),
+                      ),
+                    ),
+                    Positioned(
+                      right: 20,
+                      top: compact ? 166 : 174,
+                      child: Column(
+                        children: [
+                          _HudIconButton(
+                            icon: Icons.history,
+                            tooltip: 'Riwayat',
+                            isActive: activePanel == GamePanel.history,
+                            badge: '${farmState.history.length}',
+                            onPressed: () => onPanelSelected(GamePanel.history),
+                          ),
+                          const SizedBox(height: 8),
+                          _HudIconButton(
+                            icon: Icons.backpack,
+                            tooltip: 'Backpack',
+                            isActive: activePanel == GamePanel.backpack,
+                            badge: '${farmState.totalSeeds}',
+                            onPressed: () =>
+                                onPanelSelected(GamePanel.backpack),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Positioned(
+                      left: joystickLeft,
+                      top: joystickTop,
+                      child: _Joystick(game: game, compact: compact),
+                    ),
+                    Positioned(
+                      left: compact ? 194 : 260,
+                      right: compact ? 330 : 320,
+                      bottom: compact ? 20 : 32,
+                      child: _ContextPill(
+                        text: contextText,
+                        enabled: interaction != GameInteraction.none,
+                        onTap: () {
+                          farmState.playClick();
+                          _openContextDialog(
+                            context,
+                            interaction,
+                            selectedPlot,
+                          );
+                        },
+                      ),
+                    ),
+                    if (farmState.statusVisible)
+                      Positioned(
+                        left: constraints.maxWidth * 0.31,
+                        right: constraints.maxWidth * 0.31,
+                        top: 80,
+                        child: _StatusPopup(farmState: farmState),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _handleWorldTap(BuildContext context, Offset position) {
+    final target = game.interactionAtScreenPosition(position);
+    if (target.interaction == GameInteraction.none) {
+      return;
+    }
+    farmState.playClick();
+    _openContextDialog(context, target.interaction, target.plotIndex);
+  }
+
+  void _openContextDialog(
+    BuildContext context,
+    GameInteraction interaction,
+    int? plotIndex,
+  ) {
+    if (interaction == GameInteraction.none) {
+      farmState.showMessage(
+        'Dekati lahan, shop, rumah jual, atau rumah swap dulu.',
+        success: false,
+      );
+      return;
+    }
+    if (interaction == GameInteraction.shop) {
+      _showShopDialog(context);
+      return;
+    }
+    if (interaction == GameInteraction.swapToken) {
+      farmState.prepareSwapAmount();
+    }
+    _showInteractionDialog(context, interaction, plotIndex);
+  }
+
+  void _showInteractionDialog(
+    BuildContext context,
+    GameInteraction interaction,
+    int? plotIndex,
+  ) {
+    showDialog<void>(
+      context: context,
+      barrierColor: const Color(0xAA000000),
+      builder: (dialogContext) {
+        return AnimatedBuilder(
+          animation: farmState,
+          builder: (context, _) {
+            return Material(
+              type: MaterialType.transparency,
+              child: PhysicalViewport(
+                alignment: Alignment.center,
+                child: Center(
+                  child: _InteractionPanel(
+                    farmState: farmState,
+                    interaction: interaction,
+                    plotIndex: plotIndex,
+                    onClose: () => Navigator.of(dialogContext).maybePop(),
+                    onOpenShop: () {
+                      Navigator.of(dialogContext).maybePop();
+                      _showShopDialog(context);
+                    },
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showShopDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      barrierColor: const Color(0xAA000000),
+      builder: (dialogContext) {
+        return AnimatedBuilder(
+          animation: farmState,
+          builder: (context, _) {
+            return Material(
+              type: MaterialType.transparency,
+              child: PhysicalViewport(
+                alignment: Alignment.center,
+                child: Center(
+                  child: _ShopPanel(
+                    farmState: farmState,
+                    onClose: () => Navigator.of(dialogContext).maybePop(),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showWalletDialog(BuildContext context) {
+    farmState.playClick();
+    showDialog<void>(
+      context: context,
+      barrierColor: const Color(0xAA000000),
+      builder: (dialogContext) {
+        return AnimatedBuilder(
+          animation: farmState,
+          builder: (context, _) {
+            return Material(
+              type: MaterialType.transparency,
+              child: PhysicalViewport(
+                alignment: Alignment.center,
+                child: Center(
+                  child: WalletPanel(
+                    farmState: farmState,
+                    onClose: () => Navigator.of(dialogContext).maybePop(),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+double _joystickRadius(bool compact) => compact ? 72 : 82;
+
+double _joystickSize(bool compact) => _joystickRadius(compact) * 2.2;
+
+class _TopCluster extends StatelessWidget {
+  const _TopCluster({
+    required this.farmState,
+    required this.compact,
+    required this.menuActive,
+    required this.onMenuPressed,
+    required this.onWalletPressed,
+  });
+
+  final FarmStateController farmState;
+  final bool compact;
+  final bool menuActive;
+  final VoidCallback onMenuPressed;
+  final VoidCallback onWalletPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final barWidth = compact ? 282.0 : 322.0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _CurrencyBar(farmState: farmState, width: barWidth),
+            const SizedBox(width: 12),
+            _HudIconButton(
+              icon: Icons.menu,
+              tooltip: 'Menu',
+              isActive: menuActive,
+              onPressed: onMenuPressed,
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _WalletButton(
+          farmState: farmState,
+          width: compact ? 292 : 350,
+          onPressed: onWalletPressed,
+        ),
+      ],
+    );
+  }
+}
+
+class _CurrencyBar extends StatelessWidget {
+  const _CurrencyBar({required this.farmState, required this.width});
+
+  final FarmStateController farmState;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    return _HudFrame(
+      width: width,
+      height: 76,
+      color: const Color(0xFF704110),
+      border: const Color(0xFF56300C),
+      child: Row(
+        children: [
+          _CoinIcon(size: 46),
+          const SizedBox(width: 10),
+          _AmountBlock(label: 'COIN', value: '${farmState.coins}'),
+          const Spacer(),
+          Container(width: 4, height: 50, color: const Color(0xFF4C2A0C)),
+          const Spacer(),
+          _HarvestIcon(size: 46),
+          const SizedBox(width: 10),
+          _AmountBlock(label: 'TANI', value: '${farmState.tani}'),
+        ],
+      ),
+    );
+  }
+}
+
+class _AmountBlock extends StatelessWidget {
+  const _AmountBlock({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: const Color(0xFFF0DEB3),
+            fontSize: 13,
+          ),
+        ),
+        Text(
+          value,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: const Color(0xFFF0DEB3),
+            fontSize: 26,
+            height: 0.92,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _WalletButton extends StatelessWidget {
+  const _WalletButton({
+    required this.farmState,
+    required this.width,
+    required this.onPressed,
+  });
+
+  final FarmStateController farmState;
+  final double width;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final connected = farmState.walletConnected;
+    return Tooltip(
+      message: connected ? 'Wallet tersambung' : 'Connect wallet',
+      child: GestureDetector(
+        onTap: onPressed,
+        child: _HudFrame(
+          width: width,
+          height: 72,
+          color: connected ? const Color(0xFF246644) : const Color(0xFF2A573E),
+          border: connected ? const Color(0xFF69C487) : const Color(0xFF5B8F68),
+          child: Row(
+            children: [
+              _WalletIcon(connected: connected),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      farmState.walletLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: const Color(0xFFECF8E2),
+                        fontSize: connected ? 20 : 21,
+                      ),
+                    ),
+                    Text(
+                      connected ? 'tap untuk ganti/sync' : 'mode lokal aktif',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: connected
+                            ? const Color(0xFFB1EEB9)
+                            : const Color(0xFFD9EBCB),
+                        fontSize: 15,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniMap extends StatelessWidget {
+  const _MiniMap({
+    required this.game,
+    required this.width,
+    required this.height,
+  });
+
+  final TaniinGame game;
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final mapWidth = width.clamp(236.0, 286.0).toDouble();
+    final mapHeight = height.clamp(194.0, 264.0).toDouble();
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {},
+      child: _HudFrame(
+        width: mapWidth,
+        height: mapHeight,
+        color: const Color(0xFF4E3F1E),
+        border: const Color(0xFF936C2D),
+        padding: const EdgeInsets.all(8),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(5),
+          child: SizedBox.expand(
+            child: CustomPaint(painter: _MiniMapPainter(game)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniMapPainter extends CustomPainter {
+  const _MiniMapPainter(this.game);
+
+  final TaniinGame game;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    game.drawMiniMapPreview(canvas, Offset.zero & size);
+  }
+
+  @override
+  bool shouldRepaint(covariant _MiniMapPainter oldDelegate) => true;
+}
+
+class _ContextPill extends StatelessWidget {
+  const _ContextPill({
+    required this.text,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final String text;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: enabled ? const Color(0xD8221512) : const Color(0xB8171512),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: enabled ? const Color(0xFFFFD75A) : const Color(0x886E5B37),
+            width: 3,
+          ),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x70000000),
+              offset: Offset(0, 5),
+              blurRadius: 0,
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: Colors.white,
+              fontSize: 20,
+              height: 1.05,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Joystick extends StatefulWidget {
+  const _Joystick({required this.game, required this.compact});
+
+  final TaniinGame game;
+  final bool compact;
+
+  @override
+  State<_Joystick> createState() => _JoystickState();
+}
+
+class _JoystickState extends State<_Joystick> {
+  Offset _knob = Offset.zero;
+  bool _dragging = false;
+
+  double get _radius => _joystickRadius(widget.compact);
+
+  double get _knobRadius => widget.compact ? 31 : 34;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = _radius * 2.2;
+    final center = Offset(size * 0.5, size * 0.5);
+    final knobCenter = _dragging ? center + _knob : center;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onPanStart: (details) => _update(details.localPosition, center),
+      onPanUpdate: (details) => _update(details.localPosition, center),
+      onPanEnd: (_) => _release(),
+      onPanCancel: _release,
+      child: SizedBox.square(
+        dimension: size,
+        child: CustomPaint(
+          painter: _JoystickPainter(
+            knobCenter: knobCenter,
+            center: center,
+            radius: _radius,
+            knobRadius: _knobRadius,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _update(Offset position, Offset center) {
+    final raw = position - center;
+    final distance = raw.distance;
+    final travel = _radius * 0.92;
+    final clamped = distance > travel ? raw / distance * travel : raw;
+    widget.game.setInputVector(clamped / travel);
+    setState(() {
+      _dragging = true;
+      _knob = clamped;
+    });
+  }
+
+  void _release() {
+    widget.game.setInputVector(Offset.zero);
+    setState(() {
+      _dragging = false;
+      _knob = Offset.zero;
+    });
+  }
+}
+
+class _JoystickPainter extends CustomPainter {
+  const _JoystickPainter({
+    required this.knobCenter,
+    required this.center,
+    required this.radius,
+    required this.knobRadius,
+  });
+
+  final Offset knobCenter;
+  final Offset center;
+  final double radius;
+  final double knobRadius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..isAntiAlias = true;
+    paint.color = const Color(0x66141414);
+    canvas.drawCircle(center, radius, paint);
+    paint.color = const Color(0x99FFFFFF);
+    canvas.drawCircle(knobCenter, knobRadius, paint);
+    paint
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4
+      ..color = const Color(0x55FFFFFF);
+    canvas.drawCircle(center, radius - 6, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _JoystickPainter oldDelegate) =>
+      oldDelegate.knobCenter != knobCenter;
+}
+
+class _InteractionPanel extends StatelessWidget {
+  const _InteractionPanel({
+    required this.farmState,
+    required this.interaction,
+    required this.plotIndex,
+    required this.onClose,
+    required this.onOpenShop,
+  });
+
+  final FarmStateController farmState;
+  final GameInteraction interaction;
+  final int? plotIndex;
+  final VoidCallback onClose;
+  final VoidCallback onOpenShop;
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.sizeOf(context);
+    final wide = interaction == GameInteraction.swapToken;
+    final tall = wide || interaction == GameInteraction.sellHarvest;
+    final panelWidth = math.max(
+      360.0,
+      math.min(media.width - 44, wide ? 980.0 : 820.0),
+    );
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: panelWidth,
+        maxHeight: math.min(media.height - 44, tall ? 760 : 560),
+      ),
+      child: SizedBox(
+        width: panelWidth,
+        child: PixelPanel(
+          color: const Color(0xFF9E4E20),
+          borderColor: const Color(0xFF4D2A0E),
+          padding: const EdgeInsets.fromLTRB(28, 24, 28, 26),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      farmState.interactionTitle(interaction),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: const Color(0xFFFFDE19),
+                        fontSize: 38,
+                      ),
+                    ),
+                  ),
+                  PanelCloseButton(onPressed: onClose),
+                ],
+              ),
+              const SizedBox(height: 18),
+              _DialogBody(
+                text: farmState.interactionBody(
+                  interaction,
+                  plotIndex: plotIndex,
+                ),
+              ),
+              if (interaction == GameInteraction.plant) ...[
+                const SizedBox(height: 18),
+                Text(
+                  'Pilih Benih',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: const Color(0xFFFFE054),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _PlantSeedSelector(farmState: farmState),
+              ],
+              if (interaction == GameInteraction.sellHarvest &&
+                  farmState.harvests > 0) ...[
+                const SizedBox(height: 18),
+                Text(
+                  'Pilih Panen',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: const Color(0xFFFFE054),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _SellHarvestSelector(farmState: farmState),
+              ],
+              if (interaction == GameInteraction.swapToken) ...[
+                const SizedBox(height: 18),
+                _SwapControl(farmState: farmState),
+              ],
+              const SizedBox(height: 24),
+              _InteractionButtons(
+                farmState: farmState,
+                interaction: interaction,
+                plotIndex: plotIndex,
+                onClose: onClose,
+                onOpenShop: onOpenShop,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DialogBody extends StatelessWidget {
+  const _DialogBody({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF8E411B),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF5C2A0C), width: 4),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: const Color(0xFFFFF0D4),
+            fontSize: 26,
+            height: 1.12,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InteractionButtons extends StatelessWidget {
+  const _InteractionButtons({
+    required this.farmState,
+    required this.interaction,
+    required this.plotIndex,
+    required this.onClose,
+    required this.onOpenShop,
+  });
+
+  final FarmStateController farmState;
+  final GameInteraction interaction;
+  final int? plotIndex;
+  final VoidCallback onClose;
+  final VoidCallback onOpenShop;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      alignment: WrapAlignment.center,
+      runSpacing: 14,
+      spacing: 18,
+      children: [
+        _DialogButton(
+          label: _primaryLabel(),
+          color: const Color(0xFF61320C),
+          border: const Color(0xFFFFD900),
+          onPressed: () => _performPrimary(context),
+        ),
+        if (interaction == GameInteraction.plant) ...[
+          _DialogButton(
+            label: 'Jual lahan',
+            color: const Color(0xFF724718),
+            border: const Color(0xFFFFB23F),
+            onPressed: () {
+              final index = plotIndex;
+              if (index != null) {
+                farmState.sellLand(index);
+              }
+              onClose();
+            },
+          ),
+        ],
+        _DialogButton(
+          label: 'Batal',
+          color: const Color(0xFFA00500),
+          border: const Color(0xFF5C0000),
+          onPressed: onClose,
+        ),
+      ],
+    );
+  }
+
+  String _primaryLabel() {
+    return switch (interaction) {
+      GameInteraction.sellHarvest =>
+        farmState.harvests > 0 && farmState.selectedSellCrop.quantity > 0
+            ? 'Jual ${farmState.selectedSellCrop.name}'
+            : 'Pilih panen',
+      GameInteraction.swapToken =>
+        farmState.selectedSwapAmount > 0
+            ? 'Swap ${farmState.selectedSwapAmount}'
+            : 'Oke',
+      GameInteraction.buyLand => 'Ya, beli lahan',
+      GameInteraction.plant =>
+        farmState.selectedSeed.quantity > 0
+            ? 'Ya, tanam ${farmState.selectedSeed.name}'
+            : 'Buka toko',
+      GameInteraction.waitCrop => 'Oke',
+      GameInteraction.harvest => 'Panen',
+      _ => 'Lanjut',
+    };
+  }
+
+  void _performPrimary(BuildContext context) {
+    switch (interaction) {
+      case GameInteraction.sellHarvest:
+        if (farmState.sellHarvest()) {
+          onClose();
+        }
+        return;
+      case GameInteraction.swapToken:
+        if (farmState.swapCoinsToTani()) {
+          onClose();
+        }
+        return;
+      case GameInteraction.waitCrop:
+        onClose();
+        return;
+      case GameInteraction.buyLand:
+      case GameInteraction.plant:
+      case GameInteraction.harvest:
+        final index = plotIndex;
+        if (index == null) {
+          farmState.showMessage('Dekati lahan dulu.', success: false);
+          onClose();
+          return;
+        }
+        if (interaction == GameInteraction.plant &&
+            farmState.selectedSeed.quantity <= 0) {
+          onOpenShop();
+          return;
+        }
+        farmState.performPlotAction(index);
+        onClose();
+        return;
+      default:
+        onClose();
+    }
+  }
+}
+
+class _PlantSeedSelector extends StatelessWidget {
+  const _PlantSeedSelector({required this.farmState});
+
+  final FarmStateController farmState;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        for (var i = 0; i < farmState.seeds.length; i++) ...[
+          Expanded(
+            child: _SeedOption(
+              seed: farmState.seeds[i],
+              selected: farmState.selectedSeedIndex == i,
+              onTap: () => farmState.selectSeed(i),
+            ),
+          ),
+          if (i != farmState.seeds.length - 1) const SizedBox(width: 12),
+        ],
+      ],
+    );
+  }
+}
+
+class _SeedOption extends StatelessWidget {
+  const _SeedOption({
+    required this.seed,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final SeedStack seed;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final available = seed.quantity > 0;
+    return GestureDetector(
+      onTap: onTap,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFA7581E) : const Color(0xFF793A17),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected ? const Color(0xFFFFDA2E) : const Color(0xFF5E2C0D),
+            width: selected ? 5 : 3,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _SeedPacket(
+                color: available ? seed.color : const Color(0xFF6B594D),
+                size: 44,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                seed.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: available
+                      ? const Color(0xFFFFF0D4)
+                      : const Color(0xFFBE977C),
+                  fontSize: 20,
+                ),
+              ),
+              Text(
+                'Stok x${seed.quantity}',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: available
+                      ? const Color(0xFFFFF0D4)
+                      : const Color(0xFFBE977C),
+                  fontSize: 17,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SellHarvestSelector extends StatelessWidget {
+  const _SellHarvestSelector({required this.farmState});
+
+  final FarmStateController farmState;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        for (var i = 0; i < farmState.crops.length; i++) ...[
+          Expanded(
+            child: _CropOption(
+              crop: farmState.crops[i],
+              selected: farmState.selectedSellCropIndex == i,
+              price: FarmStateController.harvestSellPrice,
+              onTap: () => farmState.selectSellCrop(i),
+            ),
+          ),
+          if (i != farmState.crops.length - 1) const SizedBox(width: 12),
+        ],
+      ],
+    );
+  }
+}
+
+class _CropOption extends StatelessWidget {
+  const _CropOption({
+    required this.crop,
+    required this.selected,
+    required this.price,
+    required this.onTap,
+  });
+
+  final CropStack crop;
+  final bool selected;
+  final int price;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final available = crop.quantity > 0;
+    final value = crop.quantity * price;
+    return GestureDetector(
+      onTap: onTap,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFA7581E) : const Color(0xFF793A17),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected ? const Color(0xFFFFDA2E) : const Color(0xFF5E2C0D),
+            width: selected ? 5 : 3,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _SeedPacket(
+                color: available ? crop.color : const Color(0xFF6B594D),
+                size: 44,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                crop.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: available
+                      ? const Color(0xFFFFF0D4)
+                      : const Color(0xFFBE977C),
+                  fontSize: 20,
+                ),
+              ),
+              Text(
+                available ? 'x${crop.quantity} -> $value coin' : 'Stok kosong',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: available
+                      ? const Color(0xFFFFF0D4)
+                      : const Color(0xFFBE977C),
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SwapControl extends StatelessWidget {
+  const _SwapControl({required this.farmState});
+
+  final FarmStateController farmState;
+
+  @override
+  Widget build(BuildContext context) {
+    final maxCoins = math.max(0, farmState.coins);
+    final amount = farmState.selectedSwapAmount;
+    final value = amount.toDouble();
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF793A17),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF5E2C0D), width: 4),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final vertical = constraints.maxWidth < 760;
+            final fromCard = _SwapAssetCard(
+              label: 'DARI',
+              asset: 'GAME COIN',
+              amount: '$amount',
+              balance: 'Saldo ${farmState.coins}',
+              icon: Icons.paid,
+              color: const Color(0xFF6C3915),
+            );
+            final toCard = _SwapAssetCard(
+              label: 'KE',
+              asset: 'TANI SEPOLIA',
+              amount: '+$amount',
+              balance: 'Saldo ${farmState.tani}',
+              icon: Icons.token,
+              color: const Color(0xFF22543B),
+            );
+            final arrow = Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: vertical ? 0 : 14,
+                vertical: vertical ? 10 : 0,
+              ),
+              child: _SwapArrow(vertical: vertical),
+            );
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                vertical
+                    ? Column(children: [fromCard, arrow, toCard])
+                    : Row(
+                        children: [
+                          Expanded(child: fromCard),
+                          arrow,
+                          Expanded(child: toCard),
+                        ],
+                      ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Jumlah swap',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              color: const Color(0xFFFFF0D4),
+                              fontSize: 22,
+                            ),
+                      ),
+                    ),
+                    Text(
+                      '$amount / $maxCoins coin',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: const Color(0xFFFFDE19),
+                        fontSize: 22,
+                      ),
+                    ),
+                  ],
+                ),
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: 10,
+                    thumbShape: const RoundSliderThumbShape(
+                      enabledThumbRadius: 15,
+                    ),
+                    activeTrackColor: const Color(0xFFFFD900),
+                    inactiveTrackColor: const Color(0xFF5E2C0D),
+                    thumbColor: const Color(0xFFFFF0D4),
+                  ),
+                  child: Slider(
+                    value: value,
+                    min: 0,
+                    max: math.max(1, maxCoins).toDouble(),
+                    divisions: math.max(1, maxCoins),
+                    onChanged: maxCoins == 0
+                        ? null
+                        : (newValue) =>
+                              farmState.setSwapAmount(newValue.round()),
+                  ),
+                ),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    _SwapPresetButton(
+                      label: '25%',
+                      enabled: maxCoins > 0,
+                      onTap: () => farmState.setSwapAmount(
+                        math.max(1, (maxCoins * 0.25).round()),
+                      ),
+                    ),
+                    _SwapPresetButton(
+                      label: '50%',
+                      enabled: maxCoins > 0,
+                      onTap: () => farmState.setSwapAmount(
+                        math.max(1, (maxCoins * 0.50).round()),
+                      ),
+                    ),
+                    _SwapPresetButton(
+                      label: 'MAX',
+                      enabled: maxCoins > 0,
+                      onTap: () => farmState.setSwapAmount(maxCoins),
+                    ),
+                    _SwapPresetButton(
+                      label: farmState.walletConnected
+                          ? 'WALLET AKTIF'
+                          : 'MODE LOKAL',
+                      enabled: true,
+                      onTap: () => farmState.showMessage(
+                        farmState.walletConnected
+                            ? 'Wallet aktif: ${farmState.walletLabel}'
+                            : 'Buka tombol Connect Wallet di kanan atas.',
+                        success: farmState.walletConnected,
+                      ),
+                      highlighted: farmState.walletConnected,
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _SwapAssetCard extends StatelessWidget {
+  const _SwapAssetCard({
+    required this.label,
+    required this.asset,
+    required this.amount,
+    required this.balance,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final String asset;
+  final String amount;
+  final String balance;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFFFB23F), width: 3),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: const Color(0x33FFFFFF),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: SizedBox.square(
+                dimension: 54,
+                child: Icon(icon, color: const Color(0xFFFFF0D4), size: 34),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    label,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: const Color(0xFFE9C692),
+                      fontSize: 14,
+                    ),
+                  ),
+                  Text(
+                    asset,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: const Color(0xFFFFF0D4),
+                      fontSize: 21,
+                    ),
+                  ),
+                  Text(
+                    balance,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFFDDBF91),
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              amount,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: const Color(0xFFFFDE19),
+                fontSize: 32,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SwapArrow extends StatelessWidget {
+  const _SwapArrow({required this.vertical});
+
+  final bool vertical;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF5E2C0D),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFFFD900), width: 3),
+      ),
+      child: SizedBox.square(
+        dimension: 48,
+        child: Icon(
+          vertical ? Icons.keyboard_arrow_down : Icons.arrow_forward,
+          color: const Color(0xFFFFF0D4),
+          size: 32,
+        ),
+      ),
+    );
+  }
+}
+
+class _SwapPresetButton extends StatelessWidget {
+  const _SwapPresetButton({
+    required this.label,
+    required this.enabled,
+    required this.onTap,
+    this.highlighted = false,
+  });
+
+  final String label;
+  final bool enabled;
+  final VoidCallback onTap;
+  final bool highlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: !enabled
+              ? const Color(0xFF5F4A38)
+              : highlighted
+              ? const Color(0xFF246644)
+              : const Color(0xFF6A3512),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: highlighted
+                ? const Color(0xFF86E276)
+                : const Color(0xFFFFB23F),
+            width: 3,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: const Color(0xFFFFF0D4),
+              fontSize: 16,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ShopPanel extends StatelessWidget {
+  const _ShopPanel({required this.farmState, required this.onClose});
+
+  final FarmStateController farmState;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.sizeOf(context);
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: math.min(media.width - 44, 1180),
+        maxHeight: math.min(media.height - 44, 700),
+      ),
+      child: PixelPanel(
+        color: const Color(0xFF9C4B1E),
+        borderColor: const Color(0xFF46270D),
+        padding: const EdgeInsets.fromLTRB(28, 24, 28, 26),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.shopping_cart,
+                  size: 48,
+                  color: Color(0xFFFFDE19),
+                ),
+                const SizedBox(width: 14),
+                Text(
+                  'Shop',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: const Color(0xFFFFDE19),
+                    fontSize: 44,
+                  ),
+                ),
+                const Spacer(),
+                PanelCloseButton(onPressed: onClose),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _DialogBody(
+              text: 'Pilih benih, atur jumlah paket, lalu tekan Beli di kartu.',
+            ),
+            const SizedBox(height: 16),
+            _ShopSummary(farmState: farmState),
+            const SizedBox(height: 16),
+            Flexible(
+              child: GridView.builder(
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                itemCount: farmState.seeds.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 14,
+                  crossAxisSpacing: 14,
+                  childAspectRatio: 4.5,
+                ),
+                itemBuilder: (context, index) {
+                  return _ShopSeedCard(farmState: farmState, seedIndex: index);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ShopSummary extends StatelessWidget {
+  const _ShopSummary({required this.farmState});
+
+  final FarmStateController farmState;
+
+  @override
+  Widget build(BuildContext context) {
+    final seed = farmState.selectedSeed;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF8B3F19),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF5F2B0C), width: 3),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Game Coin: ${farmState.coins} | ${seed.name} | Paket x${farmState.shopBundleQuantity} = ${farmState.seedTotalAmount()} benih | Total ${farmState.seedTotalPrice(farmState.selectedSeedIndex)} Coin',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: const Color(0xFFFFEED3),
+                  fontSize: 20,
+                ),
+              ),
+            ),
+            _SmallStepperButton(
+              label: '-',
+              onTap: () => farmState.adjustShopBundleQuantity(-1),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Text(
+                'x${farmState.shopBundleQuantity}',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: const Color(0xFFFFEED3),
+                  fontSize: 23,
+                ),
+              ),
+            ),
+            _SmallStepperButton(
+              label: '+',
+              onTap: () => farmState.adjustShopBundleQuantity(1),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ShopSeedCard extends StatelessWidget {
+  const _ShopSeedCard({required this.farmState, required this.seedIndex});
+
+  final FarmStateController farmState;
+  final int seedIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    final seed = farmState.seeds[seedIndex];
+    final selected = farmState.selectedSeedIndex == seedIndex;
+    final price = farmState.seedTotalPrice(seedIndex);
+    final canBuy = farmState.coins >= price;
+    return GestureDetector(
+      onTap: () => farmState.selectSeed(seedIndex),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFA7581E) : const Color(0xFF793A17),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected ? const Color(0xFFFFDA2E) : const Color(0xFF5E2C0D),
+            width: selected ? 5 : 3,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              _SeedPacket(color: seed.color, size: 58),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      seed.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: const Color(0xFFFFF0D4),
+                        fontSize: 24,
+                      ),
+                    ),
+                    Text(
+                      'Isi ${FarmStateController.seedBundleAmount} - Stok x${seed.quantity}',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFFFFDDA8),
+                        fontSize: 18,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              _DialogButton(
+                label: canBuy ? 'Beli $price' : 'Kurang',
+                color: canBuy
+                    ? const Color(0xFF24703C)
+                    : const Color(0xFF664B35),
+                border: canBuy
+                    ? const Color(0xFF86E276)
+                    : const Color(0xFF8B6A53),
+                onPressed: () => farmState.buySeeds(seedIndex),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HudIconButton extends StatelessWidget {
+  const _HudIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+    this.isActive = false,
+    this.badge,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+  final bool isActive;
+  final String? badge;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onPressed,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            _HudFrame(
+              width: 76,
+              height: 76,
+              color: isActive
+                  ? const Color(0xFF8D5218)
+                  : const Color(0xFF7A4818),
+              border: const Color(0xFF5B3510),
+              padding: EdgeInsets.zero,
+              child: Icon(icon, size: 42, color: const Color(0xFFF5E7CB)),
+            ),
+            if (badge != null)
+              Positioned(
+                right: -8,
+                top: -8,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFDB5F),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFF2C1F0F),
+                      width: 3,
+                    ),
+                  ),
+                  child: SizedBox.square(
+                    dimension: 34,
+                    child: Center(
+                      child: Text(
+                        badge!,
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: const Color(0xFF2C1F0F),
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HudFrame extends StatelessWidget {
+  const _HudFrame({
+    required this.child,
+    required this.width,
+    required this.height,
+    required this.color,
+    required this.border,
+    this.padding = const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+  });
+
+  final Widget child;
+  final double width;
+  final double height;
+  final Color color;
+  final Color border;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0x5A000000),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.only(right: 4, bottom: 5),
+        child: SizedBox(
+          width: width,
+          height: height,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: border, width: 4),
+            ),
+            child: Padding(padding: padding, child: child),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DialogButton extends StatelessWidget {
+  const _DialogButton({
+    required this.label,
+    required this.color,
+    required this.border,
+    required this.onPressed,
+  });
+
+  final String label;
+  final Color color;
+  final Color border;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: border, width: 4),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x55000000),
+              offset: Offset(4, 5),
+              blurRadius: 0,
+            ),
+          ],
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 150, minHeight: 62),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: Center(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: const Color(0xFFFFEDCD),
+                  fontSize: 24,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SmallStepperButton extends StatelessWidget {
+  const _SmallStepperButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: const Color(0xFF68330E),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFFFD64E), width: 3),
+        ),
+        child: SizedBox.square(
+          dimension: 54,
+          child: Center(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: const Color(0xFFFFEED3),
+                fontSize: 30,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusPopup extends StatelessWidget {
+  const _StatusPopup({required this.farmState});
+
+  final FarmStateController farmState;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF22723E),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF7DE282), width: 4),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x88000000),
+            offset: Offset(6, 7),
+            blurRadius: 0,
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        child: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Color(0xFFD3FFCB), size: 42),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                farmState.statusMessage,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Colors.white,
+                  fontSize: 20,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CoinIcon extends StatelessWidget {
+  const _CoinIcon({required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.square(
+      dimension: size,
+      child: CustomPaint(painter: _CoinPainter()),
+    );
+  }
+}
+
+class _HarvestIcon extends StatelessWidget {
+  const _HarvestIcon({required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.square(
+      dimension: size,
+      child: CustomPaint(painter: _HarvestPainter()),
+    );
+  }
+}
+
+class _WalletIcon extends StatelessWidget {
+  const _WalletIcon({required this.connected});
+
+  final bool connected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.square(
+      dimension: 52,
+      child: CustomPaint(painter: _WalletPainter(connected)),
+    );
+  }
+}
+
+class _SeedPacket extends StatelessWidget {
+  const _SeedPacket({required this.color, required this.size});
+
+  final Color color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.square(
+      dimension: size,
+      child: CustomPaint(painter: _SeedPacketPainter(color)),
+    );
+  }
+}
+
+class _CoinPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..isAntiAlias = true;
+    final center = size.center(Offset.zero);
+    paint.color = const Color(0xFFF8F2D7);
+    canvas.drawCircle(center, size.width * 0.50, paint);
+    paint
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size.width * 0.09
+      ..color = const Color(0xFF362A12);
+    canvas.drawCircle(center, size.width * 0.40, paint);
+    paint
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xFFEEC530);
+    canvas.drawCircle(center, size.width * 0.22, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _HarvestPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..isAntiAlias = true;
+    final center = size.center(Offset.zero);
+    paint.color = const Color(0xFF2474D8);
+    canvas.drawCircle(center, size.width * 0.50, paint);
+    paint
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size.width * 0.08
+      ..color = const Color(0xFFD1EEFF);
+    canvas.drawCircle(center, size.width * 0.37, paint);
+    paint
+      ..style = PaintingStyle.fill
+      ..color = Colors.white;
+    final path = Path()
+      ..moveTo(center.dx - size.width * 0.18, center.dy - size.height * 0.19)
+      ..lineTo(center.dx, center.dy - size.height * 0.03)
+      ..lineTo(center.dx + size.width * 0.20, center.dy - size.height * 0.22)
+      ..lineTo(center.dx + size.width * 0.26, center.dy - size.height * 0.05)
+      ..lineTo(center.dx + size.width * 0.08, center.dy + size.height * 0.10)
+      ..lineTo(center.dx + size.width * 0.26, center.dy + size.height * 0.26)
+      ..lineTo(center.dx + size.width * 0.08, center.dy + size.height * 0.26)
+      ..lineTo(center.dx, center.dy + size.height * 0.16)
+      ..lineTo(center.dx - size.width * 0.10, center.dy + size.height * 0.26)
+      ..lineTo(center.dx - size.width * 0.28, center.dy + size.height * 0.26)
+      ..lineTo(center.dx - size.width * 0.08, center.dy + size.height * 0.09)
+      ..lineTo(center.dx - size.width * 0.26, center.dy - size.height * 0.06)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _WalletPainter extends CustomPainter {
+  const _WalletPainter(this.connected);
+
+  final bool connected;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..isAntiAlias = true;
+    final center = size.center(Offset.zero);
+    paint.color = connected ? const Color(0xFF70E084) : const Color(0xFFF4D057);
+    canvas.drawCircle(center, size.width * 0.45, paint);
+    paint.color = const Color(0xFF212F20);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(
+          center: center,
+          width: size.width * 0.62,
+          height: size.height * 0.44,
+        ),
+        const Radius.circular(5),
+      ),
+      paint,
+    );
+    paint.color = const Color(0xFFF0F6E4);
+    canvas.drawRect(
+      Rect.fromCenter(
+        center: center.translate(0, -2),
+        width: size.width * 0.42,
+        height: 4,
+      ),
+      paint,
+    );
+    paint.color = connected ? const Color(0xFF45AA53) : const Color(0xFFC18A24);
+    canvas.drawCircle(
+      center.translate(size.width * 0.30, -size.height * 0.30),
+      size.width * 0.11,
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _WalletPainter oldDelegate) =>
+      oldDelegate.connected != connected;
+}
+
+class _SeedPacketPainter extends CustomPainter {
+  const _SeedPacketPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..isAntiAlias = true;
+    final scale = size.width / 44;
+    final center = size.center(Offset.zero);
+    paint.color = const Color(0xFFFFF6D8);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: center, width: 32 * scale, height: 38 * scale),
+        Radius.circular(4 * scale),
+      ),
+      paint,
+    );
+    paint.color = color;
+    canvas.drawRect(
+      Rect.fromLTWH(
+        center.dx - 12 * scale,
+        center.dy - 12 * scale,
+        24 * scale,
+        19 * scale,
+      ),
+      paint,
+    );
+    paint.color = const Color(0xFF472C1F);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          center.dx - 8 * scale,
+          center.dy + 3 * scale,
+          16 * scale,
+          11 * scale,
+        ),
+        Radius.circular(3 * scale),
+      ),
+      paint,
+    );
+    paint.color = const Color(0xFF60D25C);
+    canvas.drawOval(
+      Rect.fromLTWH(
+        center.dx - 10 * scale,
+        center.dy - 4 * scale,
+        12 * scale,
+        9 * scale,
+      ),
+      paint,
+    );
+    canvas.drawOval(
+      Rect.fromLTWH(center.dx, center.dy - 7 * scale, 11 * scale, 10 * scale),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _SeedPacketPainter oldDelegate) =>
+      oldDelegate.color != color;
+}
