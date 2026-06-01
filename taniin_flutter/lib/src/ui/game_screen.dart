@@ -24,6 +24,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   late final TaniinGame _game;
   late final GameAudioController _audio;
   GamePanel? _activePanel;
+  bool _gameMounted = false;
   bool _loadingFinished = false;
   bool _audioStarted = false;
   bool _appInForeground = true;
@@ -42,6 +43,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _game = TaniinGame(_farmState);
     _game.walkingNotifier.addListener(_syncWalkAudio);
     _syncAudio();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() => _gameMounted = true);
+      }
+    });
   }
 
   @override
@@ -53,6 +59,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _game.loadingComplete.dispose();
     _game.walkingNotifier.dispose();
     _game.hudNotifier.dispose();
+    _game.miniMapNotifier.dispose();
     _audio.release();
     _farmState.dispose();
     super.dispose();
@@ -144,26 +151,29 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         builder: (context, _) {
           return Stack(
             children: [
-              Positioned.fill(child: GameWidget(game: _game)),
-              Positioned.fill(
-                child: GameHud(
-                  game: _game,
-                  farmState: _farmState,
-                  activePanel: _activePanel,
-                  onPanelSelected: _togglePanel,
+              if (_gameMounted) ...[
+                Positioned.fill(child: GameWidget(game: _game)),
+                Positioned.fill(
+                  child: GameHud(
+                    game: _game,
+                    farmState: _farmState,
+                    activePanel: _activePanel,
+                    onPanelSelected: _togglePanel,
+                  ),
                 ),
-              ),
-              Positioned.fill(
-                child: _activePanel == null
-                    ? const SizedBox.shrink()
-                    : ColoredBox(
-                        color: const Color(0x66000000),
-                        child: PhysicalViewport(
-                          alignment: Alignment.center,
-                          child: Center(child: _buildPanel()),
+                Positioned.fill(
+                  child: _activePanel == null
+                      ? const SizedBox.shrink()
+                      : ColoredBox(
+                          color: const Color(0x66000000),
+                          child: PhysicalViewport(
+                            alignment: Alignment.center,
+                            child: Center(child: _buildPanel()),
+                          ),
                         ),
-                      ),
-              ),
+                ),
+              ] else
+                const Positioned.fill(child: _LoadingBackdrop()),
               Positioned.fill(
                 child: PhysicalViewport(
                   child: LoadingOverlay(
@@ -194,5 +204,24 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         onClose: _closePanel,
       ),
     };
+  }
+}
+
+class _LoadingBackdrop extends StatelessWidget {
+  const _LoadingBackdrop();
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const ColoredBox(color: Color(0xFF275D35)),
+        Image.asset(
+          'assets/images/loadingscreen.jpg',
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.none,
+        ),
+      ],
+    );
   }
 }

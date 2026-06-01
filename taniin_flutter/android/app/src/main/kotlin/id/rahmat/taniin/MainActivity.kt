@@ -1,34 +1,55 @@
-package id.rahmat.taniin_flutter
+package id.rahmat.taniin
 
 import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.RectF
+import android.graphics.Typeface
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.SoundPool
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.View
+import android.view.ViewGroup
 import android.view.Window
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.embedding.engine.renderer.FlutterUiDisplayListener
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private var audioBridge: AndroidAudioBridge? = null
     private var platformChannel: MethodChannel? = null
+    private var splashOverlay: View? = null
     private var pendingWalletAddress = ""
+    private val flutterUiDisplayListener = object : FlutterUiDisplayListener {
+        override fun onFlutterUiDisplayed() {
+            window.decorView.postDelayed({ removeNativeSplashOverlay() }, 120L)
+        }
+
+        override fun onFlutterUiNoLongerDisplayed() = Unit
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         requestWindowFeature(Window.FEATURE_NO_TITLE)
         configureFullscreenWindow()
         super.onCreate(savedInstanceState)
+        installNativeSplashOverlay()
         handleWalletIntent(intent)
-        hideSystemUi()
+        scheduleHideSystemUi()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -60,7 +81,7 @@ class MainActivity : FlutterActivity() {
 
     override fun onResume() {
         super.onResume()
-        hideSystemUi()
+        scheduleHideSystemUi()
         audioBridge?.resume()
     }
 
@@ -70,6 +91,7 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        removeNativeSplashOverlay()
         audioBridge?.release()
         audioBridge = null
         platformChannel = null
@@ -79,8 +101,38 @@ class MainActivity : FlutterActivity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) {
-            hideSystemUi()
+            scheduleHideSystemUi()
         }
+    }
+
+    private fun scheduleHideSystemUi() {
+        hideSystemUi()
+        window.decorView.post { hideSystemUi() }
+        window.decorView.postDelayed({ hideSystemUi() }, 250L)
+        window.decorView.postDelayed({ hideSystemUi() }, 900L)
+    }
+
+    private fun installNativeSplashOverlay() {
+        if (splashOverlay != null) {
+            return
+        }
+        val overlay = NativeLoadingSplashView(this)
+        splashOverlay = overlay
+        addContentView(
+            overlay,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
+        flutterEngine?.renderer?.addIsDisplayingFlutterUiListener(flutterUiDisplayListener)
+    }
+
+    private fun removeNativeSplashOverlay() {
+        flutterEngine?.renderer?.removeIsDisplayingFlutterUiListener(flutterUiDisplayListener)
+        val overlay = splashOverlay ?: return
+        splashOverlay = null
+        (overlay.parent as? ViewGroup)?.removeView(overlay)
     }
 
     private fun configureFullscreenWindow() {
@@ -166,6 +218,176 @@ class MainActivity : FlutterActivity() {
             }
         }
     }
+}
+
+private class NativeLoadingSplashView(context: Context) : View(context) {
+    private val image: Bitmap = BitmapFactory.decodeResource(resources, R.drawable.loadingscreen)
+    private val imageSource = Rect(0, 0, image.width, image.height)
+    private val imageTarget = RectF()
+    private val startedAt = SystemClock.uptimeMillis()
+    private val imagePaint = Paint().apply {
+        isAntiAlias = false
+        isFilterBitmap = false
+        isDither = false
+    }
+    private val paint = Paint().apply {
+        isAntiAlias = false
+        isFilterBitmap = false
+    }
+    private val textPaint = Paint().apply {
+        isAntiAlias = false
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        textAlign = Paint.Align.CENTER
+    }
+    private var keepAnimating = false
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        keepAnimating = true
+        postInvalidateOnAnimation()
+    }
+
+    override fun onDetachedFromWindow() {
+        keepAnimating = false
+        super.onDetachedFromWindow()
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        drawBackground(canvas)
+        if (keepAnimating) {
+            postInvalidateOnAnimation()
+        }
+    }
+
+    private fun drawBackground(canvas: Canvas) {
+        canvas.drawColor(Color.rgb(35, 74, 42))
+        val canvasRatio = width.toFloat() / height.toFloat()
+        val imageRatio = image.width.toFloat() / image.height.toFloat()
+        if (canvasRatio > imageRatio) {
+            val targetHeight = width / imageRatio
+            val top = (height - targetHeight) * 0.5f
+            imageTarget.set(0f, top, width.toFloat(), top + targetHeight)
+        } else {
+            val targetWidth = height * imageRatio
+            val left = (width - targetWidth) * 0.5f
+            imageTarget.set(left, 0f, left + targetWidth, height.toFloat())
+        }
+        canvas.drawBitmap(image, imageSource, imageTarget, imagePaint)
+        canvas.drawColor(Color.argb(84, 16, 28, 20))
+        drawLoadingChrome(canvas)
+    }
+
+    private fun drawLoadingChrome(canvas: Canvas) {
+        if (width <= 0 || height <= 0) {
+            return
+        }
+        val scale = (height / 414f).coerceIn(0.82f, 2.0f)
+        val centerX = width * 0.5f
+        val titleY = maxOf(58f * scale, height * 0.18f)
+        drawOutlinedText(
+            canvas,
+            "Taniin",
+            centerX,
+            titleY,
+            72f * scale,
+            Color.rgb(255, 222, 82),
+            Color.rgb(30, 71, 36),
+            5f * scale,
+        )
+        drawOutlinedText(
+            canvas,
+            "GAME ONCHAIN BERTANI",
+            centerX,
+            titleY + 38f * scale,
+            20f * scale,
+            Color.rgb(250, 247, 208),
+            Color.rgb(23, 55, 35),
+            3f * scale,
+        )
+        drawLoadingPanel(canvas, scale)
+    }
+
+    private fun drawLoadingPanel(canvas: Canvas, scale: Float) {
+        val panelWidth = minOf(width - 48f * scale, 650f * scale)
+        val panelHeight = 108f * scale
+        val left = (width - panelWidth) * 0.5f
+        val bottom = height - maxOf(28f * scale, height * 0.10f)
+        val panel = RectF(left, bottom - panelHeight, left + panelWidth, bottom)
+
+        paint.color = Color.argb(150, 0, 0, 0)
+        canvas.drawRect(panel.left + 6f * scale, panel.top + 7f * scale, panel.right + 6f * scale, panel.bottom + 7f * scale, paint)
+        paint.color = Color.rgb(24, 48, 31)
+        canvas.drawRect(panel, paint)
+        paint.color = Color.rgb(255, 219, 87)
+        canvas.drawRect(panel.left, panel.top, panel.right, panel.top + 5f * scale, paint)
+        canvas.drawRect(panel.left, panel.bottom - 5f * scale, panel.right, panel.bottom, paint)
+        canvas.drawRect(panel.left, panel.top, panel.left + 5f * scale, panel.bottom, paint)
+        canvas.drawRect(panel.right - 5f * scale, panel.top, panel.right, panel.bottom, paint)
+        paint.color = Color.rgb(54, 109, 58)
+        canvas.drawRect(panel.left + 10f * scale, panel.top + 10f * scale, panel.right - 10f * scale, panel.bottom - 10f * scale, paint)
+
+        val progress = loadingProgress()
+        drawLabelText(canvas, "LOADING FARM", panel.left + 24f * scale, panel.top + 34f * scale, 19f * scale, Paint.Align.LEFT)
+        drawLabelText(canvas, "${(progress * 100).toInt()}%", panel.right - 24f * scale, panel.top + 35f * scale, 22f * scale, Paint.Align.RIGHT)
+
+        val bar = RectF(panel.left + 24f * scale, panel.top + 55f * scale, panel.right - 24f * scale, panel.top + 80f * scale)
+        paint.color = Color.rgb(15, 32, 20)
+        canvas.drawRect(bar, paint)
+        paint.color = Color.rgb(115, 65, 32)
+        canvas.drawRect(bar.left, bar.top, bar.right, bar.top + 4f * scale, paint)
+        canvas.drawRect(bar.left, bar.bottom - 4f * scale, bar.right, bar.bottom, paint)
+        val fillRight = bar.left + bar.width() * progress
+        paint.color = Color.rgb(255, 215, 76)
+        canvas.drawRect(bar.left + 4f * scale, bar.top + 5f * scale, fillRight - 4f * scale, bar.bottom - 5f * scale, paint)
+        paint.color = Color.rgb(255, 239, 132)
+        canvas.drawRect(bar.left + 4f * scale, bar.top + 5f * scale, fillRight - 4f * scale, bar.top + 10f * scale, paint)
+    }
+
+    private fun loadingProgress(): Float {
+        val elapsed = (SystemClock.uptimeMillis() - startedAt).coerceAtLeast(0L)
+        val loop = (elapsed % 1800L) / 1800f
+        return (0.12f + loop * 0.82f).coerceIn(0.12f, 0.94f)
+    }
+
+    private fun drawOutlinedText(
+        canvas: Canvas,
+        text: String,
+        x: Float,
+        y: Float,
+        size: Float,
+        fillColor: Int,
+        strokeColor: Int,
+        strokeWidth: Float,
+    ) {
+        textPaint.textAlign = Paint.Align.CENTER
+        textPaint.textSize = size
+        textPaint.style = Paint.Style.STROKE
+        textPaint.strokeWidth = strokeWidth
+        textPaint.color = strokeColor
+        canvas.drawText(text, x, y, textPaint)
+        textPaint.style = Paint.Style.FILL
+        textPaint.strokeWidth = 0f
+        textPaint.color = fillColor
+        canvas.drawText(text, x, y, textPaint)
+    }
+
+    private fun drawLabelText(
+        canvas: Canvas,
+        text: String,
+        x: Float,
+        y: Float,
+        size: Float,
+        align: Paint.Align,
+    ) {
+        textPaint.textAlign = align
+        textPaint.textSize = size
+        textPaint.style = Paint.Style.FILL
+        textPaint.strokeWidth = 0f
+        textPaint.color = Color.rgb(255, 243, 199)
+        canvas.drawText(text, x, y, textPaint)
+    }
+
 }
 
 private class AndroidAudioBridge(private val activity: MainActivity) {

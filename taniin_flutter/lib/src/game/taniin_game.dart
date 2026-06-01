@@ -34,7 +34,7 @@ class TaniinGame extends FlameGame {
   static const double _swapBottomTile = 16.5;
   static const double _swapSignXTile = 10.85;
   static const double _swapSignYTile = 13.15;
-  static const double _miniMapCacheScale = 3.0;
+  static const int _miniMapRasterScale = 1;
   static const int _dirRight = 0;
   static const int _dirUp = 1;
   static const int _dirDown = 2;
@@ -42,6 +42,7 @@ class TaniinGame extends FlameGame {
 
   final FarmStateController farmState;
   final ValueNotifier<int> hudNotifier = ValueNotifier<int>(0);
+  final ValueNotifier<int> miniMapNotifier = ValueNotifier<int>(0);
   final ValueNotifier<bool> loadingComplete = ValueNotifier<bool>(false);
   final ValueNotifier<bool> walkingNotifier = ValueNotifier<bool>(false);
   final Paint _paint = Paint()..isAntiAlias = false;
@@ -49,6 +50,9 @@ class TaniinGame extends FlameGame {
     ..isAntiAlias = false
     ..filterQuality = FilterQuality.none;
   final Paint _miniMapPaint = Paint()
+    ..isAntiAlias = true
+    ..filterQuality = FilterQuality.high;
+  final Paint _miniMapMarkerPaint = Paint()
     ..isAntiAlias = true
     ..filterQuality = FilterQuality.high;
   final List<Rect> _collisionRects = <Rect>[];
@@ -179,14 +183,9 @@ class TaniinGame extends FlameGame {
         ..color = const Color(0xFF69B84E);
       canvas.drawRect(bounds, _paint);
     } else {
-      final cacheWidth = math.max(
-        1,
-        (bounds.width * _miniMapCacheScale).round(),
-      );
-      final cacheHeight = math.max(
-        1,
-        (bounds.height * _miniMapCacheScale).round(),
-      );
+      final cacheSize = map.miniMapRasterSize(scale: _miniMapRasterScale);
+      final cacheWidth = math.max(1, cacheSize.width.round());
+      final cacheHeight = math.max(1, cacheSize.height.round());
       final cached = _miniMapImage;
       if (cached != null &&
           _miniMapImageSize.width == cacheWidth &&
@@ -211,12 +210,23 @@ class TaniinGame extends FlameGame {
         bounds.left + (_playerX / math.max(1, _worldWidth)) * bounds.width;
     final y =
         bounds.top + (_playerY / math.max(1, _worldHeight)) * bounds.height;
-    _paint
+    final markerCenter = Offset(x, y);
+    final markerOuterRadius = (math.min(bounds.width, bounds.height) * 0.035)
+        .clamp(7.2, 10.4)
+        .toDouble();
+    final markerInnerRadius = markerOuterRadius * 0.68;
+    _miniMapMarkerPaint
       ..style = PaintingStyle.fill
-      ..color = Colors.white;
-    canvas.drawCircle(Offset(x, y), 4.6, _paint);
-    _paint.color = const Color(0xFFE12622);
-    canvas.drawCircle(Offset(x, y), 3.2, _paint);
+      ..color = const Color(0x66000000);
+    canvas.drawCircle(
+      markerCenter + Offset(0, markerOuterRadius * 0.26),
+      markerOuterRadius * 1.04,
+      _miniMapMarkerPaint,
+    );
+    _miniMapMarkerPaint.color = Colors.white;
+    canvas.drawCircle(markerCenter, markerOuterRadius, _miniMapMarkerPaint);
+    _miniMapMarkerPaint.color = const Color(0xFFE12622);
+    canvas.drawCircle(markerCenter, markerInnerRadius, _miniMapMarkerPaint);
   }
 
   @override
@@ -343,6 +353,7 @@ class TaniinGame extends FlameGame {
     if (playerMoved) {
       _lastPlayerMoveClock = _clock;
       _setWalking(true);
+      miniMapNotifier.value++;
     } else if (_clock - _lastPlayerMoveClock > 0.08) {
       _setWalking(false);
     }
@@ -379,6 +390,7 @@ class TaniinGame extends FlameGame {
         _miniMapImage?.dispose();
         _miniMapImage = image;
         _miniMapImageSize = Size(width.toDouble(), height.toDouble());
+        miniMapNotifier.value++;
         hudNotifier.value++;
       } finally {
         picture.dispose();

@@ -517,7 +517,7 @@ class _MiniMap extends StatelessWidget {
 }
 
 class _MiniMapPainter extends CustomPainter {
-  const _MiniMapPainter(this.game);
+  _MiniMapPainter(this.game) : super(repaint: game.miniMapNotifier);
 
   final TaniinGame game;
 
@@ -527,7 +527,8 @@ class _MiniMapPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _MiniMapPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _MiniMapPainter oldDelegate) =>
+      oldDelegate.game != game;
 }
 
 class _ContextPill extends StatelessWidget {

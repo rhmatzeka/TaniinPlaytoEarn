@@ -16,11 +16,11 @@ class TmxMap {
     ..isAntiAlias = false
     ..filterQuality = FilterQuality.none;
   final Paint _miniPaint = Paint()
-    ..isAntiAlias = true
+    ..isAntiAlias = false
     ..style = PaintingStyle.fill;
   final Paint _miniTilePaint = Paint()
-    ..isAntiAlias = true
-    ..filterQuality = FilterQuality.high;
+    ..isAntiAlias = false
+    ..filterQuality = FilterQuality.none;
 
   int tileWidth = 16;
   int tileHeight = 16;
@@ -115,6 +115,18 @@ class TmxMap {
     return (maxTileY - minTileY + 1) * targetTileSize;
   }
 
+  int get tileColumns => maxTileX - minTileX + 1;
+
+  int get tileRows => maxTileY - minTileY + 1;
+
+  Size miniMapRasterSize({int scale = 1}) {
+    final safeScale = math.max(1, scale);
+    return Size(
+      (tileColumns * tileWidth * safeScale).toDouble(),
+      (tileRows * tileHeight * safeScale).toDouble(),
+    );
+  }
+
   List<Rect> collisionRects(double targetTileSize) {
     final rects = <Rect>[];
     final bridgeTiles = <int>{};
@@ -168,15 +180,17 @@ class TmxMap {
   }
 
   void drawMiniMap(Canvas canvas, Rect bounds, double targetTileSize) {
-    final scaleX =
-        bounds.width / math.max(1, getWorldWidthPixels(targetTileSize));
-    final scaleY =
-        bounds.height / math.max(1, getWorldHeightPixels(targetTileSize));
-    final tileW = math.max(1.0, targetTileSize * scaleX);
-    final tileH = math.max(1.0, targetTileSize * scaleY);
+    final columns = math.max(1, tileColumns);
+    final rows = math.max(1, tileRows);
+    final tileW = bounds.width / columns;
+    final tileH = bounds.height / rows;
+    final bleedX = math.min(0.45, tileW * 0.08);
+    final bleedY = math.min(0.45, tileH * 0.08);
 
     _miniPaint.color = const Color(0xFF69B84E);
     canvas.drawRect(bounds, _miniPaint);
+    canvas.save();
+    canvas.clipRect(bounds);
     for (final layer in _layers) {
       for (final tile in layer.tiles) {
         final tileset = _findTileset(tile.gid);
@@ -186,18 +200,32 @@ class TmxMap {
         final localId = tile.gid - tileset.firstGid;
         final sourceX = (localId % tileset.columns) * tileset.tileWidth;
         final sourceY = (localId ~/ tileset.columns) * tileset.tileHeight;
-        final src = Rect.fromLTWH(
-          sourceX.toDouble(),
-          sourceY.toDouble(),
-          tileset.tileWidth.toDouble(),
-          tileset.tileHeight.toDouble(),
+        final sourceInset = math.min(
+          0.25,
+          math.min(tileset.tileWidth, tileset.tileHeight) * 0.04,
         );
-        final x = bounds.left + (tile.x - minTileX) * targetTileSize * scaleX;
-        final y = bounds.top + (tile.y - minTileY) * targetTileSize * scaleY;
-        final dst = Rect.fromLTWH(x, y, tileW, tileH);
+        final src = Rect.fromLTRB(
+          sourceX + sourceInset,
+          sourceY + sourceInset,
+          sourceX + tileset.tileWidth - sourceInset,
+          sourceY + tileset.tileHeight - sourceInset,
+        );
+        final column = tile.x - minTileX;
+        final row = tile.y - minTileY;
+        final left = bounds.left + column * tileW;
+        final top = bounds.top + row * tileH;
+        final right = bounds.left + (column + 1) * tileW;
+        final bottom = bounds.top + (row + 1) * tileH;
+        final dst = Rect.fromLTRB(
+          left - bleedX,
+          top - bleedY,
+          right + bleedX,
+          bottom + bleedY,
+        );
         canvas.drawImageRect(tileset.image, src, dst, _miniTilePaint);
       }
     }
+    canvas.restore();
   }
 
   void _buildLayerIndexes() {
