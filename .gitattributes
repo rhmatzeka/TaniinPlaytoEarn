@@ -1,5 +1,3 @@
 # GitHub Linguist language statistics override.
-# Count Android source toward the C++ profile in GitHub's language bar.
-*.java linguist-language=C++
-*.kt linguist-language=C++
-*.kts linguist-language=C++
+# Keep generated/tooling files out of the language bar when needed, but let
+# app source files count as their real languages.
