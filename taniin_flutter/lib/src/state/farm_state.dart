@@ -744,9 +744,9 @@ class FarmStateController extends ChangeNotifier {
     final defaultWalletAvailable = isValidAddress(config.defaultWalletAddress);
     chainStatus = config.hasGameApi
         ? defaultWalletAvailable
-              ? 'Connect wallet pemain dulu. Default wallet hanya untuk backend/testing.'
+              ? 'Connect wallet untuk mulai bermain dan sync transaksi Sepolia.'
               : 'Signer Sepolia siap. Connect wallet supaya aksi punya tx hash.'
-        : 'Mode lokal: signer backend belum diset.';
+        : 'Connect wallet untuk mulai bermain.';
     _commitState();
   }
 
@@ -931,7 +931,7 @@ class FarmStateController extends ChangeNotifier {
       GameInteraction.swapToken =>
         'Tap rumah swap: tukar Game Coin dan TANI Sepolia.',
       GameInteraction.buyLand => 'Tap tanda BELI: beli $landBuyPrice coin.',
-      GameInteraction.plant => 'Tap lahan: tanam atau jual lahan kosong.',
+      GameInteraction.plant => 'Tap tanda TANAM: tanam atau jual lahan kosong.',
       GameInteraction.sellLand =>
         'Tap lahan kosong: jual +$landSellPrice coin.',
       GameInteraction.waitCrop => 'Tanaman masih tumbuh.',

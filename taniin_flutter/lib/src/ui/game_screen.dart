@@ -139,7 +139,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   void _handleLoadingFinished() {
-    _loadingFinished = true;
+    setState(() => _loadingFinished = true);
     _startAudioIfReady();
   }
 
@@ -158,12 +158,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       body: AnimatedBuilder(
         animation: _farmState,
         builder: (context, _) {
-          final needsWalletLogin = _gameMounted && !_farmState.walletConnected;
+          final startupReady = _gameMounted && _loadingFinished;
+          final needsWalletLogin = startupReady && !_farmState.walletConnected;
+          final canShowGameHud = startupReady && _farmState.walletConnected;
           return Stack(
             children: [
               if (_gameMounted) ...[
                 Positioned.fill(child: GameWidget(game: _game)),
-                if (!needsWalletLogin) ...[
+                if (canShowGameHud) ...[
                   Positioned.fill(
                     child: GameHud(
                       game: _game,
@@ -230,20 +232,26 @@ class _WalletLoginGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: const Color(0xCC1F3524),
-      child: PhysicalViewport(
-        alignment: Alignment.center,
-        child: Center(
-          child: WalletPanel(
-            farmState: farmState,
-            onClose: () {},
-            showCloseButton: false,
-            title: 'Login Wallet',
-            subtitle: 'Connect wallet dulu untuk mulai bermain',
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const _LoadingBackdrop(),
+        const ColoredBox(color: Color(0x7A102015)),
+        PhysicalViewport(
+          alignment: Alignment.center,
+          child: Center(
+            child: WalletPanel(
+              farmState: farmState,
+              onClose: () {},
+              showCloseButton: false,
+              prominent: true,
+              showFacts: false,
+              title: 'Login Wallet',
+              subtitle: 'Connect wallet dulu untuk mulai bermain',
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 }

@@ -4,13 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:taniin_flutter/src/app/taniin_app.dart';
+import 'package:taniin_flutter/src/chain/chain_client.dart';
 import 'package:taniin_flutter/src/state/farm_state.dart';
 import 'package:taniin_flutter/src/ui/settings_panel.dart';
 import 'package:taniin_flutter/src/ui/taniin_theme.dart';
 import 'package:taniin_flutter/src/ui/wallet_panel.dart';
 
 void main() {
-  testWidgets('requires wallet login before showing the game HUD', (
+  testWidgets('keeps wallet login hidden while loading is active', (
     WidgetTester tester,
   ) async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -19,15 +20,11 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('Login Wallet'), findsOneWidget);
-    expect(
-      find.text('Connect wallet dulu untuk mulai bermain'),
-      findsOneWidget,
-    );
+    expect(find.text('Login Wallet'), findsNothing);
     expect(find.text('COIN'), findsNothing);
   });
 
-  testWidgets('renders the game HUD when a wallet session is saved', (
+  testWidgets('keeps the game HUD hidden while loading is active', (
     WidgetTester tester,
   ) async {
     SharedPreferences.setMockInitialValues(<String, Object>{
@@ -42,9 +39,52 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
+    expect(find.text('COIN'), findsNothing);
     expect(find.text('Login Wallet'), findsNothing);
-    expect(find.text('COIN'), findsOneWidget);
-    expect(find.text('TANI'), findsOneWidget);
+  });
+
+  testWidgets('renders wallet login panel copy', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final farmState = FarmStateController();
+    farmState.configureChain(
+      const ChainConfig(
+        gameApiUrl: 'https://example.com',
+        defaultWalletAddress: '0x0000000000000000000000000000000000000001',
+      ),
+    );
+    addTearDown(farmState.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTaniinTheme(),
+        home: Scaffold(
+          body: WalletPanel(
+            farmState: farmState,
+            onClose: () {},
+            showCloseButton: false,
+            prominent: true,
+            showFacts: false,
+            title: 'Login Wallet',
+            subtitle: 'Connect wallet dulu untuk mulai bermain',
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Login Wallet'), findsOneWidget);
+    expect(
+      find.text('Connect wallet dulu untuk mulai bermain'),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'Connect wallet untuk mulai bermain dan sync transaksi Sepolia.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Wallet: '), findsNothing);
+    expect(find.text('API: '), findsNothing);
+    expect(farmState.chainStatus, isNot(contains('backend/testing')));
   });
 
   testWidgets('settings about tab shows creator and github link', (

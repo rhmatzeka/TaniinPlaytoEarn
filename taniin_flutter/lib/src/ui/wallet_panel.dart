@@ -13,6 +13,8 @@ class WalletPanel extends StatefulWidget {
     required this.farmState,
     required this.onClose,
     this.showCloseButton = true,
+    this.prominent = false,
+    this.showFacts = true,
     this.title,
     this.subtitle,
     super.key,
@@ -21,6 +23,8 @@ class WalletPanel extends StatefulWidget {
   final FarmStateController farmState;
   final VoidCallback onClose;
   final bool showCloseButton;
+  final bool prominent;
+  final bool showFacts;
   final String? title;
   final String? subtitle;
 
@@ -58,15 +62,24 @@ class _WalletPanelState extends State<WalletPanel> {
             : farmState.walletConnected
             ? 'Sepolia wallet aktif'
             : 'Sepolia network');
+    final prominent = widget.prominent;
     return ConstrainedBox(
       constraints: BoxConstraints(
-        maxWidth: math.min(media.width - 44, 880),
-        maxHeight: math.min(media.height - 44, 690),
+        maxWidth: math.min(
+          media.width - (prominent ? 32 : 44),
+          prominent ? 1120 : 880,
+        ),
+        maxHeight: math.min(
+          media.height - (prominent ? 32 : 44),
+          prominent ? 760 : 690,
+        ),
       ),
       child: PixelPanel(
         color: const Color(0xFF9E4E20),
         borderColor: const Color(0xFF4D2A0E),
-        padding: const EdgeInsets.fromLTRB(28, 24, 28, 26),
+        padding: prominent
+            ? const EdgeInsets.fromLTRB(40, 34, 40, 38)
+            : const EdgeInsets.fromLTRB(28, 24, 28, 26),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -74,8 +87,11 @@ class _WalletPanelState extends State<WalletPanel> {
             children: [
               Row(
                 children: [
-                  _WalletBadge(connected: farmState.walletConnected),
-                  const SizedBox(width: 14),
+                  _WalletBadge(
+                    connected: farmState.walletConnected,
+                    prominent: prominent,
+                  ),
+                  SizedBox(width: prominent ? 20 : 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -86,7 +102,7 @@ class _WalletPanelState extends State<WalletPanel> {
                           style: Theme.of(context).textTheme.titleLarge
                               ?.copyWith(
                                 color: const Color(0xFFFFDE19),
-                                fontSize: 38,
+                                fontSize: prominent ? 54 : 38,
                               ),
                         ),
                         Text(
@@ -98,7 +114,7 @@ class _WalletPanelState extends State<WalletPanel> {
                                 color: farmState.walletIsBackendSigner
                                     ? const Color(0xFFFFE184)
                                     : const Color(0xFFA9EFA7),
-                                fontSize: 18,
+                                fontSize: prominent ? 25 : 18,
                               ),
                         ),
                       ],
@@ -108,38 +124,43 @@ class _WalletPanelState extends State<WalletPanel> {
                     PanelCloseButton(onPressed: widget.onClose),
                 ],
               ),
-              const SizedBox(height: 18),
+              SizedBox(height: prominent ? 24 : 18),
               _StatusBox(
                 text: farmState.chainStatus,
                 connected: farmState.walletConnected,
+                prominent: prominent,
               ),
-              const SizedBox(height: 18),
+              SizedBox(height: prominent ? 24 : 18),
               Wrap(
-                spacing: 12,
-                runSpacing: 12,
+                spacing: prominent ? 16 : 12,
+                runSpacing: prominent ? 16 : 12,
                 children: [
                   _WalletActionButton(
                     label: 'MetaMask',
                     icon: Icons.account_balance_wallet,
                     color: const Color(0xFF267049),
+                    prominent: prominent,
                     onPressed: () => _openWalletConnect(metaMask: true),
                   ),
                   _WalletActionButton(
                     label: 'Browser',
                     icon: Icons.open_in_browser,
                     color: const Color(0xFF5F4984),
+                    prominent: prominent,
                     onPressed: () => _openWalletConnect(metaMask: false),
                   ),
                   _WalletActionButton(
                     label: 'Tempel',
                     icon: Icons.content_paste,
                     color: const Color(0xFF6F4E2B),
+                    prominent: prominent,
                     onPressed: _pasteWallet,
                   ),
                   _WalletActionButton(
                     label: 'Sync',
                     icon: Icons.sync,
                     color: const Color(0xFF2B6C48),
+                    prominent: prominent,
                     onPressed: farmState.walletConnected
                         ? () => unawaited(
                             farmState.refreshWalletState(revealMessage: true),
@@ -148,15 +169,15 @@ class _WalletPanelState extends State<WalletPanel> {
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
+              SizedBox(height: prominent ? 24 : 18),
               Text(
                 'Public address Sepolia',
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
                   color: const Color(0xFFE9C692),
-                  fontSize: 17,
+                  fontSize: prominent ? 22 : 17,
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: prominent ? 12 : 8),
               TextField(
                 controller: _controller,
                 maxLines: 1,
@@ -164,16 +185,16 @@ class _WalletPanelState extends State<WalletPanel> {
                 textInputAction: TextInputAction.done,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: const Color(0xFFFFF0D4),
-                  fontSize: 20,
+                  fontSize: prominent ? 26 : 20,
                 ),
                 decoration: InputDecoration(
                   hintText: '0x wallet address',
                   hintStyle: const TextStyle(color: Color(0xFFD2AA7D)),
                   filled: true,
                   fillColor: const Color(0xFF7A3713),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: prominent ? 22 : 16,
+                    vertical: prominent ? 20 : 14,
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -192,25 +213,29 @@ class _WalletPanelState extends State<WalletPanel> {
                 ),
                 onSubmitted: (_) => _saveWallet(),
               ),
-              const SizedBox(height: 16),
-              _WalletFacts(farmState: farmState),
-              const SizedBox(height: 22),
+              if (widget.showFacts) ...[
+                const SizedBox(height: 16),
+                _WalletFacts(farmState: farmState),
+              ],
+              SizedBox(height: prominent ? 26 : 22),
               Wrap(
                 alignment: WrapAlignment.end,
-                spacing: 14,
-                runSpacing: 12,
+                spacing: prominent ? 18 : 14,
+                runSpacing: prominent ? 16 : 12,
                 children: [
                   if (farmState.walletConnected)
                     _WalletActionButton(
                       label: 'Logout',
                       icon: Icons.logout,
                       color: const Color(0xFF8B2F23),
+                      prominent: prominent,
                       onPressed: _logoutWallet,
                     ),
                   _WalletActionButton(
                     label: farmState.walletConnected ? 'Ganti' : 'Simpan',
                     icon: Icons.check,
                     color: const Color(0xFFD68127),
+                    prominent: prominent,
                     onPressed: _saveWallet,
                   ),
                 ],
@@ -281,12 +306,14 @@ class _WalletPanelState extends State<WalletPanel> {
 }
 
 class _WalletBadge extends StatelessWidget {
-  const _WalletBadge({required this.connected});
+  const _WalletBadge({required this.connected, required this.prominent});
 
   final bool connected;
+  final bool prominent;
 
   @override
   Widget build(BuildContext context) {
+    final dimension = prominent ? 64.0 : 46.0;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: connected ? const Color(0xFF70E084) : const Color(0xFFFFD51C),
@@ -294,12 +321,12 @@ class _WalletBadge extends StatelessWidget {
         border: Border.all(color: const Color(0xFF4C230B), width: 3),
       ),
       child: SizedBox.square(
-        dimension: 46,
+        dimension: dimension,
         child: Center(
           child: Icon(
             connected ? Icons.check : Icons.account_balance_wallet,
             color: const Color(0xFF3A2614),
-            size: 27,
+            size: prominent ? 37 : 27,
           ),
         ),
       ),
@@ -308,10 +335,15 @@ class _WalletBadge extends StatelessWidget {
 }
 
 class _StatusBox extends StatelessWidget {
-  const _StatusBox({required this.text, required this.connected});
+  const _StatusBox({
+    required this.text,
+    required this.connected,
+    required this.prominent,
+  });
 
   final String text;
   final bool connected;
+  final bool prominent;
 
   @override
   Widget build(BuildContext context) {
@@ -322,12 +354,15 @@ class _StatusBox extends StatelessWidget {
         border: Border.all(color: const Color(0xFF5C2A0C), width: 4),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
+        padding: EdgeInsets.symmetric(
+          horizontal: prominent ? 24 : 18,
+          vertical: prominent ? 20 : 15,
+        ),
         child: Text(
           text,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
             color: const Color(0xFFFFF0D4),
-            fontSize: 20,
+            fontSize: prominent ? 26 : 20,
             height: 1.15,
           ),
         ),
@@ -431,12 +466,14 @@ class _WalletActionButton extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.onPressed,
+    this.prominent = false,
   });
 
   final String label;
   final IconData icon;
   final Color color;
   final VoidCallback? onPressed;
+  final bool prominent;
 
   @override
   Widget build(BuildContext context) {
@@ -454,21 +491,28 @@ class _WalletActionButton extends StatelessWidget {
           ),
         ),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 60),
+          constraints: BoxConstraints(minHeight: prominent ? 82 : 60),
           child: Center(
             widthFactor: 1,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              padding: EdgeInsets.symmetric(
+                horizontal: prominent ? 25 : 18,
+                vertical: prominent ? 20 : 14,
+              ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(icon, color: const Color(0xFFFFF0D4), size: 26),
-                  const SizedBox(width: 10),
+                  Icon(
+                    icon,
+                    color: const Color(0xFFFFF0D4),
+                    size: prominent ? 34 : 26,
+                  ),
+                  SizedBox(width: prominent ? 13 : 10),
                   Text(
                     label,
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       color: const Color(0xFFFFF0D4),
-                      fontSize: 18,
+                      fontSize: prominent ? 23 : 18,
                       height: 1.0,
                     ),
                   ),

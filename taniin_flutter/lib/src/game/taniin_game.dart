@@ -710,6 +710,7 @@ class TaniinGame extends FlameGame {
       final interaction = farmState.plotInteraction(i);
       final label = switch (interaction) {
         GameInteraction.buyLand => 'BELI',
+        GameInteraction.plant => 'TANAM',
         GameInteraction.harvest => 'PANEN',
         _ => '',
       };
@@ -720,7 +721,7 @@ class TaniinGame extends FlameGame {
       final centerY = (plot.tileY - 0.34) * _tile - _cameraY;
       final sign = Rect.fromCenter(
         center: Offset(centerX, centerY),
-        width: label == 'PANEN' ? 164 : 148,
+        width: label == 'PANEN' || label == 'TANAM' ? 164 : 148,
         height: 58,
       );
       final highlighted =
