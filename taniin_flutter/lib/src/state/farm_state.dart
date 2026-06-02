@@ -734,16 +734,18 @@ class FarmStateController extends ChangeNotifier {
   void configureChain(ChainConfig config) {
     chainConfig = config;
     _chainClient = ChainClient(config);
-    if (isValidAddress(config.defaultWalletAddress) && !walletConnected) {
-      _storeWalletAddress(config.defaultWalletAddress);
+    if (walletConnected) {
       chainStatus =
-          'Wallet default tersambung: ${shortAddress(walletAddress)}. Sync Sepolia...';
+          'Wallet tersambung: ${shortAddress(walletAddress)}. Sync Sepolia...';
       _commitState();
       refreshWalletState(revealMessage: false);
       return;
     }
+    final defaultWalletAvailable = isValidAddress(config.defaultWalletAddress);
     chainStatus = config.hasGameApi
-        ? 'Signer Sepolia siap. Connect wallet supaya aksi punya tx hash.'
+        ? defaultWalletAvailable
+              ? 'Connect wallet pemain dulu. Default wallet hanya untuk backend/testing.'
+              : 'Signer Sepolia siap. Connect wallet supaya aksi punya tx hash.'
         : 'Mode lokal: signer backend belum diset.';
     _commitState();
   }

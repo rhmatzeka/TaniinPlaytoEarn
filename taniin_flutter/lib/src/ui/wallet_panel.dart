@@ -12,11 +12,17 @@ class WalletPanel extends StatefulWidget {
   const WalletPanel({
     required this.farmState,
     required this.onClose,
+    this.showCloseButton = true,
+    this.title,
+    this.subtitle,
     super.key,
   });
 
   final FarmStateController farmState;
   final VoidCallback onClose;
+  final bool showCloseButton;
+  final String? title;
+  final String? subtitle;
 
   @override
   State<WalletPanel> createState() => _WalletPanelState();
@@ -42,6 +48,16 @@ class _WalletPanelState extends State<WalletPanel> {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.sizeOf(context);
+    final title =
+        widget.title ??
+        (farmState.walletConnected ? 'Ganti Wallet' : 'Connect Wallet');
+    final subtitle =
+        widget.subtitle ??
+        (farmState.walletIsBackendSigner
+            ? 'Wallet signer backend'
+            : farmState.walletConnected
+            ? 'Sepolia wallet aktif'
+            : 'Sepolia network');
     return ConstrainedBox(
       constraints: BoxConstraints(
         maxWidth: math.min(media.width - 44, 880),
@@ -66,9 +82,7 @@ class _WalletPanelState extends State<WalletPanel> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          farmState.walletConnected
-                              ? 'Ganti Wallet'
-                              : 'Connect Wallet',
+                          title,
                           style: Theme.of(context).textTheme.titleLarge
                               ?.copyWith(
                                 color: const Color(0xFFFFDE19),
@@ -76,11 +90,7 @@ class _WalletPanelState extends State<WalletPanel> {
                               ),
                         ),
                         Text(
-                          farmState.walletIsBackendSigner
-                              ? 'Wallet signer backend'
-                              : farmState.walletConnected
-                              ? 'Sepolia wallet aktif'
-                              : 'Sepolia network',
+                          subtitle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodyMedium
@@ -94,7 +104,8 @@ class _WalletPanelState extends State<WalletPanel> {
                       ],
                     ),
                   ),
-                  PanelCloseButton(onPressed: widget.onClose),
+                  if (widget.showCloseButton)
+                    PanelCloseButton(onPressed: widget.onClose),
                 ],
               ),
               const SizedBox(height: 18),
@@ -191,10 +202,10 @@ class _WalletPanelState extends State<WalletPanel> {
                 children: [
                   if (farmState.walletConnected)
                     _WalletActionButton(
-                      label: 'Lepas',
-                      icon: Icons.link_off,
-                      color: const Color(0xFF74512E),
-                      onPressed: farmState.disconnectWallet,
+                      label: 'Logout',
+                      icon: Icons.logout,
+                      color: const Color(0xFF8B2F23),
+                      onPressed: _logoutWallet,
                     ),
                   _WalletActionButton(
                     label: farmState.walletConnected ? 'Ganti' : 'Simpan',
@@ -255,6 +266,15 @@ class _WalletPanelState extends State<WalletPanel> {
       success: opened,
     );
     if (opened) {
+      if (widget.showCloseButton) {
+        widget.onClose();
+      }
+    }
+  }
+
+  void _logoutWallet() {
+    farmState.disconnectWallet();
+    if (widget.showCloseButton) {
       widget.onClose();
     }
   }

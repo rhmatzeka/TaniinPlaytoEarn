@@ -13,6 +13,7 @@ import 'history_panel.dart';
 import 'loading_overlay.dart';
 import 'physical_viewport.dart';
 import 'settings_panel.dart';
+import 'wallet_panel.dart';
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
@@ -157,29 +158,36 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       body: AnimatedBuilder(
         animation: _farmState,
         builder: (context, _) {
+          final needsWalletLogin = _gameMounted && !_farmState.walletConnected;
           return Stack(
             children: [
               if (_gameMounted) ...[
                 Positioned.fill(child: GameWidget(game: _game)),
-                Positioned.fill(
-                  child: GameHud(
-                    game: _game,
-                    farmState: _farmState,
-                    activePanel: _activePanel,
-                    onPanelSelected: _togglePanel,
+                if (!needsWalletLogin) ...[
+                  Positioned.fill(
+                    child: GameHud(
+                      game: _game,
+                      farmState: _farmState,
+                      activePanel: _activePanel,
+                      onPanelSelected: _togglePanel,
+                    ),
                   ),
-                ),
-                Positioned.fill(
-                  child: _activePanel == null
-                      ? const SizedBox.shrink()
-                      : ColoredBox(
-                          color: const Color(0x66000000),
-                          child: PhysicalViewport(
-                            alignment: Alignment.center,
-                            child: Center(child: _buildPanel()),
+                  Positioned.fill(
+                    child: _activePanel == null
+                        ? const SizedBox.shrink()
+                        : ColoredBox(
+                            color: const Color(0x66000000),
+                            child: PhysicalViewport(
+                              alignment: Alignment.center,
+                              child: Center(child: _buildPanel()),
+                            ),
                           ),
-                        ),
-                ),
+                  ),
+                ],
+                if (needsWalletLogin)
+                  Positioned.fill(
+                    child: _WalletLoginGate(farmState: _farmState),
+                  ),
               ] else
                 const Positioned.fill(child: _LoadingBackdrop()),
               Positioned.fill(
@@ -212,6 +220,31 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         onClose: _closePanel,
       ),
     };
+  }
+}
+
+class _WalletLoginGate extends StatelessWidget {
+  const _WalletLoginGate({required this.farmState});
+
+  final FarmStateController farmState;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: const Color(0xCC1F3524),
+      child: PhysicalViewport(
+        alignment: Alignment.center,
+        child: Center(
+          child: WalletPanel(
+            farmState: farmState,
+            onClose: () {},
+            showCloseButton: false,
+            title: 'Login Wallet',
+            subtitle: 'Connect wallet dulu untuk mulai bermain',
+          ),
+        ),
+      ),
+    );
   }
 }
 
