@@ -138,7 +138,7 @@ class _WalletPanelState extends State<WalletPanel> {
                   _WalletActionButton(
                     label: 'MetaMask',
                     icon: Icons.account_balance_wallet,
-                    color: const Color(0xFF267049),
+                    color: const Color(0xFFB85B1E),
                     prominent: prominent,
                     onPressed: () => _openWalletConnect(metaMask: true),
                   ),
@@ -257,6 +257,7 @@ class _WalletPanelState extends State<WalletPanel> {
   }
 
   Future<void> _pasteWallet() async {
+    farmState.playClick();
     final address = await PlatformBridge.clipboardWalletAddress();
     if (address.isEmpty) {
       farmState.showMessage(
@@ -271,6 +272,27 @@ class _WalletPanelState extends State<WalletPanel> {
   }
 
   Future<void> _openWalletConnect({required bool metaMask}) async {
+    farmState.playClick();
+    if (metaMask && PlatformBridge.hasBrowserWalletProvider()) {
+      farmState.showMessage('Menunggu approve MetaMask...');
+      final address = await PlatformBridge.requestBrowserWalletAddress();
+      if (address.isNotEmpty) {
+        _controller.text = address;
+        _controller.selection = TextSelection.collapsed(offset: address.length);
+        unawaited(farmState.connectWalletFromDeepLink(address));
+        if (widget.showCloseButton) {
+          widget.onClose();
+        }
+        return;
+      }
+      final error = PlatformBridge.browserWalletConnectError();
+      farmState.showMessage(
+        error.isEmpty ? 'Connect MetaMask dibatalkan.' : error,
+        success: false,
+      );
+      return;
+    }
+
     final url = metaMask
         ? PlatformBridge.metamaskWalletConnectUrl(farmState.chainConfig)
         : PlatformBridge.walletConnectUrl(farmState.chainConfig);

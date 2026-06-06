@@ -1,5 +1,7 @@
 import 'package:flutter/services.dart';
 
+import 'web_audio.dart' as web_audio;
+
 class GameAudioController {
   static const MethodChannel _channel = MethodChannel('taniin/audio');
 
@@ -9,6 +11,15 @@ class GameAudioController {
   double _sfxVolume = 0.8;
 
   Future<void> start() async {
+    if (web_audio.startWebAudio(sfxVolume: _sfxVolume)) {
+      await sync(
+        musicEnabled: _musicEnabled,
+        sfxEnabled: _sfxEnabled,
+        musicVolume: _musicVolume,
+        sfxVolume: _sfxVolume,
+      );
+      return;
+    }
     await _invoke('startMusic');
     await sync(
       musicEnabled: _musicEnabled,
@@ -28,6 +39,12 @@ class GameAudioController {
     _sfxEnabled = sfxEnabled;
     _musicVolume = musicVolume.clamp(0, 1).toDouble();
     _sfxVolume = sfxVolume.clamp(0, 1).toDouble();
+    if (web_audio.syncWebAudio(
+      sfxEnabled: _sfxEnabled,
+      sfxVolume: _sfxVolume,
+    )) {
+      return;
+    }
     await _invoke('sync', <String, Object>{
       'musicEnabled': _musicEnabled,
       'sfxEnabled': _sfxEnabled,
@@ -40,6 +57,9 @@ class GameAudioController {
     if (!_sfxEnabled) {
       return;
     }
+    if (web_audio.playWebClick(sfxVolume: _sfxVolume)) {
+      return;
+    }
     await _invoke('playClick');
   }
 
@@ -50,13 +70,33 @@ class GameAudioController {
     await _invoke('startWalk');
   }
 
-  Future<void> stopWalk() => _invoke('stopWalk');
+  Future<void> stopWalk() async {
+    if (web_audio.stopWebWalk()) {
+      return;
+    }
+    await _invoke('stopWalk');
+  }
 
-  Future<void> pause() => _invoke('pauseMusic');
+  Future<void> pause() async {
+    if (web_audio.pauseWebAudio()) {
+      return;
+    }
+    await _invoke('pauseMusic');
+  }
 
-  Future<void> resume() => _invoke('resumeMusic');
+  Future<void> resume() async {
+    if (web_audio.resumeWebAudio()) {
+      return;
+    }
+    await _invoke('resumeMusic');
+  }
 
-  Future<void> release() => _invoke('release');
+  Future<void> release() async {
+    if (web_audio.releaseWebAudio()) {
+      return;
+    }
+    await _invoke('release');
+  }
 
   Future<void> _invoke(String method, [Object? arguments]) async {
     try {

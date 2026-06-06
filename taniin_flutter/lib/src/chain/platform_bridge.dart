@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'browser_wallet.dart' as browser_wallet;
 import 'browser_url.dart';
 import 'chain_client.dart';
 
@@ -91,6 +92,28 @@ class PlatformBridge {
       return '';
     }
     final address = Uri.base.queryParameters['address']?.trim() ?? '';
+    return isValidAddress(address) ? address : '';
+  }
+
+  static bool hasBrowserWalletProvider() {
+    if (!kIsWeb) {
+      return false;
+    }
+    return browser_wallet.hasBrowserWalletProvider();
+  }
+
+  static String browserWalletConnectError() {
+    if (!kIsWeb) {
+      return '';
+    }
+    return browser_wallet.browserWalletError();
+  }
+
+  static Future<String> requestBrowserWalletAddress() async {
+    if (!kIsWeb) {
+      return '';
+    }
+    final address = await browser_wallet.requestBrowserWalletAddress();
     return isValidAddress(address) ? address : '';
   }
 
