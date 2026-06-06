@@ -19,7 +19,16 @@ session.on('Runtime.exceptionThrown', ({ exceptionDetails }) => {
 page.on('pageerror', (error) => errors.push(error.stack ?? error.message));
 page.on('console', (message) => {
   if (message.type() === 'error') {
-    errors.push(message.text());
+    const text = message.text();
+    if (text.includes('Failed to load resource') && text.includes('404')) {
+      return;
+    }
+    errors.push(text);
+  }
+});
+page.on('response', (response) => {
+  if (response.status() === 404 && !response.url().endsWith('/health')) {
+    errors.push(`404 ${response.url()}`);
   }
 });
 

@@ -7,17 +7,23 @@ const String _musicAsset = 'assets/assets/audio/backsound.mp3';
 const String _clickAsset = 'assets/assets/audio/klik.mp3';
 const String _walkAsset = 'assets/assets/audio/soundjalan.mp3';
 const int _clickPoolSize = 4;
+const int _walkPoolSize = 2;
+const double _walkLoopOverlapSeconds = 0.09;
+const double _walkLoopFallbackSeconds = 0.82;
 const double _walkVolumeRatio = 0.64;
 
 final List<web.HTMLAudioElement> _clickPool = <web.HTMLAudioElement>[];
+final List<web.HTMLAudioElement> _walkPool = <web.HTMLAudioElement>[];
 web.HTMLAudioElement? _musicAudio;
-web.HTMLAudioElement? _walkAudio;
 int _nextClick = 0;
+int _nextWalk = 0;
+Timer? _walkLoopTimer;
 bool _started = false;
 bool _paused = false;
 bool _musicEnabled = true;
 bool _sfxEnabled = true;
 bool _walkRequested = false;
+bool _walkLoopActive = false;
 double _musicVolume = 0.65;
 double _sfxVolume = 0.8;
 
@@ -30,7 +36,7 @@ bool startWebAudio({
   _started = true;
   _paused = false;
   _ensureMusicAudio();
-  _ensureWalkAudio();
+  _ensureWalkPool();
   _ensureClickPool();
   syncWebAudio(
     musicEnabled: musicEnabled,
@@ -85,14 +91,12 @@ bool startWebWalk({required double sfxVolume}) {
   if (!_sfxEnabled || _paused) {
     return true;
   }
-  _ensureWalkAudio();
-  final audio = _walkAudio;
-  if (audio == null) {
-    return true;
-  }
-  audio.volume = (_sfxVolume * _walkVolumeRatio).clamp(0, 1).toDouble();
-  if (audio.paused) {
-    unawaited(_play(audio));
+  _ensureWalkPool();
+  _applyWalkVolume();
+  if (!_walkLoopActive) {
+    _walkLoopActive = true;
+    _nextWalk = 0;
+    _playNextWalkSegment();
   }
   _syncMusicPlayback();
   return true;
@@ -125,12 +129,12 @@ bool releaseWebAudio() {
   _paused = false;
   _walkRequested = false;
   _musicAudio?.pause();
-  _walkAudio?.pause();
+  _stopWalkPool(reset: true);
   for (final audio in _clickPool) {
     audio.pause();
   }
   _musicAudio = null;
-  _walkAudio = null;
+  _walkPool.clear();
   _clickPool.clear();
   return true;
 }
@@ -150,7 +154,7 @@ void _syncMusicPlayback() {
 
 void _applyVolumes() {
   _musicAudio?.volume = _musicVolume;
-  _walkAudio?.volume = (_sfxVolume * _walkVolumeRatio).clamp(0, 1).toDouble();
+  _applyWalkVolume();
   for (final audio in _clickPool) {
     audio.volume = _sfxVolume;
   }
@@ -159,11 +163,19 @@ void _applyVolumes() {
 web.HTMLAudioElement _ensureMusicAudio() =>
     _musicAudio ??= _createLoopingAudio(_musicAsset, _musicVolume);
 
-void _ensureWalkAudio() {
-  _walkAudio ??= _createLoopingAudio(
-    _walkAsset,
-    (_sfxVolume * _walkVolumeRatio).clamp(0, 1).toDouble(),
-  );
+void _ensureWalkPool() {
+  if (_walkPool.isNotEmpty) {
+    return;
+  }
+  final volume = _walkVolume();
+  for (var i = 0; i < _walkPoolSize; i += 1) {
+    final audio = web.HTMLAudioElement()
+      ..src = _walkAsset
+      ..preload = 'auto'
+      ..volume = volume;
+    audio.load();
+    _walkPool.add(audio);
+  }
 }
 
 void _ensureClickPool() {
@@ -191,15 +203,59 @@ web.HTMLAudioElement _createLoopingAudio(String src, double volume) {
 }
 
 void _pauseWalk({required bool reset}) {
-  final audio = _walkAudio;
-  if (audio == null) {
+  _stopWalkPool(reset: reset);
+}
+
+void _playNextWalkSegment() {
+  if (!_walkRequested || !_sfxEnabled || _paused || _walkPool.isEmpty) {
+    _stopWalkPool(reset: true);
     return;
   }
-  audio.pause();
-  if (reset) {
+
+  final audio = _walkPool[_nextWalk];
+  _nextWalk = (_nextWalk + 1) % _walkPool.length;
+  try {
+    audio.pause();
     audio.currentTime = 0;
+    audio.volume = _walkVolume();
+    unawaited(_play(audio));
+  } on Object {
+    // Ignore media failures and retry on the next scheduled segment.
+  }
+
+  _walkLoopTimer?.cancel();
+  _walkLoopTimer = Timer(_walkLoopDelay(audio), _playNextWalkSegment);
+}
+
+Duration _walkLoopDelay(web.HTMLAudioElement audio) {
+  final duration = audio.duration;
+  final seconds = duration.isFinite && duration > _walkLoopOverlapSeconds
+      ? duration - _walkLoopOverlapSeconds
+      : _walkLoopFallbackSeconds;
+  final milliseconds = (seconds * 1000).round().clamp(120, 5000);
+  return Duration(milliseconds: milliseconds);
+}
+
+void _stopWalkPool({required bool reset}) {
+  _walkLoopTimer?.cancel();
+  _walkLoopTimer = null;
+  _walkLoopActive = false;
+  for (final audio in _walkPool) {
+    audio.pause();
+    if (reset) {
+      audio.currentTime = 0;
+    }
   }
 }
+
+void _applyWalkVolume() {
+  final volume = _walkVolume();
+  for (final audio in _walkPool) {
+    audio.volume = volume;
+  }
+}
+
+double _walkVolume() => (_sfxVolume * _walkVolumeRatio).clamp(0, 1).toDouble();
 
 Future<void> _play(web.HTMLAudioElement audio) async {
   try {

@@ -95,9 +95,9 @@ try {
   await page.keyboard.down('KeyD');
   await page.waitForFunction(
     () =>
-      window.__taniinAudioPlaySources.some((src) =>
+      window.__taniinAudioPlaySources.filter((src) =>
         String(src).includes('soundjalan.mp3'),
-      ),
+      ).length >= 2,
     null,
     { timeout: 10000 },
   );
