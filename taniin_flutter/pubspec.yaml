@@ -37,6 +37,7 @@ dependencies:
   flame: ^1.37.0
   xml: ^6.6.1
   shared_preferences: ^2.5.5
+  web: ^1.1.1
 
 dev_dependencies:
   flutter_test:

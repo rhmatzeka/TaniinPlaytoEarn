@@ -1,0 +1,12 @@
+{
+  "name": "taniin-flutter-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "e2e:web": "playwright test e2e/web_smoke.spec.ts --browser=chromium --reporter=line",
+    "e2e:web:cdp": "node e2e/web_smoke_cdp.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0"
+  }
+}

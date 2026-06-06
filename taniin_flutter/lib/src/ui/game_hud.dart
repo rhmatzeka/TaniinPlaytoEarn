@@ -297,7 +297,7 @@ class _TopCluster extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final barWidth = compact ? 304.0 : 344.0;
+    final barWidth = compact ? 198.0 : 218.0;
     final walletWidth = compact ? 350.0 : 390.0;
     final walletHeight = compact ? 90.0 : 94.0;
     return Column(
@@ -344,14 +344,10 @@ class _CurrencyBar extends StatelessWidget {
       child: Row(
         children: [
           _CoinIcon(size: 46),
-          const SizedBox(width: 10),
-          _AmountBlock(label: 'COIN', value: '${farmState.coins}'),
-          const Spacer(),
-          Container(width: 4, height: 50, color: const Color(0xFF4C2A0C)),
-          const Spacer(),
-          _HarvestIcon(size: 46),
-          const SizedBox(width: 10),
-          _AmountBlock(label: 'TANI', value: '${farmState.tani}'),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _AmountBlock(label: 'COIN', value: '${farmState.coins}'),
+          ),
         ],
       ),
     );
@@ -1992,20 +1988,6 @@ class _CoinIcon extends StatelessWidget {
   }
 }
 
-class _HarvestIcon extends StatelessWidget {
-  const _HarvestIcon({required this.size});
-
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox.square(
-      dimension: size,
-      child: CustomPaint(painter: _HarvestPainter()),
-    );
-  }
-}
-
 class _WalletIcon extends StatelessWidget {
   const _WalletIcon({required this.connected});
 
@@ -2051,42 +2033,6 @@ class _CoinPainter extends CustomPainter {
       ..style = PaintingStyle.fill
       ..color = const Color(0xFFEEC530);
     canvas.drawCircle(center, size.width * 0.22, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _HarvestPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..isAntiAlias = true;
-    final center = size.center(Offset.zero);
-    paint.color = const Color(0xFF2474D8);
-    canvas.drawCircle(center, size.width * 0.50, paint);
-    paint
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = size.width * 0.08
-      ..color = const Color(0xFFD1EEFF);
-    canvas.drawCircle(center, size.width * 0.37, paint);
-    paint
-      ..style = PaintingStyle.fill
-      ..color = Colors.white;
-    final path = Path()
-      ..moveTo(center.dx - size.width * 0.18, center.dy - size.height * 0.19)
-      ..lineTo(center.dx, center.dy - size.height * 0.03)
-      ..lineTo(center.dx + size.width * 0.20, center.dy - size.height * 0.22)
-      ..lineTo(center.dx + size.width * 0.26, center.dy - size.height * 0.05)
-      ..lineTo(center.dx + size.width * 0.08, center.dy + size.height * 0.10)
-      ..lineTo(center.dx + size.width * 0.26, center.dy + size.height * 0.26)
-      ..lineTo(center.dx + size.width * 0.08, center.dy + size.height * 0.26)
-      ..lineTo(center.dx, center.dy + size.height * 0.16)
-      ..lineTo(center.dx - size.width * 0.10, center.dy + size.height * 0.26)
-      ..lineTo(center.dx - size.width * 0.28, center.dy + size.height * 0.26)
-      ..lineTo(center.dx - size.width * 0.08, center.dy + size.height * 0.09)
-      ..lineTo(center.dx - size.width * 0.26, center.dy - size.height * 0.06)
-      ..close();
-    canvas.drawPath(path, paint);
   }
 
   @override

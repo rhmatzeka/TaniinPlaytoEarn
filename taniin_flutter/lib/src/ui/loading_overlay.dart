@@ -22,14 +22,13 @@ class _LoadingOverlayState extends State<LoadingOverlay>
   @override
   void initState() {
     super.initState();
-    _controller =
-        AnimationController(
-            vsync: this,
-            duration: const Duration(milliseconds: 2800),
-          )
-          ..addListener(() => setState(() {}))
-          ..addStatusListener((_) => _completeIfReady())
-          ..forward();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2800),
+    );
+    _controller.addListener(() => setState(() {}));
+    _controller.addStatusListener((_) => _completeIfReady());
+    _controller.forward();
     widget.loaded.addListener(_completeIfReady);
   }
 

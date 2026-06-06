@@ -646,12 +646,75 @@ class TaniinGame extends FlameGame {
               ? const Color(0xE6FFE652)
               : const Color(0x885B3923);
         canvas.drawRRect(lockedPlot, _paint);
+        _drawLockedPlotBadge(canvas, rect, selected == i);
       }
       if (plot.status == PlotStatus.growing && cropSheet != null) {
         _drawPlotCrops(canvas, plot, cropSheet, now);
       }
     }
     _paint.style = PaintingStyle.fill;
+  }
+
+  void _drawLockedPlotBadge(Canvas canvas, Rect plotRect, bool highlighted) {
+    if (_isOffscreen(plotRect)) {
+      return;
+    }
+    final center = plotRect.center;
+    final size = math.min(plotRect.width, plotRect.height) * 0.34;
+    final body = Rect.fromCenter(
+      center: Offset(center.dx, center.dy + size * 0.12),
+      width: size * 0.92,
+      height: size * 0.70,
+    );
+    final shackle = Rect.fromCenter(
+      center: Offset(center.dx, center.dy - size * 0.20),
+      width: size * 0.62,
+      height: size * 0.66,
+    );
+    _paint
+      ..style = PaintingStyle.fill
+      ..color = const Color(0x66000000);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        body.shift(Offset(size * 0.10, size * 0.12)),
+        Radius.circular(size * 0.10),
+      ),
+      _paint,
+    );
+    _paint
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(5.0, size * 0.11)
+      ..strokeCap = StrokeCap.round
+      ..color = highlighted ? const Color(0xFFFFE77C) : const Color(0xFFE9C67B);
+    canvas.drawArc(shackle, math.pi, math.pi, false, _paint);
+    _paint
+      ..style = PaintingStyle.fill
+      ..color = highlighted ? const Color(0xFFD99331) : const Color(0xFF9B6426);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(body, Radius.circular(size * 0.10)),
+      _paint,
+    );
+    _paint
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(3.0, size * 0.045)
+      ..color = highlighted ? const Color(0xFFFFF0A6) : const Color(0xFF5B3718);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(body, Radius.circular(size * 0.10)),
+      _paint,
+    );
+    _paint
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xFF422817);
+    canvas.drawCircle(center.translate(0, size * 0.08), size * 0.085, _paint);
+    canvas.drawRect(
+      Rect.fromCenter(
+        center: Offset(center.dx, center.dy + size * 0.22),
+        width: size * 0.08,
+        height: size * 0.20,
+      ),
+      _paint,
+    );
+    _paint.strokeCap = StrokeCap.butt;
   }
 
   void _drawPlotCrops(

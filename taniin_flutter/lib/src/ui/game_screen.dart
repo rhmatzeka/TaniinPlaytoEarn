@@ -79,6 +79,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       return;
     }
     _farmState.configureChain(config);
+    final launchWalletAddress = PlatformBridge.launchWalletAddress();
+    if (launchWalletAddress.isNotEmpty) {
+      unawaited(_farmState.connectWalletFromDeepLink(launchWalletAddress));
+    }
   }
 
   @override

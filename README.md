@@ -1,10 +1,10 @@
 # Taniin
 
-Taniin is a landscape Android farming game prototype with Web3 hooks for Sepolia. The app renders a pixel farm map, lets the player buy seeds, plant, harvest, sell crops, and sync the in-game coin display with a connected wallet.
+Taniin is a Flutter/Flame landscape farming game prototype for Android and Web with Web3 hooks for Sepolia. The app renders a pixel farm map, lets the player buy seeds, plant, harvest, sell crops, and sync the in-game coin display with a connected wallet.
 
 ## Current Features
 
-- Java Canvas game loop with TMX map rendering, collisions, foreground layers, minimap, joystick, and hardware key support.
+- Flutter/Flame game loop with TMX map rendering, collisions, foreground layers, minimap, joystick, and hardware key support.
 - Fullscreen loading screen using `app/src/main/res/drawable/loadingscreen.jpg` with animated 1-100 progress before entering the game.
 - Farming loop for land ownership, land selling, seed selection, quantity-based seed purchase, planting confirmation, harvest confirmation, success popups, and harvest effects.
 - Separate seed shop and crop-selling house interactions.
@@ -17,15 +17,17 @@ Taniin is a landscape Android farming game prototype with Web3 hooks for Sepolia
 
 ## Project Structure
 
-- `app/src/main/java/id/rahmat/taniin/` - Android gameplay, TMX parser, wallet/RPC client, and blockchain action queue.
-- `app/src/main/assets/game/` - Tiled map files and tileset source images used by the runtime map renderer.
-- `app/src/main/res/drawable/` - Sprite sheets loaded directly through `R.drawable`.
-- `app/src/main/res/raw/` - Put background music or short audio files here, for example `farm_backsound.mp3`. Android resource filenames must use lowercase letters, numbers, and underscores.
+- `taniin_flutter/lib/` - Flutter app shell, Flame game, UI panels, state controller, wallet bridge, and Sepolia client.
+- `taniin_flutter/web/` - Flutter Web shell and web manifest.
+- `taniin_flutter/assets/game/` - Tiled map files and tileset source images used by the runtime map renderer.
+- `taniin_flutter/assets/audio/` - Flutter audio assets. Android native audio resources are mirrored under `taniin_flutter/android/app/src/main/res/raw/`.
+- `taniin_flutter/android/` - Android host app, fullscreen handling, deep link bridge, and native audio bridge.
 - `contracts/` - Solidity contracts and Hardhat deploy helper.
 - `.env.example` - Local configuration template. Real `.env` files are ignored by git.
 
 ## Requirements
 
+- Flutter stable with Web support enabled.
 - Android Studio or Android SDK command-line tools with Android Gradle Plugin 9.1.1 support.
 - JDK 17 or newer.
 - Android SDK platform 36.
@@ -49,7 +51,7 @@ TANIIN_DEFAULT_WALLET_ADDRESS=
 DEPLOYER_PRIVATE_KEY=replace_with_new_private_key_do_not_commit
 ```
 
-The Android build reads the public values into `BuildConfig`. `TANIIN_DEFAULT_WALLET_ADDRESS` is optional and lets the debug app auto-connect without typing a wallet address when no player wallet has been saved yet. A saved in-app wallet always wins, and tapping the wallet HUD opens the wallet app connect/sync dialog. When `TANIIN_GAME_API_URL` is set, `/wallet-connect` can be opened in MetaMask or another injected Ethereum wallet browser; the page requests the public account and returns to Android through `taniin://wallet`. Manual address entry remains a fallback only. For USB device testing, run `adb reverse tcp:8787 tcp:8787` and use `TANIIN_GAME_API_URL=http://127.0.0.1:8787`. For WiFi ADB, use the computer LAN IP, for example `http://192.168.1.9:8787`. For an emulator without `adb reverse`, use `http://10.0.2.2:8787`; the app also tries the matching local fallback. Only public values should be shipped in the APK. Never put a real private key in Android source, Gradle config, screenshots, commits, or APK assets. If a private key has been pasted into chat or git, treat it as compromised and move funds/assets to a new wallet.
+The Android build reads the public values into `BuildConfig`. Flutter Web reads the same public values from `--dart-define` at build/run time. On Web, if `TANIIN_GAME_API_URL` is omitted, the app uses the current site origin, which works when the Flutter static files and Vercel API live in the same Vercel project. `TANIIN_DEFAULT_WALLET_ADDRESS` is optional and lets debug builds prefill a public wallet address when no player wallet has been saved yet. A saved in-app wallet always wins, and tapping the wallet HUD opens the wallet connect/sync dialog. When `TANIIN_GAME_API_URL` is set, or when Web uses the same-origin fallback, `/wallet-connect` can be opened in MetaMask or another injected Ethereum wallet browser; the page requests the public account and returns to Android through `taniin://wallet` or to Flutter Web through an `?address=...` callback. Manual address entry remains a fallback only. For USB device testing, run `adb reverse tcp:8787 tcp:8787` and use `TANIIN_GAME_API_URL=http://127.0.0.1:8787`. For WiFi ADB, use the computer LAN IP, for example `http://192.168.1.9:8787`. For an emulator without `adb reverse`, use `http://10.0.2.2:8787`; the app also tries the matching local fallback. Only public values should be shipped in the APK or web build. Never put a real private key in Android source, Gradle config, Flutter assets, screenshots, commits, or browser-delivered files. If a private key has been pasted into chat or git, treat it as compromised and move funds/assets to a new wallet.
 
 ## Build And Run
 
@@ -71,6 +73,46 @@ On Windows from this WSL workspace, this command is known to work:
 cmd.exe /c gradlew.bat :app:assembleDebug --console=plain
 ```
 
+For local Flutter Web testing against an existing API URL:
+
+```bash
+cd taniin_flutter
+flutter config --enable-web
+flutter run -d chrome \
+  --dart-define=TANIIN_GAME_API_URL=https://your-project.vercel.app \
+  --dart-define=TANIIN_COIN_CONTRACT_ADDRESS=0x8E1584fF95842C888F1FAaB29ed1e55d886A81F8 \
+  --dart-define=TANIIN_LAND_CONTRACT_ADDRESS=0x55D768D736b66B842EE72Ff7fa143f03245F81cc \
+  --dart-define=TANIIN_ITEMS_CONTRACT_ADDRESS=0x9414eD4F6d9beF484484D72da3d8361989348AEf
+```
+
+For a production web bundle:
+
+```bash
+cd taniin_flutter
+flutter build web --release \
+  --dart-define=TANIIN_COIN_CONTRACT_ADDRESS=0x8E1584fF95842C888F1FAaB29ed1e55d886A81F8 \
+  --dart-define=TANIIN_LAND_CONTRACT_ADDRESS=0x55D768D736b66B842EE72Ff7fa143f03245F81cc \
+  --dart-define=TANIIN_ITEMS_CONTRACT_ADDRESS=0x9414eD4F6d9beF484484D72da3d8361989348AEf
+```
+
+The static website output is `taniin_flutter/build/web`. If your existing Vercel project root is `contracts`, build Flutter locally, copy the contents of `taniin_flutter/build/web` into `contracts/public`, then deploy the same Vercel project. The existing Vercel API rewrites keep `/game-actions`, `/health`, and `/wallet-connect` working. For the same Vercel project, omit `TANIIN_GAME_API_URL` so Web uses the deployed domain automatically. If the API is on a different domain, set `TANIIN_GAME_API_URL` to that origin and do not add `/api` to the URL.
+
+For a repeatable Web smoke test, install the local Playwright test dependency in `taniin_flutter`, serve the static output, then run the E2E script:
+
+```bash
+cd taniin_flutter
+npm install
+python3 -m http.server 4174 --bind 127.0.0.1 --directory ../contracts/public
+npm run e2e:web
+```
+
+On WSL without Linux browser system libraries, start Chrome on Windows with a remote debugging port and run the CDP variant instead:
+
+```bash
+powershell.exe -NoProfile -Command "Start-Process -FilePath 'C:\Program Files\Google\Chrome\Application\chrome.exe' -ArgumentList '--remote-debugging-port=9223','--user-data-dir=C:\Users\matsg\AppData\Local\Temp\taniin-e2e-chrome','--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check'"
+cmd.exe /c "set TANIIN_E2E_BASE_URL=http://127.0.0.1:4174&& npm run e2e:web:cdp"
+```
+
 ## Web3 Flow
 
 1. Deploy the contracts from `contracts/`.
@@ -79,10 +121,10 @@ cmd.exe /c gradlew.bat :app:assembleDebug --console=plain
 4. Optionally set `TANIIN_DEFAULT_WALLET_ADDRESS` to a public Sepolia wallet address before building. The app will auto-connect that wallet only until a player wallet is saved in-app; tapping the wallet button opens the wallet app connect/sync dialog.
 5. The shop coin display uses the ERC-20 TANI balance when `TANIIN_COIN_CONTRACT_ADDRESS` is set. Otherwise it falls back to local prototype coins saved on the device.
 6. Start the local backend signer with `cd contracts && npm run game-api`. It listens on port `8787` and signs `/game-actions` with the deployer wallet from the root `.env`. On a USB device, also run `adb reverse tcp:8787 tcp:8787`.
-7. Gameplay actions are recorded in the local history. When `TANIIN_GAME_API_URL` is set, the app posts each action to `/game-actions` for the backend signer to process. If the backend returns a transaction hash, the app saves it in the transaction history and opens Sepolia Etherscan when tapped. Without that signer URL, the history marks actions as not yet on-chain instead of leaving them pending forever.
+7. Gameplay actions are recorded in the local history. When `TANIIN_GAME_API_URL` is set, or when Web uses the same-origin fallback, the app posts each action to `/game-actions` for the backend signer to process. If the backend returns a transaction hash, the app saves it in the transaction history and opens Sepolia Etherscan when tapped. Without that signer URL, the history marks actions as not yet on-chain instead of leaving them pending forever.
 8. The swap house can fund local Game Coin from Sepolia ETH through a signer receipt transaction, and can swap game coins to either TANI or native Sepolia ETH. ETH payout is sent from the backend signer wallet, so keep the signer funded, connect a player wallet that is different from the signer, and configure `TANIIN_ETH_WEI_PER_COIN` plus `TANIIN_MAX_ETH_PAYOUT_WEI` deliberately before using this on a public deployment. If the connected wallet equals the backend signer, the app marks it as a signer wallet and asks the player to change wallets before ETH payout.
 
-For non-local testing, deploy the signer in `contracts/api/` to Vercel with the Vercel project root set to `contracts`. Set `TANIIN_GAME_API_URL=https://your-project.vercel.app` in the Android root `.env` and rebuild the APK. The Vercel rewrites keep the Android endpoint as `/game-actions`, so do not add `/api` to the URL.
+For non-local testing, deploy the signer in `contracts/api/` to Vercel with the Vercel project root set to `contracts`. Set `TANIIN_GAME_API_URL=https://your-project.vercel.app` in the Android root `.env` and rebuild the APK. Flutter Web can omit `TANIIN_GAME_API_URL` when it is deployed to the same Vercel project as the API. The Vercel rewrites keep the endpoint as `/game-actions`, so do not add `/api` to the URL.
 
 The Android app does not sign transactions with a private key. A production setup should use WalletConnect or a backend signer with strict server-side validation.
 

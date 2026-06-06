@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+
+import 'chain_http_client.dart';
 
 const String sepoliaExplorerTxBase = 'https://sepolia.etherscan.io/tx/';
 
@@ -353,44 +354,11 @@ class ChainClient {
   }
 
   static Future<String> _postJson(String url, String payload) async {
-    final client = HttpClient()..connectionTimeout = _timeout;
-    try {
-      final request = await client.postUrl(Uri.parse(url)).timeout(_timeout);
-      request.headers.contentType = ContentType.json;
-      final body = utf8.encode(payload);
-      request.contentLength = body.length;
-      request.add(body);
-      final response = await request.close().timeout(_timeout);
-      return await _readHttpResponse(response);
-    } finally {
-      client.close(force: true);
-    }
+    return postJson(url, payload, timeout: _timeout);
   }
 
   static Future<String> _getJson(String url) async {
-    final client = HttpClient()..connectionTimeout = _timeout;
-    try {
-      final request = await client.getUrl(Uri.parse(url)).timeout(_timeout);
-      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      final response = await request.close().timeout(_timeout);
-      return await _readHttpResponse(response);
-    } finally {
-      client.close(force: true);
-    }
-  }
-
-  static Future<String> _readHttpResponse(HttpClientResponse response) async {
-    final body = await response
-        .transform(utf8.decoder)
-        .join()
-        .timeout(_timeout);
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      final apiError = extractApiError(body);
-      throw StateError(
-        'HTTP ${response.statusCode}${apiError.isEmpty ? ' $body' : ' $apiError'}',
-      );
-    }
-    return body;
+    return getJson(url, timeout: _timeout);
   }
 
   static String _erc20BalanceOfData(String walletAddress) {
