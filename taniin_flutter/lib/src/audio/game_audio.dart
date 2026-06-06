@@ -11,7 +11,12 @@ class GameAudioController {
   double _sfxVolume = 0.8;
 
   Future<void> start() async {
-    if (web_audio.startWebAudio(sfxVolume: _sfxVolume)) {
+    if (web_audio.startWebAudio(
+      musicEnabled: _musicEnabled,
+      sfxEnabled: _sfxEnabled,
+      musicVolume: _musicVolume,
+      sfxVolume: _sfxVolume,
+    )) {
       await sync(
         musicEnabled: _musicEnabled,
         sfxEnabled: _sfxEnabled,
@@ -40,7 +45,9 @@ class GameAudioController {
     _musicVolume = musicVolume.clamp(0, 1).toDouble();
     _sfxVolume = sfxVolume.clamp(0, 1).toDouble();
     if (web_audio.syncWebAudio(
+      musicEnabled: _musicEnabled,
       sfxEnabled: _sfxEnabled,
+      musicVolume: _musicVolume,
       sfxVolume: _sfxVolume,
     )) {
       return;
@@ -65,6 +72,9 @@ class GameAudioController {
 
   Future<void> startWalk() async {
     if (!_sfxEnabled) {
+      return;
+    }
+    if (web_audio.startWebWalk(sfxVolume: _sfxVolume)) {
       return;
     }
     await _invoke('startWalk');

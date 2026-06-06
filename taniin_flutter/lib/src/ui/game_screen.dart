@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../chain/platform_bridge.dart';
 import '../audio/game_audio.dart';
@@ -26,6 +27,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   late final FarmStateController _farmState;
   late final TaniinGame _game;
   late final GameAudioController _audio;
+  final FocusNode _gameFocusNode = FocusNode(debugLabel: 'Taniin game input');
+  final Set<LogicalKeyboardKey> _movementKeys = <LogicalKeyboardKey>{};
   GamePanel? _activePanel;
   bool _gameMounted = false;
   bool _loadingFinished = false;
@@ -58,6 +61,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _game.walkingNotifier.dispose();
     _game.hudNotifier.dispose();
     _game.miniMapNotifier.dispose();
+    _gameFocusNode.dispose();
     _audio.release();
     unawaited(_farmState.saveNow());
     _farmState.dispose();
@@ -98,6 +102,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.detached) {
       _appInForeground = false;
+      _clearMovementInput();
       unawaited(_farmState.saveNow());
       if (_audioStarted) {
         _audio.stopWalk();
@@ -108,9 +113,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _togglePanel(GamePanel panel) {
     _farmState.playClick();
+    final closing = _activePanel == panel;
     setState(() {
-      _activePanel = _activePanel == panel ? null : panel;
+      _activePanel = closing ? null : panel;
     });
+    _clearMovementInput();
+    if (closing) {
+      _requestGameFocus();
+    }
   }
 
   void _closePanel() {
@@ -118,6 +128,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     setState(() {
       _activePanel = null;
     });
+    _clearMovementInput();
+    _requestGameFocus();
   }
 
   void _syncAudio() {
@@ -128,6 +140,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       sfxVolume: _farmState.sfxVolume,
     );
     _syncWalkAudio();
+    _requestGameFocus();
   }
 
   void _syncWalkAudio() {
@@ -145,6 +158,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void _handleLoadingFinished() {
     setState(() => _loadingFinished = true);
     _startAudioIfReady();
+    _requestGameFocus();
   }
 
   void _startAudioIfReady() {
@@ -156,57 +170,136 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _syncWalkAudio();
   }
 
+  bool get _canUseKeyboardMovement =>
+      _gameMounted &&
+      _loadingFinished &&
+      _appInForeground &&
+      _farmState.walletConnected &&
+      _activePanel == null;
+
+  void _requestGameFocus() {
+    if (!mounted || !_canUseKeyboardMovement) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _canUseKeyboardMovement) {
+        _gameFocusNode.requestFocus();
+      }
+    });
+  }
+
+  KeyEventResult _handleGameKeyEvent(FocusNode node, KeyEvent event) {
+    final key = event.logicalKey;
+    if (!_isMovementKey(key)) {
+      return KeyEventResult.ignored;
+    }
+    if (!_canUseKeyboardMovement) {
+      _clearMovementInput();
+      return KeyEventResult.ignored;
+    }
+
+    if (event is KeyDownEvent || event is KeyRepeatEvent) {
+      _movementKeys.add(key);
+    } else if (event is KeyUpEvent) {
+      _movementKeys.remove(key);
+    }
+    _syncKeyboardMovement();
+    return KeyEventResult.handled;
+  }
+
+  void _syncKeyboardMovement() {
+    if (!_canUseKeyboardMovement || _movementKeys.isEmpty) {
+      _game.setInputVector(Offset.zero);
+      return;
+    }
+
+    var dx = 0.0;
+    var dy = 0.0;
+    if (_movementKeys.any(_leftMovementKeys.contains)) {
+      dx -= 1;
+    }
+    if (_movementKeys.any(_rightMovementKeys.contains)) {
+      dx += 1;
+    }
+    if (_movementKeys.any(_upMovementKeys.contains)) {
+      dy -= 1;
+    }
+    if (_movementKeys.any(_downMovementKeys.contains)) {
+      dy += 1;
+    }
+    _game.setInputVector(Offset(dx, dy));
+  }
+
+  void _clearMovementInput() {
+    _movementKeys.clear();
+    _game.setInputVector(Offset.zero);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: AnimatedBuilder(
-        animation: _farmState,
-        builder: (context, _) {
-          final startupReady = _gameMounted && _loadingFinished;
-          final needsWalletLogin = startupReady && !_farmState.walletConnected;
-          final canShowGameHud = startupReady && _farmState.walletConnected;
-          return Stack(
-            children: [
-              if (_gameMounted) ...[
-                Positioned.fill(child: GameWidget(game: _game)),
-                if (canShowGameHud) ...[
+      body: Focus(
+        focusNode: _gameFocusNode,
+        autofocus: true,
+        onFocusChange: (focused) {
+          if (!focused) {
+            _clearMovementInput();
+          }
+        },
+        onKeyEvent: _handleGameKeyEvent,
+        child: Listener(
+          onPointerDown: (_) => _requestGameFocus(),
+          child: AnimatedBuilder(
+            animation: _farmState,
+            builder: (context, _) {
+              final startupReady = _gameMounted && _loadingFinished;
+              final needsWalletLogin =
+                  startupReady && !_farmState.walletConnected;
+              final canShowGameHud = startupReady && _farmState.walletConnected;
+              return Stack(
+                children: [
+                  if (_gameMounted) ...[
+                    Positioned.fill(child: GameWidget(game: _game)),
+                    if (canShowGameHud) ...[
+                      Positioned.fill(
+                        child: GameHud(
+                          game: _game,
+                          farmState: _farmState,
+                          activePanel: _activePanel,
+                          onPanelSelected: _togglePanel,
+                        ),
+                      ),
+                      Positioned.fill(
+                        child: _activePanel == null
+                            ? const SizedBox.shrink()
+                            : ColoredBox(
+                                color: const Color(0x66000000),
+                                child: PhysicalViewport(
+                                  alignment: Alignment.center,
+                                  child: Center(child: _buildPanel()),
+                                ),
+                              ),
+                      ),
+                    ],
+                    if (needsWalletLogin)
+                      Positioned.fill(
+                        child: _WalletLoginGate(farmState: _farmState),
+                      ),
+                  ] else
+                    const Positioned.fill(child: _LoadingBackdrop()),
                   Positioned.fill(
-                    child: GameHud(
-                      game: _game,
-                      farmState: _farmState,
-                      activePanel: _activePanel,
-                      onPanelSelected: _togglePanel,
+                    child: PhysicalViewport(
+                      child: LoadingOverlay(
+                        loaded: _game.loadingComplete,
+                        onFinished: _handleLoadingFinished,
+                      ),
                     ),
                   ),
-                  Positioned.fill(
-                    child: _activePanel == null
-                        ? const SizedBox.shrink()
-                        : ColoredBox(
-                            color: const Color(0x66000000),
-                            child: PhysicalViewport(
-                              alignment: Alignment.center,
-                              child: Center(child: _buildPanel()),
-                            ),
-                          ),
-                  ),
                 ],
-                if (needsWalletLogin)
-                  Positioned.fill(
-                    child: _WalletLoginGate(farmState: _farmState),
-                  ),
-              ] else
-                const Positioned.fill(child: _LoadingBackdrop()),
-              Positioned.fill(
-                child: PhysicalViewport(
-                  child: LoadingOverlay(
-                    loaded: _game.loadingComplete,
-                    onFinished: _handleLoadingFinished,
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
+              );
+            },
+          ),
+        ),
       ),
     );
   }
@@ -228,6 +321,32 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     };
   }
 }
+
+final Set<LogicalKeyboardKey> _leftMovementKeys = <LogicalKeyboardKey>{
+  LogicalKeyboardKey.keyA,
+  LogicalKeyboardKey.arrowLeft,
+};
+
+final Set<LogicalKeyboardKey> _rightMovementKeys = <LogicalKeyboardKey>{
+  LogicalKeyboardKey.keyD,
+  LogicalKeyboardKey.arrowRight,
+};
+
+final Set<LogicalKeyboardKey> _upMovementKeys = <LogicalKeyboardKey>{
+  LogicalKeyboardKey.keyW,
+  LogicalKeyboardKey.arrowUp,
+};
+
+final Set<LogicalKeyboardKey> _downMovementKeys = <LogicalKeyboardKey>{
+  LogicalKeyboardKey.keyS,
+  LogicalKeyboardKey.arrowDown,
+};
+
+bool _isMovementKey(LogicalKeyboardKey key) =>
+    _leftMovementKeys.contains(key) ||
+    _rightMovementKeys.contains(key) ||
+    _upMovementKeys.contains(key) ||
+    _downMovementKeys.contains(key);
 
 class _WalletLoginGate extends StatelessWidget {
   const _WalletLoginGate({required this.farmState});

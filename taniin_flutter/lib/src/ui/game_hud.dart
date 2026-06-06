@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../game/taniin_game.dart';
@@ -38,30 +39,52 @@ class GameHud extends StatelessWidget {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final compact = constraints.maxWidth < 980;
+                final showTouchJoystick = shouldShowTouchJoystickForPlatform();
                 final miniMapWidth = (constraints.maxWidth * 0.112)
                     .clamp(236.0, 286.0)
                     .toDouble();
-                final joystickSize = _joystickSize(compact);
-                final joystickBaseX = (constraints.maxWidth * 0.145)
-                    .clamp(compact ? 270.0 : 320.0, compact ? 340.0 : 390.0)
-                    .toDouble();
-                final joystickBaseY =
-                    constraints.maxHeight -
-                    (constraints.maxHeight * 0.31)
-                        .clamp(compact ? 270.0 : 300.0, compact ? 320.0 : 350.0)
-                        .toDouble();
-                final joystickLeft = (joystickBaseX - joystickSize * 0.5)
-                    .clamp(
-                      16.0,
-                      math.max(16.0, constraints.maxWidth - joystickSize - 16),
-                    )
-                    .toDouble();
-                final joystickTop = (joystickBaseY - joystickSize * 0.5)
-                    .clamp(
-                      16.0,
-                      math.max(16.0, constraints.maxHeight - joystickSize - 16),
-                    )
-                    .toDouble();
+                final joystickSize = showTouchJoystick
+                    ? _joystickSize(compact)
+                    : 0.0;
+                final joystickBaseX = showTouchJoystick
+                    ? (constraints.maxWidth * 0.145)
+                          .clamp(
+                            compact ? 270.0 : 320.0,
+                            compact ? 340.0 : 390.0,
+                          )
+                          .toDouble()
+                    : 0.0;
+                final joystickBaseY = showTouchJoystick
+                    ? constraints.maxHeight -
+                          (constraints.maxHeight * 0.31)
+                              .clamp(
+                                compact ? 270.0 : 300.0,
+                                compact ? 320.0 : 350.0,
+                              )
+                              .toDouble()
+                    : 0.0;
+                final joystickLeft = showTouchJoystick
+                    ? (joystickBaseX - joystickSize * 0.5)
+                          .clamp(
+                            16.0,
+                            math.max(
+                              16.0,
+                              constraints.maxWidth - joystickSize - 16,
+                            ),
+                          )
+                          .toDouble()
+                    : 0.0;
+                final joystickTop = showTouchJoystick
+                    ? (joystickBaseY - joystickSize * 0.5)
+                          .clamp(
+                            16.0,
+                            math.max(
+                              16.0,
+                              constraints.maxHeight - joystickSize - 16,
+                            ),
+                          )
+                          .toDouble()
+                    : 0.0;
                 return Stack(
                   children: [
                     Positioned.fill(
@@ -116,11 +139,12 @@ class GameHud extends StatelessWidget {
                         ],
                       ),
                     ),
-                    Positioned(
-                      left: joystickLeft,
-                      top: joystickTop,
-                      child: _Joystick(game: game, compact: compact),
-                    ),
+                    if (showTouchJoystick)
+                      Positioned(
+                        left: joystickLeft,
+                        top: joystickTop,
+                        child: _Joystick(game: game, compact: compact),
+                      ),
                     Positioned(
                       left: compact ? 194 : 260,
                       right: compact ? 330 : 320,
@@ -279,6 +303,9 @@ class GameHud extends StatelessWidget {
 double _joystickRadius(bool compact) => compact ? 72 : 82;
 
 double _joystickSize(bool compact) => _joystickRadius(compact) * 2.2;
+
+@visibleForTesting
+bool shouldShowTouchJoystickForPlatform({bool isWeb = kIsWeb}) => !isWeb;
 
 class _TopCluster extends StatelessWidget {
   const _TopCluster({

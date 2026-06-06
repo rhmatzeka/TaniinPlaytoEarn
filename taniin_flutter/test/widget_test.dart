@@ -6,11 +6,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:taniin_flutter/src/app/taniin_app.dart';
 import 'package:taniin_flutter/src/chain/chain_client.dart';
 import 'package:taniin_flutter/src/state/farm_state.dart';
+import 'package:taniin_flutter/src/ui/game_hud.dart';
 import 'package:taniin_flutter/src/ui/settings_panel.dart';
 import 'package:taniin_flutter/src/ui/taniin_theme.dart';
 import 'package:taniin_flutter/src/ui/wallet_panel.dart';
 
 void main() {
+  test('hides touch joystick on web builds', () {
+    expect(shouldShowTouchJoystickForPlatform(isWeb: true), isFalse);
+    expect(shouldShowTouchJoystickForPlatform(isWeb: false), isTrue);
+  });
+
   testWidgets('keeps wallet login hidden while loading is active', (
     WidgetTester tester,
   ) async {
