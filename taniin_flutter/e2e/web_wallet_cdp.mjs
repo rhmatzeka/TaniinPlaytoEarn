@@ -33,6 +33,7 @@ try {
     window.__taniinEthereumRequests = [];
     window.__taniinAudioPlayCount = 0;
     window.__taniinAudioPlaySources = [];
+    window.__taniinWalkBufferStartCount = 0;
 
     Object.defineProperty(window, 'ethereum', {
       configurable: true,
@@ -68,6 +69,14 @@ try {
       }
       return Promise.resolve();
     };
+
+    const originalBufferStart = AudioBufferSourceNode.prototype.start;
+    AudioBufferSourceNode.prototype.start = function start(...args) {
+      if (this.loop) {
+        window.__taniinWalkBufferStartCount += 1;
+      }
+      return originalBufferStart.apply(this, args);
+    };
   }, walletAddress);
 
   await page.goto(baseUrl, { waitUntil: 'networkidle', timeout: 45000 });
@@ -94,10 +103,7 @@ try {
   await page.keyboard.down('KeyW');
   await page.keyboard.down('KeyD');
   await page.waitForFunction(
-    () =>
-      window.__taniinAudioPlaySources.filter((src) =>
-        String(src).includes('soundjalan.mp3'),
-      ).length >= 2,
+    () => window.__taniinWalkBufferStartCount >= 1,
     null,
     { timeout: 10000 },
   );
