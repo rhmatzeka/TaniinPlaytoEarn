@@ -792,7 +792,7 @@ void _appendSmallObstacleCollision(
   _addInsetRect(rects, left, top, size, 0.24, 0.42, 0.76, 0.82);
 }
 
-int _tileKey(int x, int y) => (x << 32) ^ (y & 0xffffffff);
+int _tileKey(int x, int y) => x * 1000000 + y;
 
 bool _isForegroundLayer(String layerName) {
   return layerName.toLowerCase().contains('depan');
