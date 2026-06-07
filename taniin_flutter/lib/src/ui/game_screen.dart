@@ -40,6 +40,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _audio = GameAudioController();
+    _audio.preload();
     _farmState = FarmStateController(onSfx: () => _audio.playClick());
     _farmState.addListener(_syncAudio);
     PlatformBridge.setWalletAddressHandler(

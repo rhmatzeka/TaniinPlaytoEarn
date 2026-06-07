@@ -52,12 +52,10 @@ class GameHud extends StatelessWidget {
                           .clamp(1.0, 4.0)
                           .toDouble();
                 final mobileWebTouchLayout = kIsWeb && showTouchJoystick;
-                final mobileWebCompactHud =
-                    mobileWebTouchLayout && logicalViewport.shortestSide <= 700;
-                final showMiniMap = !mobileWebCompactHud;
-                final miniMapWidth = (constraints.maxWidth * 0.112)
-                    .clamp(236.0, 286.0)
-                    .toDouble();
+                const showMiniMap = true;
+                final miniMapWidth = compact
+                    ? (constraints.maxWidth * 0.28).clamp(112.0, 140.0).toDouble()
+                    : (constraints.maxWidth * 0.112).clamp(236.0, 286.0).toDouble();
                 final joystickRadius = showTouchJoystick
                     ? mobileWebTouchLayout
                           ? _mobileWebJoystickRadius(
@@ -416,8 +414,8 @@ class _TopCluster extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final barWidth = compact ? 198.0 : 218.0;
-    final walletWidth = compact ? 350.0 : 390.0;
-    final walletHeight = compact ? 90.0 : 94.0;
+    final walletWidth = compact ? 220.0 : 390.0;
+    final walletHeight = compact ? 64.0 : 94.0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
@@ -439,6 +437,7 @@ class _TopCluster extends StatelessWidget {
           farmState: farmState,
           width: walletWidth,
           height: walletHeight,
+          compact: compact,
           onPressed: onWalletPressed,
         ),
       ],
@@ -509,12 +508,14 @@ class _WalletButton extends StatelessWidget {
     required this.farmState,
     required this.width,
     required this.height,
+    required this.compact,
     required this.onPressed,
   });
 
   final FarmStateController farmState;
   final double width;
   final double height;
+  final bool compact;
   final VoidCallback onPressed;
 
   @override
@@ -530,11 +531,14 @@ class _WalletButton extends StatelessWidget {
           height: height,
           color: connected ? const Color(0xFF246644) : const Color(0xFF2A573E),
           border: connected ? const Color(0xFF69C487) : const Color(0xFF5B8F68),
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 10 : 18,
+            vertical: compact ? 6 : 12,
+          ),
           child: Row(
             children: [
               _WalletIcon(connected: connected),
-              const SizedBox(width: 16),
+              SizedBox(width: compact ? 8 : 16),
               Expanded(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -546,7 +550,7 @@ class _WalletButton extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: const Color(0xFFECF8E2),
-                        fontSize: connected ? 22 : 23,
+                        fontSize: compact ? 16 : (connected ? 22 : 23),
                         height: 1.0,
                       ),
                     ),
@@ -558,7 +562,7 @@ class _WalletButton extends StatelessWidget {
                         color: connected
                             ? const Color(0xFFB1EEB9)
                             : const Color(0xFFD9EBCB),
-                        fontSize: 16,
+                        fontSize: compact ? 12 : 16,
                         height: 1.05,
                       ),
                     ),

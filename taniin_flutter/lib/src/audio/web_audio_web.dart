@@ -27,6 +27,13 @@ bool _walkRequested = false;
 double _musicVolume = 0.65;
 double _sfxVolume = 0.8;
 
+bool preloadWebAudio() {
+  _ensureMusicAudio();
+  unawaited(_loadWalkBuffer());
+  _ensureClickPool();
+  return true;
+}
+
 bool startWebAudio({
   required bool musicEnabled,
   required bool sfxEnabled,

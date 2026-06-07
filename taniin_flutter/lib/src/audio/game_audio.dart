@@ -10,6 +10,10 @@ class GameAudioController {
   double _musicVolume = 0.65;
   double _sfxVolume = 0.8;
 
+  Future<void> preload() async {
+    web_audio.preloadWebAudio();
+  }
+
   Future<void> start() async {
     if (web_audio.startWebAudio(
       musicEnabled: _musicEnabled,

@@ -23,3 +23,5 @@ bool pauseWebAudio() => false;
 bool resumeWebAudio() => false;
 
 bool releaseWebAudio() => false;
+
+bool preloadWebAudio() => false;
