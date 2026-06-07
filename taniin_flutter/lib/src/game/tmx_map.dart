@@ -34,19 +34,42 @@ class TmxMap {
     final basePath = _parentPath(assetPath);
     final document = XmlDocument.parse(await rootBundle.loadString(assetPath));
     final root = document.rootElement;
-    map.tileWidth = _intAttr(root, 'tilewidth', 16);
-    map.tileHeight = _intAttr(root, 'tileheight', 16);
+    map._readMapSize(root);
+    await map._loadTilesets(root, basePath);
+    map._loadLayers(root);
+    return map;
+  }
 
+  @visibleForTesting
+  static Future<TmxMap> loadCollisionDataForTesting(String assetPath) async {
+    final map = TmxMap._();
+    final document = XmlDocument.parse(await rootBundle.loadString(assetPath));
+    final root = document.rootElement;
+    map
+      .._readMapSize(root)
+      .._loadLayers(root);
+    return map;
+  }
+
+  void _readMapSize(XmlElement root) {
+    tileWidth = _intAttr(root, 'tilewidth', 16);
+    tileHeight = _intAttr(root, 'tileheight', 16);
+  }
+
+  Future<void> _loadTilesets(XmlElement root, String basePath) async {
     for (final element in root.findElements('tileset')) {
       final source = element.getAttribute('source');
       if (source == null || source.isEmpty) {
         continue;
       }
       final firstGid = _intAttr(element, 'firstgid', 1);
-      map._tilesets.add(await _loadTileset(basePath, source, firstGid));
+      _tilesets.add(await _loadTileset(basePath, source, firstGid));
     }
-    map._tilesets.sort((a, b) => a.firstGid.compareTo(b.firstGid));
+    _tilesets.sort((a, b) => a.firstGid.compareTo(b.firstGid));
+  }
 
+  void _loadLayers(XmlElement root) {
+    _layers.clear();
     var minX = 1 << 30;
     var minY = 1 << 30;
     var maxX = -(1 << 30);
@@ -88,7 +111,7 @@ class TmxMap {
         }
       }
       if (layer.tiles.isNotEmpty) {
-        map._layers.add(layer);
+        _layers.add(layer);
       }
     }
 
@@ -98,13 +121,12 @@ class TmxMap {
       maxX = 1;
       maxY = 1;
     }
-    map
+    this
       ..minTileX = minX
       ..minTileY = minY
       ..maxTileX = maxX
       ..maxTileY = maxY
       .._buildLayerIndexes();
-    return map;
   }
 
   double getWorldWidthPixels(double targetTileSize) {
@@ -380,10 +402,24 @@ String _joinAssetPath(String parent, String child) {
 
 bool _isWaterTile(int gid) {
   return switch (gid) {
-    818 || 819 || 821 || 840 || 861 || 865 || 883 || 884 || 906 || 907 => true,
+    818 ||
+    819 ||
+    821 ||
+    840 ||
+    844 ||
+    861 ||
+    865 ||
+    868 ||
+    883 ||
+    884 ||
+    906 ||
+    907 => true,
     _ => false,
   };
 }
+
+@visibleForTesting
+bool isWaterTileForTesting(int gid) => _isWaterTile(gid);
 
 bool _isBridgeTile(int gid) => gid >= 1396 && gid <= 1410;
 

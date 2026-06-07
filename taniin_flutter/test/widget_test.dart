@@ -13,6 +13,8 @@ import 'package:taniin_flutter/src/ui/taniin_theme.dart';
 import 'package:taniin_flutter/src/ui/wallet_panel.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('shows touch joystick on mobile web, but hides it on desktop web', () {
     expect(
       shouldShowTouchJoystickForPlatform(
@@ -69,6 +71,38 @@ void main() {
     expect(contains(leftBridgeGuards, const Offset(50, 50)), isFalse);
     expect(contains(rightBridgeGuards, const Offset(190, 50)), isTrue);
     expect(contains(rightBridgeGuards, const Offset(150, 50)), isFalse);
+  });
+
+  test('classifies river detail tiles as water blockers', () {
+    expect(isWaterTileForTesting(844), isTrue);
+    expect(isWaterTileForTesting(868), isTrue);
+  });
+
+  testWidgets('blocks the visible river while leaving bridge centers open', (
+    WidgetTester tester,
+  ) async {
+    const tileSize = 128.0;
+    final map = await TmxMap.loadCollisionDataForTesting('assets/game/map.tmx');
+    final collisionRects = map.collisionRects(tileSize);
+
+    bool blocksPlayerAtTile(int column, int row) {
+      final x = (column + 0.5) * tileSize;
+      final y = (row + 0.5) * tileSize;
+      final hitbox = Rect.fromLTRB(
+        x - tileSize * 0.22,
+        y - tileSize * 0.18,
+        x + tileSize * 0.22,
+        y + tileSize * 0.16,
+      );
+      return collisionRects.any(hitbox.overlaps);
+    }
+
+    expect(blocksPlayerAtTile(18, 9), isTrue);
+    expect(blocksPlayerAtTile(19, 9), isTrue);
+    expect(blocksPlayerAtTile(22, 9), isTrue);
+    expect(blocksPlayerAtTile(23, 9), isFalse);
+    expect(blocksPlayerAtTile(24, 9), isFalse);
+    expect(blocksPlayerAtTile(25, 9), isTrue);
   });
 
   testWidgets('keeps wallet login hidden while loading is active', (

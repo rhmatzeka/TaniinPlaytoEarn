@@ -14,6 +14,7 @@ class TaniinGame extends FlameGame {
 
   static const double _tile = 128;
   static const double _playerSpeed = _tile * 3.9;
+  static const double _maxCollisionStep = _tile * 0.16;
   static const double _shopLeftTile = 13.8;
   static const double _shopRightTile = 26.4;
   static const double _shopTopTile = 16.6;
@@ -73,6 +74,7 @@ class TaniinGame extends FlameGame {
   double _cameraY = 0;
   double _playerX = 18.5 * _tile;
   double _playerY = 28.5 * _tile;
+  Offset _lastSafePlayerPosition = const Offset(18.5 * _tile, 28.5 * _tile);
   Offset _inputVector = Offset.zero;
   bool _moving = false;
   int _facingDirection = _dirDown;
@@ -412,17 +414,43 @@ class TaniinGame extends FlameGame {
   bool _movePlayer(double targetX, double targetY) {
     final oldX = _playerX;
     final oldY = _playerY;
+    if (_collidesAt(_playerX, _playerY) &&
+        !_collidesAt(_lastSafePlayerPosition.dx, _lastSafePlayerPosition.dy)) {
+      _playerX = _lastSafePlayerPosition.dx;
+      _playerY = _lastSafePlayerPosition.dy;
+    }
     final nextX = targetX
         .clamp(1.2 * _tile, _worldWidth - 1.2 * _tile)
         .toDouble();
     final nextY = targetY
         .clamp(1.2 * _tile, _worldHeight - 1.2 * _tile)
         .toDouble();
-    if (!_collidesAt(nextX, _playerY)) {
-      _playerX = nextX;
+
+    final stepCount = math.max(
+      1,
+      (math.max((nextX - _playerX).abs(), (nextY - _playerY).abs()) /
+              _maxCollisionStep)
+          .ceil(),
+    );
+    final stepX = (nextX - _playerX) / stepCount;
+    final stepY = (nextY - _playerY) / stepCount;
+    for (var step = 0; step < stepCount; step++) {
+      final horizontalTarget = _playerX + stepX;
+      if (!_collidesAt(horizontalTarget, _playerY)) {
+        _playerX = horizontalTarget;
+      }
+      final verticalTarget = _playerY + stepY;
+      if (!_collidesAt(_playerX, verticalTarget)) {
+        _playerY = verticalTarget;
+      }
     }
-    if (!_collidesAt(_playerX, nextY)) {
-      _playerY = nextY;
+
+    if (_collidesAt(_playerX, _playerY) &&
+        !_collidesAt(_lastSafePlayerPosition.dx, _lastSafePlayerPosition.dy)) {
+      _playerX = _lastSafePlayerPosition.dx;
+      _playerY = _lastSafePlayerPosition.dy;
+    } else if (!_collidesAt(_playerX, _playerY)) {
+      _lastSafePlayerPosition = Offset(_playerX, _playerY);
     }
     return (_playerX - oldX).abs() > 0.5 || (_playerY - oldY).abs() > 0.5;
   }
