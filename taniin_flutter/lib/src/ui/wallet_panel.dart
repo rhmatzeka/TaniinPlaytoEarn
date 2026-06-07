@@ -142,31 +142,6 @@ class _WalletPanelState extends State<WalletPanel> {
                     prominent: prominent,
                     onPressed: () => _openWalletConnect(metaMask: true),
                   ),
-                  _WalletActionButton(
-                    label: 'Browser',
-                    icon: Icons.open_in_browser,
-                    color: const Color(0xFF5F4984),
-                    prominent: prominent,
-                    onPressed: () => _openWalletConnect(metaMask: false),
-                  ),
-                  _WalletActionButton(
-                    label: 'Tempel',
-                    icon: Icons.content_paste,
-                    color: const Color(0xFF6F4E2B),
-                    prominent: prominent,
-                    onPressed: _pasteWallet,
-                  ),
-                  _WalletActionButton(
-                    label: 'Sync',
-                    icon: Icons.sync,
-                    color: const Color(0xFF2B6C48),
-                    prominent: prominent,
-                    onPressed: farmState.walletConnected
-                        ? () => unawaited(
-                            farmState.refreshWalletState(revealMessage: true),
-                          )
-                        : null,
-                  ),
                 ],
               ),
               SizedBox(height: prominent ? 24 : 18),
@@ -254,21 +229,6 @@ class _WalletPanelState extends State<WalletPanel> {
       return;
     }
     unawaited(farmState.connectWallet(address));
-  }
-
-  Future<void> _pasteWallet() async {
-    farmState.playClick();
-    final address = await PlatformBridge.clipboardWalletAddress();
-    if (address.isEmpty) {
-      farmState.showMessage(
-        'Clipboard belum berisi public address 0x...',
-        success: false,
-      );
-      return;
-    }
-    _controller.text = address;
-    _controller.selection = TextSelection.collapsed(offset: address.length);
-    farmState.showMessage('Address dari clipboard siap dipakai.');
   }
 
   Future<void> _openWalletConnect({required bool metaMask}) async {
