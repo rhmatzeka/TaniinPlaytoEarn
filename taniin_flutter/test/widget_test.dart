@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:taniin_flutter/src/app/taniin_app.dart';
 import 'package:taniin_flutter/src/chain/chain_client.dart';
+import 'package:taniin_flutter/src/game/tmx_map.dart';
 import 'package:taniin_flutter/src/state/farm_state.dart';
 import 'package:taniin_flutter/src/ui/game_hud.dart';
 import 'package:taniin_flutter/src/ui/settings_panel.dart';
@@ -12,9 +13,62 @@ import 'package:taniin_flutter/src/ui/taniin_theme.dart';
 import 'package:taniin_flutter/src/ui/wallet_panel.dart';
 
 void main() {
-  test('hides touch joystick on web builds', () {
-    expect(shouldShowTouchJoystickForPlatform(isWeb: true), isFalse);
+  test('shows touch joystick on mobile web, but hides it on desktop web', () {
+    expect(
+      shouldShowTouchJoystickForPlatform(
+        isWeb: true,
+        platform: TargetPlatform.windows,
+        viewportSize: const Size(1280, 720),
+      ),
+      isFalse,
+    );
+    expect(
+      shouldShowTouchJoystickForPlatform(
+        isWeb: true,
+        platform: TargetPlatform.windows,
+        viewportSize: const Size(390, 844),
+      ),
+      isTrue,
+    );
+    expect(
+      shouldShowTouchJoystickForPlatform(
+        isWeb: true,
+        platform: TargetPlatform.android,
+        viewportSize: const Size(1280, 720),
+      ),
+      isTrue,
+    );
     expect(shouldShowTouchJoystickForPlatform(isWeb: false), isTrue);
+  });
+
+  test('keeps bridge centers open while blocking water at the sides', () {
+    final leftBridgeGuards = bridgeWaterGuardRectsForTesting(
+      bridgeTiles: <(int, int), int>{(0, 0): 1401, (1, 0): 1401},
+      tileX: 0,
+      tileY: 0,
+      bridgeGid: 1401,
+      left: 0,
+      top: 0,
+      size: 100,
+    );
+    final rightBridgeGuards = bridgeWaterGuardRectsForTesting(
+      bridgeTiles: <(int, int), int>{(0, 0): 1401, (1, 0): 1401},
+      tileX: 1,
+      tileY: 0,
+      bridgeGid: 1401,
+      left: 100,
+      top: 0,
+      size: 100,
+    );
+
+    bool contains(List<Rect> rects, Offset point) {
+      return rects.any((rect) => rect.contains(point));
+    }
+
+    expect(contains(leftBridgeGuards, const Offset(10, 50)), isTrue);
+    expect(contains(leftBridgeGuards, const Offset(50, 50)), isFalse);
+    expect(contains(rightBridgeGuards, const Offset(190, 50)), isTrue);
+    expect(contains(rightBridgeGuards, const Offset(150, 50)), isFalse);
   });
 
   testWidgets('keeps wallet login hidden while loading is active', (

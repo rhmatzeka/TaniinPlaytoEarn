@@ -129,11 +129,11 @@ class TmxMap {
 
   List<Rect> collisionRects(double targetTileSize) {
     final rects = <Rect>[];
-    final bridgeTiles = <int>{};
+    final bridgeTiles = <int, int>{};
     for (final layer in _layers) {
       for (final tile in layer.tiles) {
         if (_isBridgeTile(tile.gid)) {
-          bridgeTiles.add(_tileKey(tile.x, tile.y));
+          bridgeTiles[_tileKey(tile.x, tile.y)] = tile.gid;
         }
       }
     }
@@ -141,11 +141,22 @@ class TmxMap {
     for (final layer in _layers) {
       for (final tile in layer.tiles) {
         final key = _tileKey(tile.x, tile.y);
-        if (bridgeTiles.contains(key) && _isWaterTile(tile.gid)) {
-          continue;
-        }
+        final bridgeGid = bridgeTiles[key];
         final left = (tile.x - minTileX) * targetTileSize;
         final top = (tile.y - minTileY) * targetTileSize;
+        if (bridgeGid != null && _isWaterTile(tile.gid)) {
+          _appendBridgeWaterGuardRects(
+            rects,
+            bridgeTiles,
+            tile.x,
+            tile.y,
+            bridgeGid,
+            left,
+            top,
+            targetTileSize,
+          );
+          continue;
+        }
         _appendCollisionRect(
           rects,
           layer.name,
@@ -376,6 +387,48 @@ bool _isWaterTile(int gid) {
 
 bool _isBridgeTile(int gid) => gid >= 1396 && gid <= 1410;
 
+bool _isVerticalBridgeTile(int gid) {
+  return switch (gid) {
+    1396 || 1397 || 1401 || 1402 || 1406 || 1407 => true,
+    _ => false,
+  };
+}
+
+bool _isHorizontalBridgeTile(int gid) {
+  return switch (gid) {
+    1398 || 1399 || 1400 || 1403 || 1404 || 1405 => true,
+    _ => false,
+  };
+}
+
+@visibleForTesting
+List<Rect> bridgeWaterGuardRectsForTesting({
+  required Map<(int, int), int> bridgeTiles,
+  required int tileX,
+  required int tileY,
+  required int bridgeGid,
+  required double left,
+  required double top,
+  required double size,
+}) {
+  final rects = <Rect>[];
+  final keyedBridgeTiles = <int, int>{};
+  for (final entry in bridgeTiles.entries) {
+    keyedBridgeTiles[_tileKey(entry.key.$1, entry.key.$2)] = entry.value;
+  }
+  _appendBridgeWaterGuardRects(
+    rects,
+    keyedBridgeTiles,
+    tileX,
+    tileY,
+    bridgeGid,
+    left,
+    top,
+    size,
+  );
+  return rects;
+}
+
 bool _isHouseTile(int gid) => (gid >= 241 && gid < 339) || gid >= 1431;
 
 bool _isHouseFrontEdgeTile(int gid) {
@@ -506,6 +559,37 @@ void _appendCollisionRect(
   }
   if (_isSmallObstacleTile(gid)) {
     _appendSmallObstacleCollision(rects, gid, left, top, size);
+  }
+}
+
+void _appendBridgeWaterGuardRects(
+  List<Rect> rects,
+  Map<int, int> bridgeTiles,
+  int tileX,
+  int tileY,
+  int bridgeGid,
+  double left,
+  double top,
+  double size,
+) {
+  const guardInset = 0.20;
+  if (_isVerticalBridgeTile(bridgeGid)) {
+    if (!bridgeTiles.containsKey(_tileKey(tileX - 1, tileY))) {
+      _addInsetRect(rects, left, top, size, 0.0, 0.0, guardInset, 1.0);
+    }
+    if (!bridgeTiles.containsKey(_tileKey(tileX + 1, tileY))) {
+      _addInsetRect(rects, left, top, size, 1.0 - guardInset, 0.0, 1.0, 1.0);
+    }
+    return;
+  }
+
+  if (_isHorizontalBridgeTile(bridgeGid)) {
+    if (!bridgeTiles.containsKey(_tileKey(tileX, tileY - 1))) {
+      _addInsetRect(rects, left, top, size, 0.0, 0.0, 1.0, guardInset);
+    }
+    if (!bridgeTiles.containsKey(_tileKey(tileX, tileY + 1))) {
+      _addInsetRect(rects, left, top, size, 0.0, 1.0 - guardInset, 1.0, 1.0);
+    }
   }
 }
 

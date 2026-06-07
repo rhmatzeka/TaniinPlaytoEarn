@@ -28,6 +28,7 @@ class GameHud extends StatelessWidget {
     return AnimatedBuilder(
       animation: game.hudNotifier,
       builder: (context, _) {
+        final logicalViewport = MediaQuery.sizeOf(context);
         final interaction = game.currentInteraction;
         final selectedPlot = game.selectedPlotIndex;
         final contextText = farmState.contextText(
@@ -39,13 +40,30 @@ class GameHud extends StatelessWidget {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final compact = constraints.maxWidth < 980;
-                final showTouchJoystick = shouldShowTouchJoystickForPlatform();
+                final showTouchJoystick = shouldShowTouchJoystickForPlatform(
+                  viewportSize: logicalViewport,
+                );
+                final viewportScale = logicalViewport.width <= 0
+                    ? 1.0
+                    : (constraints.maxWidth / logicalViewport.width)
+                          .clamp(1.0, 4.0)
+                          .toDouble();
+                final mobileWebTouchLayout = kIsWeb && showTouchJoystick;
+                final mobileWebCompactHud =
+                    mobileWebTouchLayout && logicalViewport.shortestSide <= 700;
+                final showMiniMap = !mobileWebCompactHud;
                 final miniMapWidth = (constraints.maxWidth * 0.112)
                     .clamp(236.0, 286.0)
                     .toDouble();
-                final joystickSize = showTouchJoystick
-                    ? _joystickSize(compact)
+                final joystickRadius = showTouchJoystick
+                    ? mobileWebTouchLayout
+                          ? _mobileWebJoystickRadius(
+                              logicalViewport,
+                              viewportScale,
+                            )
+                          : _joystickRadius(compact)
                     : 0.0;
+                final joystickSize = joystickRadius * 2.2;
                 final joystickBaseX = showTouchJoystick
                     ? (constraints.maxWidth * 0.145)
                           .clamp(
@@ -63,8 +81,13 @@ class GameHud extends StatelessWidget {
                               )
                               .toDouble()
                     : 0.0;
+                final joystickMargin = mobileWebTouchLayout
+                    ? 22.0 * viewportScale
+                    : 16.0;
                 final joystickLeft = showTouchJoystick
-                    ? (joystickBaseX - joystickSize * 0.5)
+                    ? (mobileWebTouchLayout
+                              ? joystickMargin
+                              : joystickBaseX - joystickSize * 0.5)
                           .clamp(
                             16.0,
                             math.max(
@@ -75,7 +98,11 @@ class GameHud extends StatelessWidget {
                           .toDouble()
                     : 0.0;
                 final joystickTop = showTouchJoystick
-                    ? (joystickBaseY - joystickSize * 0.5)
+                    ? (mobileWebTouchLayout
+                              ? constraints.maxHeight -
+                                    joystickSize -
+                                    joystickMargin
+                              : joystickBaseY - joystickSize * 0.5)
                           .clamp(
                             16.0,
                             math.max(
@@ -94,15 +121,16 @@ class GameHud extends StatelessWidget {
                             _handleWorldTap(context, details.localPosition),
                       ),
                     ),
-                    Positioned(
-                      left: 32,
-                      top: 26,
-                      child: _MiniMap(
-                        game: game,
-                        width: miniMapWidth,
-                        height: miniMapWidth * game.miniMapAspectRatio,
+                    if (showMiniMap)
+                      Positioned(
+                        left: 32,
+                        top: 26,
+                        child: _MiniMap(
+                          game: game,
+                          width: miniMapWidth,
+                          height: miniMapWidth * game.miniMapAspectRatio,
+                        ),
                       ),
-                    ),
                     Positioned(
                       right: 20,
                       top: 10,
@@ -143,7 +171,7 @@ class GameHud extends StatelessWidget {
                       Positioned(
                         left: joystickLeft,
                         top: joystickTop,
-                        child: _Joystick(game: game, compact: compact),
+                        child: _Joystick(game: game, radius: joystickRadius),
                       ),
                     Positioned(
                       left: compact ? 194 : 260,
@@ -222,22 +250,17 @@ class GameHud extends StatelessWidget {
         return AnimatedBuilder(
           animation: farmState,
           builder: (context, _) {
-            return Material(
-              type: MaterialType.transparency,
-              child: PhysicalViewport(
-                alignment: Alignment.center,
-                child: Center(
-                  child: _InteractionPanel(
-                    farmState: farmState,
-                    interaction: interaction,
-                    plotIndex: plotIndex,
-                    onClose: () => Navigator.of(dialogContext).maybePop(),
-                    onOpenShop: () {
-                      Navigator.of(dialogContext).maybePop();
-                      _showShopDialog(context);
-                    },
-                  ),
-                ),
+            return _DialogSurface(
+              farmState: farmState,
+              child: _InteractionPanel(
+                farmState: farmState,
+                interaction: interaction,
+                plotIndex: plotIndex,
+                onClose: () => Navigator.of(dialogContext).maybePop(),
+                onOpenShop: () {
+                  Navigator.of(dialogContext).maybePop();
+                  _showShopDialog(context);
+                },
               ),
             );
           },
@@ -254,16 +277,11 @@ class GameHud extends StatelessWidget {
         return AnimatedBuilder(
           animation: farmState,
           builder: (context, _) {
-            return Material(
-              type: MaterialType.transparency,
-              child: PhysicalViewport(
-                alignment: Alignment.center,
-                child: Center(
-                  child: _ShopPanel(
-                    farmState: farmState,
-                    onClose: () => Navigator.of(dialogContext).maybePop(),
-                  ),
-                ),
+            return _DialogSurface(
+              farmState: farmState,
+              child: _ShopPanel(
+                farmState: farmState,
+                onClose: () => Navigator.of(dialogContext).maybePop(),
               ),
             );
           },
@@ -281,16 +299,11 @@ class GameHud extends StatelessWidget {
         return AnimatedBuilder(
           animation: farmState,
           builder: (context, _) {
-            return Material(
-              type: MaterialType.transparency,
-              child: PhysicalViewport(
-                alignment: Alignment.center,
-                child: Center(
-                  child: WalletPanel(
-                    farmState: farmState,
-                    onClose: () => Navigator.of(dialogContext).maybePop(),
-                  ),
-                ),
+            return _DialogSurface(
+              farmState: farmState,
+              child: WalletPanel(
+                farmState: farmState,
+                onClose: () => Navigator.of(dialogContext).maybePop(),
               ),
             );
           },
@@ -300,12 +313,78 @@ class GameHud extends StatelessWidget {
   }
 }
 
+class _DialogSurface extends StatelessWidget {
+  const _DialogSurface({required this.farmState, required this.child});
+
+  final FarmStateController farmState;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      type: MaterialType.transparency,
+      child: PhysicalViewport(
+        alignment: Alignment.center,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final popupWidth = math
+                .min(760.0, math.max(340.0, constraints.maxWidth - 56.0))
+                .toDouble();
+            return Stack(
+              children: [
+                Center(child: child),
+                if (farmState.statusVisible)
+                  Positioned(
+                    left: (constraints.maxWidth - popupWidth) * 0.5,
+                    top: 34,
+                    width: popupWidth,
+                    child: IgnorePointer(
+                      child: _StatusPopup(farmState: farmState),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
 double _joystickRadius(bool compact) => compact ? 72 : 82;
 
-double _joystickSize(bool compact) => _joystickRadius(compact) * 2.2;
+double _mobileWebJoystickRadius(Size viewportSize, double viewportScale) {
+  final logicalSize = math
+      .min(viewportSize.shortestSide * 0.34, 132.0)
+      .clamp(112.0, 132.0)
+      .toDouble();
+  return logicalSize * viewportScale / 2.2;
+}
 
 @visibleForTesting
-bool shouldShowTouchJoystickForPlatform({bool isWeb = kIsWeb}) => !isWeb;
+bool shouldShowTouchJoystickForPlatform({
+  bool isWeb = kIsWeb,
+  TargetPlatform? platform,
+  Size? viewportSize,
+}) {
+  if (!isWeb) {
+    return true;
+  }
+
+  final effectivePlatform = platform ?? defaultTargetPlatform;
+  if (effectivePlatform == TargetPlatform.android ||
+      effectivePlatform == TargetPlatform.iOS) {
+    return true;
+  }
+
+  final size = viewportSize;
+  if (size == null) {
+    return false;
+  }
+
+  final shortestSide = math.min(size.width, size.height);
+  return shortestSide <= 700;
+}
 
 class _TopCluster extends StatelessWidget {
   const _TopCluster({
@@ -614,10 +693,10 @@ class _ContextPill extends StatelessWidget {
 }
 
 class _Joystick extends StatefulWidget {
-  const _Joystick({required this.game, required this.compact});
+  const _Joystick({required this.game, required this.radius});
 
   final TaniinGame game;
-  final bool compact;
+  final double radius;
 
   @override
   State<_Joystick> createState() => _JoystickState();
@@ -627,9 +706,9 @@ class _JoystickState extends State<_Joystick> {
   Offset _knob = Offset.zero;
   bool _dragging = false;
 
-  double get _radius => _joystickRadius(widget.compact);
+  double get _radius => widget.radius;
 
-  double get _knobRadius => widget.compact ? 31 : 34;
+  double get _knobRadius => _radius * 0.42;
 
   @override
   Widget build(BuildContext context) {
