@@ -456,6 +456,9 @@ class TaniinGame extends FlameGame {
   }
 
   bool _collidesAt(double x, double y) {
+    if (_tmxMap?.blocksWaterHitbox(_playerWaterHitbox(x, y), _tile) ?? false) {
+      return true;
+    }
     final hitbox = _playerHitbox(x, y);
     for (final obstacle in _collisionRects) {
       if (hitbox.overlaps(obstacle)) {
@@ -472,6 +475,15 @@ class TaniinGame extends FlameGame {
       y - _tile * 0.18,
       x + halfW,
       y + _tile * 0.16,
+    );
+  }
+
+  Rect _playerWaterHitbox(double x, double y) {
+    return Rect.fromLTRB(
+      x - _tile * 0.30,
+      y - _tile * 0.24,
+      x + _tile * 0.30,
+      y + _tile * 0.22,
     );
   }
 

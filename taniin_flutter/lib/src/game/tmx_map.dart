@@ -12,6 +12,8 @@ class TmxMap {
 
   final List<_Tileset> _tilesets = <_Tileset>[];
   final List<_MapLayer> _layers = <_MapLayer>[];
+  final Map<int, int> _bridgeTiles = <int, int>{};
+  final Map<int, int> _waterTiles = <int, int>{};
   final Paint _pixelPaint = Paint()
     ..isAntiAlias = false
     ..filterQuality = FilterQuality.none;
@@ -125,8 +127,9 @@ class TmxMap {
       ..minTileX = minX
       ..minTileY = minY
       ..maxTileX = maxX
-      ..maxTileY = maxY
-      .._buildLayerIndexes();
+      ..maxTileY = maxY;
+    _buildLayerIndexes();
+    _buildCollisionTileIndexes();
   }
 
   double getWorldWidthPixels(double targetTileSize) {
@@ -151,25 +154,16 @@ class TmxMap {
 
   List<Rect> collisionRects(double targetTileSize) {
     final rects = <Rect>[];
-    final bridgeTiles = <int, int>{};
-    for (final layer in _layers) {
-      for (final tile in layer.tiles) {
-        if (_isBridgeTile(tile.gid)) {
-          bridgeTiles[_tileKey(tile.x, tile.y)] = tile.gid;
-        }
-      }
-    }
-
     for (final layer in _layers) {
       for (final tile in layer.tiles) {
         final key = _tileKey(tile.x, tile.y);
-        final bridgeGid = bridgeTiles[key];
+        final bridgeGid = _bridgeTiles[key];
         final left = (tile.x - minTileX) * targetTileSize;
         final top = (tile.y - minTileY) * targetTileSize;
         if (bridgeGid != null && _isWaterTile(tile.gid)) {
           _appendBridgeWaterGuardRects(
             rects,
-            bridgeTiles,
+            _bridgeTiles,
             tile.x,
             tile.y,
             bridgeGid,
@@ -190,6 +184,65 @@ class TmxMap {
       }
     }
     return rects;
+  }
+
+  bool blocksWaterHitbox(Rect hitbox, double targetTileSize) {
+    if (targetTileSize <= 0 || _waterTiles.isEmpty) {
+      return false;
+    }
+
+    const epsilon = 0.001;
+    final firstColumn = math.max(0, (hitbox.left / targetTileSize).floor());
+    final lastColumn = math.min(
+      tileColumns - 1,
+      ((hitbox.right - epsilon) / targetTileSize).floor(),
+    );
+    final firstRow = math.max(0, (hitbox.top / targetTileSize).floor());
+    final lastRow = math.min(
+      tileRows - 1,
+      ((hitbox.bottom - epsilon) / targetTileSize).floor(),
+    );
+    if (lastColumn < firstColumn || lastRow < firstRow) {
+      return false;
+    }
+
+    for (var row = firstRow; row <= lastRow; row++) {
+      for (var column = firstColumn; column <= lastColumn; column++) {
+        final tileX = minTileX + column;
+        final tileY = minTileY + row;
+        final key = _tileKey(tileX, tileY);
+        if (!_waterTiles.containsKey(key)) {
+          continue;
+        }
+        final left = column * targetTileSize;
+        final top = row * targetTileSize;
+        final bridgeGid = _bridgeTiles[key];
+        if (bridgeGid == null) {
+          if (hitbox.overlaps(
+            Rect.fromLTWH(left, top, targetTileSize, targetTileSize),
+          )) {
+            return true;
+          }
+          continue;
+        }
+
+        final guards = <Rect>[];
+        _appendBridgeWaterGuardRects(
+          guards,
+          _bridgeTiles,
+          tileX,
+          tileY,
+          bridgeGid,
+          left,
+          top,
+          targetTileSize,
+        );
+        if (guards.any(hitbox.overlaps)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   void drawBackground(
@@ -264,6 +317,22 @@ class TmxMap {
   void _buildLayerIndexes() {
     for (final layer in _layers) {
       layer.buildDrawIndex(minTileY, maxTileY);
+    }
+  }
+
+  void _buildCollisionTileIndexes() {
+    _bridgeTiles.clear();
+    _waterTiles.clear();
+    for (final layer in _layers) {
+      for (final tile in layer.tiles) {
+        final key = _tileKey(tile.x, tile.y);
+        if (_isBridgeTile(tile.gid)) {
+          _bridgeTiles[key] = tile.gid;
+        }
+        if (_isWaterTile(tile.gid)) {
+          _waterTiles[key] = tile.gid;
+        }
+      }
     }
   }
 

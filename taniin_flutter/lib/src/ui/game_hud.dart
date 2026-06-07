@@ -7,6 +7,9 @@ import '../game/taniin_game.dart';
 import '../state/farm_state.dart';
 import 'physical_viewport.dart';
 import 'pixel_panel.dart';
+import 'web_input_capability.dart'
+    if (dart.library.js_interop) 'web_input_capability_web.dart'
+    as web_input;
 import 'wallet_panel.dart';
 
 class GameHud extends StatelessWidget {
@@ -366,9 +369,18 @@ bool shouldShowTouchJoystickForPlatform({
   bool isWeb = kIsWeb,
   TargetPlatform? platform,
   Size? viewportSize,
+  bool? coarsePointer,
 }) {
   if (!isWeb) {
     return true;
+  }
+
+  final size = viewportSize;
+  if (size == null) {
+    return false;
+  }
+  if (!_isPhoneSizedWebViewport(size)) {
+    return false;
   }
 
   final effectivePlatform = platform ?? defaultTargetPlatform;
@@ -377,13 +389,13 @@ bool shouldShowTouchJoystickForPlatform({
     return true;
   }
 
-  final size = viewportSize;
-  if (size == null) {
-    return false;
-  }
+  return coarsePointer ?? web_input.hasCoarsePointer();
+}
 
+bool _isPhoneSizedWebViewport(Size size) {
   final shortestSide = math.min(size.width, size.height);
-  return shortestSide <= 700;
+  final longestSide = math.max(size.width, size.height);
+  return shortestSide <= 520 && longestSide <= 1100;
 }
 
 class _TopCluster extends StatelessWidget {

@@ -28,7 +28,24 @@ void main() {
       shouldShowTouchJoystickForPlatform(
         isWeb: true,
         platform: TargetPlatform.windows,
+        viewportSize: const Size(960, 449),
+      ),
+      isFalse,
+    );
+    expect(
+      shouldShowTouchJoystickForPlatform(
+        isWeb: true,
+        platform: TargetPlatform.windows,
         viewportSize: const Size(390, 844),
+        coarsePointer: true,
+      ),
+      isTrue,
+    );
+    expect(
+      shouldShowTouchJoystickForPlatform(
+        isWeb: true,
+        platform: TargetPlatform.android,
+        viewportSize: const Size(932, 430),
       ),
       isTrue,
     );
@@ -38,7 +55,7 @@ void main() {
         platform: TargetPlatform.android,
         viewportSize: const Size(1280, 720),
       ),
-      isTrue,
+      isFalse,
     );
     expect(shouldShowTouchJoystickForPlatform(isWeb: false), isTrue);
   });
@@ -85,16 +102,24 @@ void main() {
     final map = await TmxMap.loadCollisionDataForTesting('assets/game/map.tmx');
     final collisionRects = map.collisionRects(tileSize);
 
-    bool blocksPlayerAtTile(int column, int row) {
+    Rect hitboxAtTile(int column, int row) {
       final x = (column + 0.5) * tileSize;
       final y = (row + 0.5) * tileSize;
-      final hitbox = Rect.fromLTRB(
+      return Rect.fromLTRB(
         x - tileSize * 0.22,
         y - tileSize * 0.18,
         x + tileSize * 0.22,
         y + tileSize * 0.16,
       );
+    }
+
+    bool blocksPlayerAtTile(int column, int row) {
+      final hitbox = hitboxAtTile(column, row);
       return collisionRects.any(hitbox.overlaps);
+    }
+
+    bool waterBlocksPlayerAtTile(int column, int row) {
+      return map.blocksWaterHitbox(hitboxAtTile(column, row), tileSize);
     }
 
     expect(blocksPlayerAtTile(18, 9), isTrue);
@@ -103,6 +128,11 @@ void main() {
     expect(blocksPlayerAtTile(23, 9), isFalse);
     expect(blocksPlayerAtTile(24, 9), isFalse);
     expect(blocksPlayerAtTile(25, 9), isTrue);
+    expect(waterBlocksPlayerAtTile(18, 9), isTrue);
+    expect(waterBlocksPlayerAtTile(19, 9), isTrue);
+    expect(waterBlocksPlayerAtTile(23, 9), isFalse);
+    expect(waterBlocksPlayerAtTile(24, 9), isFalse);
+    expect(waterBlocksPlayerAtTile(25, 9), isTrue);
   });
 
   testWidgets('keeps wallet login hidden while loading is active', (

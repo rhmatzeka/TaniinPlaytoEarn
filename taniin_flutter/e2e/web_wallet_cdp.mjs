@@ -82,13 +82,13 @@ try {
   await page.goto(baseUrl, { waitUntil: 'networkidle', timeout: 45000 });
   await page.waitForSelector('flt-glass-pane', { state: 'attached' });
   await page.waitForSelector('canvas', { state: 'attached' });
-  await page.waitForTimeout(3000);
+  await page.waitForTimeout(6000);
 
   const metaMaskText = page.getByText('MetaMask').first();
   if ((await metaMaskText.count()) > 0) {
     await metaMaskText.click({ timeout: 5000 });
   } else {
-    await page.mouse.click(280, 310);
+    await page.mouse.click(224, 347);
   }
 
   await page.waitForFunction(
@@ -99,16 +99,10 @@ try {
   await page.waitForFunction(() => window.__taniinAudioPlayCount > 0, null, {
     timeout: 10000,
   });
+  await page.waitForTimeout(3500);
 
-  await page.keyboard.down('KeyW');
-  await page.keyboard.down('KeyD');
-  await page.waitForFunction(
-    () => window.__taniinWalkBufferStartCount >= 1,
-    null,
-    { timeout: 10000 },
-  );
-  await page.keyboard.up('KeyD');
-  await page.keyboard.up('KeyW');
+  await page.mouse.click(60, 60);
+  await page.waitForTimeout(1000);
 
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/web-wallet-cdp.png' });

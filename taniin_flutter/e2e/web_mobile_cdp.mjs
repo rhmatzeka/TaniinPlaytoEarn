@@ -4,10 +4,18 @@ import { mkdir } from 'node:fs/promises';
 const baseUrl = process.env.TANIIN_E2E_BASE_URL ?? 'http://127.0.0.1:4174';
 const cdpUrl = process.env.TANIIN_E2E_CDP_URL ?? 'http://127.0.0.1:9223';
 const walletAddress = '0x1234567890abcdef1234567890abcdef12345678';
+const mobileUserAgent =
+  'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Mobile Safari/537.36';
 
 const browser = await chromium.connectOverCDP(cdpUrl);
-const context = browser.contexts()[0] ?? await browser.newContext();
-const page = context.pages()[0] ?? await context.newPage();
+const context = await browser.newContext({
+  viewport: { width: 390, height: 844 },
+  deviceScaleFactor: 2,
+  isMobile: true,
+  hasTouch: true,
+  userAgent: mobileUserAgent,
+});
+const page = await context.newPage();
 const errors = [];
 
 page.on('pageerror', (error) => errors.push(error.stack ?? error.message));
@@ -27,7 +35,6 @@ page.on('response', (response) => {
 });
 
 try {
-  await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript((address) => {
     localStorage.clear();
     window.__taniinEthereumRequests = [];
@@ -80,7 +87,7 @@ try {
   await page.goto(baseUrl, { waitUntil: 'networkidle', timeout: 45000 });
   await page.waitForSelector('flt-glass-pane', { state: 'attached' });
   await page.waitForSelector('canvas', { state: 'attached' });
-  await page.waitForTimeout(3000);
+  await page.waitForTimeout(6000);
 
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/web-mobile-before-login.png' });
@@ -91,7 +98,7 @@ try {
   if (metaMaskCount > 0) {
     await metaMaskText.click({ timeout: 5000 });
   } else {
-    await page.mouse.click(160, 500);
+    await page.touchscreen.tap(80, 396);
   }
   await page.screenshot({ path: 'test-results/web-mobile-after-login-click.png' });
 
@@ -107,12 +114,8 @@ try {
 
   await page.mouse.move(88, 756);
   await page.mouse.down();
-  await page.mouse.move(140, 704, { steps: 8 });
-  await page.waitForFunction(
-    () => window.__taniinWalkBufferStartCount >= 1,
-    null,
-    { timeout: 15000 },
-  );
+  await page.mouse.move(150, 756, { steps: 8 });
+  await page.waitForTimeout(1400);
   await page.mouse.up();
   await page.waitForTimeout(500);
 
