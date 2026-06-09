@@ -23,13 +23,14 @@ enum GameInteraction {
   harvest,
 }
 
-enum SwapAsset { gameCoin, taniSepolia }
+enum SwapAsset { gameCoin, taniSepolia, ethSepolia }
 
 extension SwapAssetText on SwapAsset {
   String get label {
     return switch (this) {
       SwapAsset.gameCoin => 'GAME COIN',
       SwapAsset.taniSepolia => 'TANI SEPOLIA',
+      SwapAsset.ethSepolia => 'ETH SEPOLIA',
     };
   }
 
@@ -37,6 +38,7 @@ extension SwapAssetText on SwapAsset {
     return switch (this) {
       SwapAsset.gameCoin => 'coin',
       SwapAsset.taniSepolia => 'TANI',
+      SwapAsset.ethSepolia => 'ETH',
     };
   }
 }
@@ -156,7 +158,16 @@ class HistoryRecord {
 }
 
 class FarmStateController extends ChangeNotifier {
-  FarmStateController({this.onSfx});
+  FarmStateController({
+    this.onSfx,
+    ChainClient Function(ChainConfig)? chainClientFactory,
+  }) : _chainClientFactory = chainClientFactory ?? _defaultChainClientFactory {
+    _chainClient = _chainClientFactory(chainConfig);
+  }
+
+  static ChainClient _defaultChainClientFactory(ChainConfig config) {
+    return ChainClient(config);
+  }
 
   static const Duration growDuration = Duration(seconds: 12);
   static const int landBuyPrice = 250;
@@ -178,11 +189,15 @@ class FarmStateController extends ChangeNotifier {
   bool walletConnected = false;
   String walletAddress = '';
   String walletNativeBalance = '';
+  String walletNativeWei = '';
+  String ethWeiPerCoin = '';
+  String maxEthPayoutWei = '';
   String chainSignerAddress = '';
   bool walletTaniBalanceAvailable = false;
   bool checkingChain = false;
   ChainConfig chainConfig = const ChainConfig();
-  late ChainClient _chainClient = ChainClient(chainConfig);
+  final ChainClient Function(ChainConfig) _chainClientFactory;
+  late ChainClient _chainClient;
   int _nextHistoryId = 1;
   Timer? _saveDebounce;
   bool _persistenceReady = false;
@@ -299,6 +314,23 @@ class FarmStateController extends ChangeNotifier {
 
   int get swapTargetBalance => balanceForSwapAsset(swapToAsset);
 
+  int get ethCoinCapacity {
+    final nativeWei = _readWei(walletNativeWei);
+    final weiPerCoin = _readWei(ethWeiPerCoin);
+    if (nativeWei <= BigInt.zero || weiPerCoin <= BigInt.zero) {
+      return 0;
+    }
+    var capacity = nativeWei ~/ weiPerCoin;
+    final payoutLimit = _readWei(maxEthPayoutWei);
+    if (payoutLimit > BigInt.zero) {
+      final payoutCapacity = payoutLimit ~/ weiPerCoin;
+      if (payoutCapacity < capacity) {
+        capacity = payoutCapacity;
+      }
+    }
+    return _clampBigIntToGameInt(capacity);
+  }
+
   bool get swappingGameCoinToTani =>
       swapFromAsset == SwapAsset.gameCoin &&
       swapToAsset == SwapAsset.taniSepolia;
@@ -307,13 +339,105 @@ class FarmStateController extends ChangeNotifier {
       swapFromAsset == SwapAsset.taniSepolia &&
       swapToAsset == SwapAsset.gameCoin;
 
-  String get swapVerb => swappingTaniToGameCoin ? 'Deposit' : 'Swap';
+  bool get swappingEthToGameCoin =>
+      swapFromAsset == SwapAsset.ethSepolia &&
+      swapToAsset == SwapAsset.gameCoin;
+
+  bool get swappingGameCoinToEth =>
+      swapFromAsset == SwapAsset.gameCoin &&
+      swapToAsset == SwapAsset.ethSepolia;
+
+  String get swapVerb {
+    if (swappingTaniToGameCoin) {
+      return 'Deposit';
+    }
+    if (swappingEthToGameCoin) {
+      return 'Beli';
+    }
+    if (swappingGameCoinToEth) {
+      return 'Payout';
+    }
+    return 'Swap';
+  }
+
+  String get swapAmountUnitLabel {
+    if (swappingEthToGameCoin || swappingGameCoinToEth) {
+      return 'Game Coin';
+    }
+    return swapFromAsset.shortLabel;
+  }
+
+  String get swapAmountProgressLabel {
+    final unit = swapAmountUnitLabel == 'Game Coin'
+        ? 'coin'
+        : swapAmountUnitLabel;
+    return '$selectedSwapAmount / $swapSourceBalance $unit';
+  }
 
   int balanceForSwapAsset(SwapAsset asset) {
     return switch (asset) {
       SwapAsset.gameCoin => coins,
       SwapAsset.taniSepolia => tani,
+      SwapAsset.ethSepolia => ethCoinCapacity,
     };
+  }
+
+  String swapBalanceLabel(SwapAsset asset) {
+    return switch (asset) {
+      SwapAsset.gameCoin => 'Saldo $coins coin',
+      SwapAsset.taniSepolia =>
+        walletTaniBalanceAvailable
+            ? 'Saldo $tani TANI'
+            : 'Saldo lokal $tani TANI',
+      SwapAsset.ethSepolia => _ethSwapBalanceLabel(),
+    };
+  }
+
+  String swapCardAmountLabel(SwapAsset asset, int amount, {required bool to}) {
+    if (amount <= 0) {
+      return '0';
+    }
+    final sign = to ? '+' : '-';
+    if (asset == SwapAsset.ethSepolia) {
+      return '${sign}ETH';
+    }
+    return '$sign$amount ${asset.shortLabel}';
+  }
+
+  String _ethSwapBalanceLabel() {
+    if (!chainConfig.hasGameApi) {
+      return 'Butuh backend Sepolia';
+    }
+    if (!walletConnected) {
+      return 'Connect wallet';
+    }
+    if (walletNativeWei.isEmpty || walletNativeBalance.isEmpty) {
+      return 'Sync wallet ETH';
+    }
+    if (ethWeiPerCoin.isEmpty) {
+      return 'Sync harga ETH';
+    }
+    final capacity = ethCoinCapacity;
+    if (capacity <= 0) {
+      return 'ETH $walletNativeBalance belum cukup';
+    }
+    return 'ETH $walletNativeBalance -> $capacity coin';
+  }
+
+  BigInt _readWei(String value) {
+    final cleaned = value.trim();
+    if (cleaned.isEmpty || !RegExp(r'^\d+$').hasMatch(cleaned)) {
+      return BigInt.zero;
+    }
+    return BigInt.tryParse(cleaned) ?? BigInt.zero;
+  }
+
+  int _clampBigIntToGameInt(BigInt value) {
+    if (value <= BigInt.zero) {
+      return 0;
+    }
+    final max = BigInt.from(0x7fffffff);
+    return value > max ? 0x7fffffff : value.toInt();
   }
 
   int get growingPlotCount =>
@@ -477,6 +601,9 @@ class FarmStateController extends ChangeNotifier {
           isValidAddress(savedWalletAddress);
       walletAddress = walletConnected ? savedWalletAddress : '';
       walletNativeBalance = '';
+      walletNativeWei = '';
+      ethWeiPerCoin = '';
+      maxEthPayoutWei = '';
       chainSignerAddress = '';
       walletTaniBalanceAvailable = false;
       checkingChain = false;
@@ -733,7 +860,7 @@ class FarmStateController extends ChangeNotifier {
 
   void configureChain(ChainConfig config) {
     chainConfig = config;
-    _chainClient = ChainClient(config);
+    _chainClient = _chainClientFactory(config);
     if (walletConnected) {
       chainStatus =
           'Wallet tersambung: ${shortAddress(walletAddress)}. Sync Sepolia...';
@@ -780,6 +907,9 @@ class FarmStateController extends ChangeNotifier {
     walletConnected = false;
     walletAddress = '';
     walletNativeBalance = '';
+    walletNativeWei = '';
+    ethWeiPerCoin = '';
+    maxEthPayoutWei = '';
     chainSignerAddress = '';
     walletTaniBalanceAvailable = false;
     checkingChain = false;
@@ -817,7 +947,10 @@ class FarmStateController extends ChangeNotifier {
               coinBalance: 0,
               coinBalanceAvailable: false,
               nativeEth: '',
+              nativeWei: '',
               signerAddress: '',
+              ethWeiPerCoin: '',
+              maxEthPayoutWei: '',
             )
           : ChainWalletState.error('Gagal sync wallet.');
     }
@@ -825,6 +958,9 @@ class FarmStateController extends ChangeNotifier {
     chainSignerAddress = state.signerAddress;
     chainStatus = state.message;
     walletNativeBalance = state.nativeEth;
+    walletNativeWei = state.nativeWei;
+    ethWeiPerCoin = state.ethWeiPerCoin;
+    maxEthPayoutWei = state.maxEthPayoutWei;
     if (state.success && state.coinBalanceAvailable) {
       tani = state.coinBalance;
       walletTaniBalanceAvailable = true;
@@ -902,7 +1038,7 @@ class FarmStateController extends ChangeNotifier {
             ? 'Pilih tanaman yang mau dijual. ${selectedSellCrop.name} x${selectedSellCrop.quantity} bernilai $selectedSellCropValue coin.'
             : 'Belum ada hasil panen untuk dijual.',
       GameInteraction.swapToken =>
-        'Pilih aset dan jumlah swap antara Game Coin dan TANI Sepolia.',
+        'Pilih aset dan jumlah untuk Game Coin, TANI Sepolia, atau ETH Sepolia.',
       GameInteraction.buyLand =>
         'Lahan ini bisa dibeli seharga $landBuyPrice coin.',
       GameInteraction.plant =>
@@ -929,7 +1065,7 @@ class FarmStateController extends ChangeNotifier {
             ? 'Tap rumah jual: pilih panen untuk dijual jadi Game Coin.'
             : 'Rumah jual: belum ada hasil panen.',
       GameInteraction.swapToken =>
-        'Tap rumah swap: tukar Game Coin dan TANI Sepolia.',
+        'Tap rumah swap: tukar Game Coin, TANI Sepolia, dan ETH Sepolia.',
       GameInteraction.buyLand => 'Tap tanda BELI: beli $landBuyPrice coin.',
       GameInteraction.plant => 'Tap tanda TANAM: tanam atau jual lahan kosong.',
       GameInteraction.sellLand =>
@@ -1119,7 +1255,7 @@ class FarmStateController extends ChangeNotifier {
 
   bool swapSelectedAssets() {
     playClick();
-    _normalizeSwapAssets();
+    _normalizeSwapAssets(preferFrom: true);
     final fromAsset = swapFromAsset;
     final toAsset = swapToAsset;
     final amount = selectedSwapAmount;
@@ -1143,6 +1279,12 @@ class FarmStateController extends ChangeNotifier {
     }
     if (swappingTaniToGameCoin) {
       return _swapTaniToGameCoin(amount);
+    }
+    if (swappingEthToGameCoin) {
+      return _swapEthToGameCoin(amount);
+    }
+    if (swappingGameCoinToEth) {
+      return _swapGameCoinToEth(amount);
     }
     showMessage('Pasangan swap belum tersedia.', success: false);
     return false;
@@ -1194,6 +1336,72 @@ class FarmStateController extends ChangeNotifier {
     return true;
   }
 
+  bool _swapEthToGameCoin(int amount) {
+    if (!chainConfig.hasGameApi) {
+      showMessage(
+        'Backend Sepolia belum aktif untuk beli coin dari ETH.',
+        success: false,
+      );
+      return false;
+    }
+    if (!walletConnected) {
+      showMessage(
+        'Connect wallet dulu untuk pakai ETH Sepolia.',
+        success: false,
+      );
+      return false;
+    }
+    if (walletNativeWei.isEmpty || ethWeiPerCoin.isEmpty) {
+      showMessage('Sync wallet dulu supaya saldo ETH kebaca.', success: false);
+      return false;
+    }
+    if (amount > ethCoinCapacity) {
+      showMessage(
+        'Saldo ETH Sepolia belum cukup untuk $amount coin.',
+        success: false,
+      );
+      return false;
+    }
+    _queueChainAction(
+      ChainAction(type: 'SWAP_ETH_COIN', plotId: 0, amount: amount),
+      title: 'Beli Game Coin dari ETH',
+      valueLabel: '+$amount coin',
+      requiresTxHash: true,
+    );
+    showMessage('Mengirim beli $amount Game Coin memakai ETH Sepolia.');
+    _commitState();
+    return true;
+  }
+
+  bool _swapGameCoinToEth(int amount) {
+    if (!chainConfig.hasGameApi) {
+      showMessage(
+        'Backend Sepolia belum aktif untuk payout ETH.',
+        success: false,
+      );
+      return false;
+    }
+    if (!walletConnected) {
+      showMessage(
+        'Connect wallet dulu untuk payout ETH Sepolia.',
+        success: false,
+      );
+      return false;
+    }
+    coins -= amount;
+    _clampSwapAmountToSource();
+    _queueChainAction(
+      ChainAction(type: 'SWAP_COIN_ETH', plotId: 0, amount: amount),
+      title: 'Payout Game Coin ke ETH',
+      valueLabel: '-$amount coin',
+      refundCoinsOnFailure: amount,
+      requiresTxHash: true,
+    );
+    showMessage('Mengirim payout ETH Sepolia dari $amount Game Coin.');
+    _commitState();
+    return true;
+  }
+
   void setSwapFromAsset(SwapAsset asset) {
     if (asset == swapFromAsset) {
       return;
@@ -1204,7 +1412,7 @@ class FarmStateController extends ChangeNotifier {
     if (swapToAsset == asset) {
       swapToAsset = previousFrom;
     }
-    _normalizeSwapAssets();
+    _normalizeSwapAssets(preferFrom: true);
     _clampSwapAmountToSource();
     showMessage(
       'Swap ${swapFromAsset.label} ke ${swapToAsset.label}.',
@@ -1223,7 +1431,7 @@ class FarmStateController extends ChangeNotifier {
     if (swapFromAsset == asset) {
       swapFromAsset = previousTo;
     }
-    _normalizeSwapAssets();
+    _normalizeSwapAssets(preferFrom: false);
     _clampSwapAmountToSource();
     showMessage(
       'Swap ${swapFromAsset.label} ke ${swapToAsset.label}.',
@@ -1266,16 +1474,44 @@ class FarmStateController extends ChangeNotifier {
     _commitState();
   }
 
-  void _normalizeSwapAssets() {
+  void _normalizeSwapAssets({bool preferFrom = true}) {
     if (swapFromAsset == swapToAsset) {
-      swapToAsset = _oppositeSwapAsset(swapFromAsset);
+      if (preferFrom) {
+        swapToAsset = _defaultTargetForSwap(swapFromAsset);
+      } else {
+        swapFromAsset = _defaultSourceForSwap(swapToAsset);
+      }
+    }
+    if (_isSupportedSwapPair(swapFromAsset, swapToAsset)) {
+      return;
+    }
+    if (preferFrom) {
+      swapToAsset = _defaultTargetForSwap(swapFromAsset);
+    } else {
+      swapFromAsset = _defaultSourceForSwap(swapToAsset);
     }
   }
 
-  SwapAsset _oppositeSwapAsset(SwapAsset asset) {
+  bool _isSupportedSwapPair(SwapAsset from, SwapAsset to) {
+    return (from == SwapAsset.gameCoin && to == SwapAsset.taniSepolia) ||
+        (from == SwapAsset.taniSepolia && to == SwapAsset.gameCoin) ||
+        (from == SwapAsset.ethSepolia && to == SwapAsset.gameCoin) ||
+        (from == SwapAsset.gameCoin && to == SwapAsset.ethSepolia);
+  }
+
+  SwapAsset _defaultTargetForSwap(SwapAsset asset) {
     return switch (asset) {
       SwapAsset.gameCoin => SwapAsset.taniSepolia,
       SwapAsset.taniSepolia => SwapAsset.gameCoin,
+      SwapAsset.ethSepolia => SwapAsset.gameCoin,
+    };
+  }
+
+  SwapAsset _defaultSourceForSwap(SwapAsset asset) {
+    return switch (asset) {
+      SwapAsset.gameCoin => SwapAsset.taniSepolia,
+      SwapAsset.taniSepolia => SwapAsset.gameCoin,
+      SwapAsset.ethSepolia => SwapAsset.gameCoin,
     };
   }
 
@@ -1400,6 +1636,10 @@ class FarmStateController extends ChangeNotifier {
         tani += action.amount;
       }
       if (action.type == 'SWAP_TANI_COIN' &&
+          isValidTransactionHash(result.txHash)) {
+        coins = math.min(0x7fffffff, coins + action.amount);
+      }
+      if (action.type == 'SWAP_ETH_COIN' &&
           isValidTransactionHash(result.txHash)) {
         coins = math.min(0x7fffffff, coins + action.amount);
       }
@@ -1547,6 +1787,9 @@ class FarmStateController extends ChangeNotifier {
     walletAddress = cleaned;
     if (changed) {
       walletNativeBalance = '';
+      walletNativeWei = '';
+      ethWeiPerCoin = '';
+      maxEthPayoutWei = '';
       chainSignerAddress = '';
       walletTaniBalanceAvailable = false;
       chainStatus =

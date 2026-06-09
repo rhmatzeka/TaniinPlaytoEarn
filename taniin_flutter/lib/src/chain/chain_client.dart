@@ -120,7 +120,10 @@ class ChainWalletState {
     this.coinBalance = 0,
     this.coinBalanceAvailable = false,
     this.nativeEth = '',
+    this.nativeWei = '',
     this.signerAddress = '',
+    this.ethWeiPerCoin = '',
+    this.maxEthPayoutWei = '',
   });
 
   factory ChainWalletState.ok({
@@ -129,6 +132,9 @@ class ChainWalletState {
     required bool coinBalanceAvailable,
     required String nativeEth,
     required String signerAddress,
+    String nativeWei = '',
+    String ethWeiPerCoin = '',
+    String maxEthPayoutWei = '',
   }) {
     return ChainWalletState(
       success: true,
@@ -136,7 +142,10 @@ class ChainWalletState {
       coinBalance: coinBalance,
       coinBalanceAvailable: coinBalanceAvailable,
       nativeEth: nativeEth,
+      nativeWei: nativeWei,
       signerAddress: signerAddress,
+      ethWeiPerCoin: ethWeiPerCoin,
+      maxEthPayoutWei: maxEthPayoutWei,
     );
   }
 
@@ -149,7 +158,22 @@ class ChainWalletState {
   final int coinBalance;
   final bool coinBalanceAvailable;
   final String nativeEth;
+  final String nativeWei;
   final String signerAddress;
+  final String ethWeiPerCoin;
+  final String maxEthPayoutWei;
+}
+
+class _GameApiHealth {
+  const _GameApiHealth({
+    this.signerAddress = '',
+    this.ethWeiPerCoin = '',
+    this.maxEthPayoutWei = '',
+  });
+
+  final String signerAddress;
+  final String ethWeiPerCoin;
+  final String maxEthPayoutWei;
 }
 
 class ChainClient {
@@ -158,7 +182,7 @@ class ChainClient {
   static const String sepoliaChainIdHex = '0xaa36a7';
   static const String sepoliaChainIdLabel = '11155111';
   static final BigInt _weiPerEth = BigInt.parse('1000000000000000000');
-  static const Duration _timeout = Duration(seconds: 9);
+  static const Duration _timeout = Duration(seconds: 45);
 
   final ChainConfig config;
 
@@ -188,12 +212,7 @@ class ChainClient {
       final network = await checkSepolia();
       final nativeWei = await _ethGetBalance(wallet);
       final nativeEth = _formatEth(nativeWei);
-      var signerAddress = '';
-      try {
-        signerAddress = await _loadGameApiSignerAddress();
-      } on Object {
-        signerAddress = '';
-      }
+      final gameApiHealth = await _loadGameApiHealthOrEmpty();
       if (config.hasCoinContract) {
         final rawCoin = await _erc20BalanceOf(
           config.coinContractAddress,
@@ -205,7 +224,10 @@ class ChainClient {
           coinBalance: wholeCoin,
           coinBalanceAvailable: true,
           nativeEth: nativeEth,
-          signerAddress: signerAddress,
+          nativeWei: nativeWei.toString(),
+          signerAddress: gameApiHealth.signerAddress,
+          ethWeiPerCoin: gameApiHealth.ethWeiPerCoin,
+          maxEthPayoutWei: gameApiHealth.maxEthPayoutWei,
         );
       }
       return ChainWalletState.ok(
@@ -214,10 +236,13 @@ class ChainClient {
         coinBalance: 0,
         coinBalanceAvailable: false,
         nativeEth: nativeEth,
-        signerAddress: signerAddress,
+        nativeWei: nativeWei.toString(),
+        signerAddress: gameApiHealth.signerAddress,
+        ethWeiPerCoin: gameApiHealth.ethWeiPerCoin,
+        maxEthPayoutWei: gameApiHealth.maxEthPayoutWei,
       );
     } on Object catch (error) {
-      final signerAddress = await _loadGameApiSignerAddress();
+      final gameApiHealth = await _loadGameApiHealthOrEmpty();
       if (config.hasGameApi) {
         return ChainWalletState.ok(
           message:
@@ -225,7 +250,10 @@ class ChainClient {
           coinBalance: 0,
           coinBalanceAvailable: false,
           nativeEth: '',
-          signerAddress: signerAddress,
+          nativeWei: '',
+          signerAddress: gameApiHealth.signerAddress,
+          ethWeiPerCoin: gameApiHealth.ethWeiPerCoin,
+          maxEthPayoutWei: gameApiHealth.maxEthPayoutWei,
         );
       }
       return ChainWalletState.error(
@@ -308,17 +336,25 @@ class ChainClient {
     return _hexToBigInt(result);
   }
 
-  Future<String> _loadGameApiSignerAddress() async {
-    if (!config.hasGameApi) {
-      return '';
-    }
+  Future<_GameApiHealth> _loadGameApiHealthOrEmpty() async {
     try {
-      final response = await _getGameApi('/health');
-      final object = jsonDecode(response) as Map<String, dynamic>;
-      return _cleanAddress(object['signer']);
+      return await _loadGameApiHealth();
     } on Object {
-      return '';
+      return const _GameApiHealth();
     }
+  }
+
+  Future<_GameApiHealth> _loadGameApiHealth() async {
+    if (!config.hasGameApi) {
+      return const _GameApiHealth();
+    }
+    final response = await _getGameApi('/health');
+    final object = jsonDecode(response) as Map<String, dynamic>;
+    return _GameApiHealth(
+      signerAddress: _cleanAddress(object['signer']),
+      ethWeiPerCoin: _decimalStringValue(object['ethWeiPerCoin']),
+      maxEthPayoutWei: _decimalStringValue(object['maxEthPayoutWei']),
+    );
   }
 
   Future<String> _postGameApi(String path, String payload) async {
@@ -508,6 +544,11 @@ String _firstValidTransactionHash(Iterable<Object?> values) {
 String _stringValue(Object? value, {String fallback = ''}) {
   final cleaned = value?.toString().trim() ?? '';
   return cleaned.isEmpty ? fallback : cleaned;
+}
+
+String _decimalStringValue(Object? value) {
+  final cleaned = _stringValue(value);
+  return RegExp(r'^\d+$').hasMatch(cleaned) ? cleaned : '';
 }
 
 String _cleanAddress(Object? value) {

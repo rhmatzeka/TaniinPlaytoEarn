@@ -54,8 +54,12 @@ class GameHud extends StatelessWidget {
                 final mobileWebTouchLayout = kIsWeb && showTouchJoystick;
                 const showMiniMap = true;
                 final miniMapWidth = compact
-                    ? (constraints.maxWidth * 0.28).clamp(112.0, 140.0).toDouble()
-                    : (constraints.maxWidth * 0.112).clamp(236.0, 286.0).toDouble();
+                    ? (constraints.maxWidth * 0.28)
+                          .clamp(112.0, 140.0)
+                          .toDouble()
+                    : (constraints.maxWidth * 0.112)
+                          .clamp(236.0, 286.0)
+                          .toDouble();
                 final joystickRadius = showTouchJoystick
                     ? mobileWebTouchLayout
                           ? _mobileWebJoystickRadius(
@@ -1290,8 +1294,12 @@ class _SwapControl extends StatelessWidget {
             final fromCard = _SwapAssetCard(
               label: 'DARI',
               selectedAsset: farmState.swapFromAsset,
-              amount: amount > 0 ? '-$amount' : '0',
-              balance: 'Saldo ${farmState.swapSourceBalance}',
+              amount: farmState.swapCardAmountLabel(
+                farmState.swapFromAsset,
+                amount,
+                to: false,
+              ),
+              balance: farmState.swapBalanceLabel(farmState.swapFromAsset),
               icon: _swapAssetIcon(farmState.swapFromAsset),
               color: _swapAssetColor(farmState.swapFromAsset),
               onAssetChanged: farmState.setSwapFromAsset,
@@ -1299,8 +1307,12 @@ class _SwapControl extends StatelessWidget {
             final toCard = _SwapAssetCard(
               label: 'KE',
               selectedAsset: farmState.swapToAsset,
-              amount: amount > 0 ? '+$amount' : '0',
-              balance: 'Saldo ${farmState.swapTargetBalance}',
+              amount: farmState.swapCardAmountLabel(
+                farmState.swapToAsset,
+                amount,
+                to: true,
+              ),
+              balance: farmState.swapBalanceLabel(farmState.swapToAsset),
               icon: _swapAssetIcon(farmState.swapToAsset),
               color: _swapAssetColor(farmState.swapToAsset),
               onAssetChanged: farmState.setSwapToAsset,
@@ -1340,7 +1352,7 @@ class _SwapControl extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        'Jumlah ${farmState.swapFromAsset.shortLabel}',
+                        'Jumlah ${farmState.swapAmountUnitLabel}',
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(
                               color: const Color(0xFFFFF0D4),
@@ -1349,7 +1361,7 @@ class _SwapControl extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '$amount / $sourceBalance ${farmState.swapFromAsset.shortLabel}',
+                      farmState.swapAmountProgressLabel,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: const Color(0xFFFFDE19),
                         fontSize: 22,
@@ -1431,6 +1443,7 @@ IconData _swapAssetIcon(SwapAsset asset) {
   return switch (asset) {
     SwapAsset.gameCoin => Icons.paid,
     SwapAsset.taniSepolia => Icons.token,
+    SwapAsset.ethSepolia => Icons.bolt,
   };
 }
 
@@ -1438,6 +1451,7 @@ Color _swapAssetColor(SwapAsset asset) {
   return switch (asset) {
     SwapAsset.gameCoin => const Color(0xFF6C3915),
     SwapAsset.taniSepolia => const Color(0xFF22543B),
+    SwapAsset.ethSepolia => const Color(0xFF244D7A),
   };
 }
 

@@ -125,6 +125,25 @@ class _HistoryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasHash = record.hasTxHash;
+    final isFailure = record.status.toLowerCase().contains('gagal');
+
+    final IconData iconData;
+    final Color iconColor;
+    final Color boxColor;
+    if (hasHash) {
+      iconData = Icons.open_in_new;
+      iconColor = const Color(0xFF203124);
+      boxColor = const Color(0xFF69E081);
+    } else if (isFailure) {
+      iconData = Icons.error_outline;
+      iconColor = const Color(0xFF5D1212);
+      boxColor = const Color(0xFFFF6B6B);
+    } else {
+      iconData = Icons.sync;
+      iconColor = const Color(0xFF4C230B);
+      boxColor = const Color(0xFFFFD51C);
+    }
+
     return GestureDetector(
       onTap: () => _openTransaction(context),
       child: DecoratedBox(
@@ -142,21 +161,13 @@ class _HistoryRow extends StatelessWidget {
             children: [
               DecoratedBox(
                 decoration: BoxDecoration(
-                  color: hasHash
-                      ? const Color(0xFF69E081)
-                      : const Color(0xFFFFD51C),
+                  color: boxColor,
                   borderRadius: BorderRadius.circular(5),
                   border: Border.all(color: const Color(0xFF4C230B), width: 3),
                 ),
                 child: SizedBox.square(
                   dimension: 26,
-                  child: hasHash
-                      ? const Icon(
-                          Icons.open_in_new,
-                          size: 17,
-                          color: Color(0xFF203124),
-                        )
-                      : const SizedBox.shrink(),
+                  child: Icon(iconData, size: 17, color: iconColor),
                 ),
               ),
               const SizedBox(width: 18),

@@ -12,6 +12,38 @@ import 'package:taniin_flutter/src/ui/settings_panel.dart';
 import 'package:taniin_flutter/src/ui/taniin_theme.dart';
 import 'package:taniin_flutter/src/ui/wallet_panel.dart';
 
+const String _validTxHash =
+    '0x1111111111111111111111111111111111111111111111111111111111111111';
+
+class _FakeChainClient extends ChainClient {
+  _FakeChainClient(super.config);
+
+  final List<ChainAction> actions = <ChainAction>[];
+
+  @override
+  Future<ChainResult> submitGameAction(
+    String walletAddress,
+    ChainAction action,
+  ) async {
+    actions.add(action);
+    return ChainResult.ok('Transaksi fake terkirim.', txHash: _validTxHash);
+  }
+
+  @override
+  Future<ChainWalletState> loadWalletState(String walletAddress) async {
+    return ChainWalletState.ok(
+      message: 'Wallet fake tersync Sepolia.',
+      coinBalance: 0,
+      coinBalanceAvailable: false,
+      nativeEth: '0.001',
+      nativeWei: '1000000000000000',
+      signerAddress: '0x0000000000000000000000000000000000000002',
+      ethWeiPerCoin: '10000000000',
+      maxEthPayoutWei: '1000000000000',
+    );
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -307,4 +339,40 @@ void main() {
       farmState.dispose();
     },
   );
+
+  test('adds Game Coin after successful ETH Sepolia funding tx', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    _FakeChainClient? fakeClient;
+    final farmState = FarmStateController(
+      chainClientFactory: (config) {
+        fakeClient = _FakeChainClient(config);
+        return fakeClient!;
+      },
+    );
+    addTearDown(farmState.dispose);
+
+    farmState.configureChain(const ChainConfig(gameApiUrl: 'https://api.test'));
+    farmState
+      ..walletConnected = true
+      ..walletAddress = '0x0000000000000000000000000000000000000001'
+      ..walletNativeBalance = '0.001'
+      ..walletNativeWei = '1000000000000000'
+      ..ethWeiPerCoin = '10000000000'
+      ..maxEthPayoutWei = '1000000000000';
+
+    farmState.setSwapFromAsset(SwapAsset.ethSepolia);
+    farmState.setSwapToAsset(SwapAsset.gameCoin);
+    farmState.setSwapAmount(25);
+
+    expect(farmState.ethCoinCapacity, 100);
+    expect(farmState.swapSelectedAssets(), isTrue);
+    expect(farmState.coins, 620);
+
+    await Future<void>.delayed(Duration.zero);
+
+    expect(fakeClient?.actions.single.type, 'SWAP_ETH_COIN');
+    expect(farmState.coins, 645);
+    expect(farmState.history.first.txHash, _validTxHash);
+    expect(farmState.history.first.status, 'on-chain');
+  });
 }
