@@ -19,6 +19,7 @@ class _FakeChainClient extends ChainClient {
   _FakeChainClient(super.config);
 
   final List<ChainAction> actions = <ChainAction>[];
+  ChainReceiptState receiptState = ChainReceiptState.ok('Confirmed fake.');
 
   @override
   Future<ChainResult> submitGameAction(
@@ -27,6 +28,11 @@ class _FakeChainClient extends ChainClient {
   ) async {
     actions.add(action);
     return ChainResult.ok('Transaksi fake terkirim.', txHash: _validTxHash);
+  }
+
+  @override
+  Future<ChainReceiptState> waitForTransaction(String txHash) async {
+    return receiptState;
   }
 
   @override
@@ -374,5 +380,44 @@ void main() {
     expect(farmState.coins, 645);
     expect(farmState.history.first.txHash, _validTxHash);
     expect(farmState.history.first.status, 'on-chain');
+  });
+
+  test('keeps ETH payout pending until Sepolia receipt confirms', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    _FakeChainClient? fakeClient;
+    final farmState = FarmStateController(
+      chainClientFactory: (config) {
+        fakeClient = _FakeChainClient(config)
+          ..receiptState = ChainReceiptState.pending(
+            'Transaksi fake belum confirmed.',
+          );
+        return fakeClient!;
+      },
+    );
+    addTearDown(farmState.dispose);
+
+    farmState.configureChain(const ChainConfig(gameApiUrl: 'https://api.test'));
+    farmState
+      ..walletConnected = true
+      ..walletAddress = '0x0000000000000000000000000000000000000001'
+      ..walletNativeBalance = '0.001'
+      ..walletNativeWei = '1000000000000000'
+      ..ethWeiPerCoin = '10000000000'
+      ..maxEthPayoutWei = '1000000000000';
+
+    farmState.setSwapFromAsset(SwapAsset.gameCoin);
+    farmState.setSwapToAsset(SwapAsset.ethSepolia);
+    farmState.setSwapAmount(20);
+
+    expect(farmState.swapSelectedAssets(), isTrue);
+    expect(farmState.coins, 600);
+
+    await Future<void>.delayed(Duration.zero);
+
+    expect(fakeClient?.actions.single.type, 'SWAP_COIN_ETH');
+    expect(farmState.coins, 600);
+    expect(farmState.history.first.txHash, _validTxHash);
+    expect(farmState.history.first.status, 'menunggu konfirmasi');
+    expect(farmState.chainStatus, contains('belum confirmed'));
   });
 }

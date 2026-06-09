@@ -125,12 +125,15 @@ class _HistoryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasHash = record.hasTxHash;
-    final isFailure = record.status.toLowerCase().contains('gagal');
+    final status = record.status.trim().toLowerCase();
+    final isConfirmed = hasHash && status == 'on-chain';
+    final isFailure = status.contains('gagal');
+    final isPendingHash = hasHash && !isConfirmed && !isFailure;
 
     final IconData iconData;
     final Color iconColor;
     final Color boxColor;
-    if (hasHash) {
+    if (isConfirmed) {
       iconData = Icons.open_in_new;
       iconColor = const Color(0xFF203124);
       boxColor = const Color(0xFF69E081);
@@ -138,6 +141,10 @@ class _HistoryRow extends StatelessWidget {
       iconData = Icons.error_outline;
       iconColor = const Color(0xFF5D1212);
       boxColor = const Color(0xFFFF6B6B);
+    } else if (isPendingHash) {
+      iconData = Icons.hourglass_top;
+      iconColor = const Color(0xFF4C230B);
+      boxColor = const Color(0xFFFFC857);
     } else {
       iconData = Icons.sync;
       iconColor = const Color(0xFF4C230B);
@@ -148,10 +155,18 @@ class _HistoryRow extends StatelessWidget {
       onTap: () => _openTransaction(context),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: hasHash ? const Color(0xFF4E6334) : const Color(0xFF8C3A14),
+          color: isConfirmed
+              ? const Color(0xFF4E6334)
+              : isPendingHash
+              ? const Color(0xFF6F4A1C)
+              : const Color(0xFF8C3A14),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: hasHash ? const Color(0xFF66CF7B) : const Color(0xFF5D260E),
+            color: isConfirmed
+                ? const Color(0xFF66CF7B)
+                : isPendingHash
+                ? const Color(0xFFFFC857)
+                : const Color(0xFF5D260E),
             width: 4,
           ),
         ),
@@ -186,14 +201,18 @@ class _HistoryRow extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      hasHash
-                          ? 'Sepolia ${shortTransactionHash(record.txHash)}'
-                          : record.status,
+                      _statusText(
+                        hasHash: hasHash,
+                        isConfirmed: isConfirmed,
+                        isPendingHash: isPendingHash,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: hasHash
+                        color: isConfirmed
                             ? const Color(0xFFB5F8BC)
+                            : isPendingHash
+                            ? const Color(0xFFFFE7A8)
                             : const Color(0xFFE9C692),
                         fontSize: 18,
                       ),
@@ -227,6 +246,23 @@ class _HistoryRow extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _statusText({
+    required bool hasHash,
+    required bool isConfirmed,
+    required bool isPendingHash,
+  }) {
+    if (isConfirmed) {
+      return 'Confirmed ${shortTransactionHash(record.txHash)}';
+    }
+    if (isPendingHash) {
+      return 'Menunggu Sepolia ${shortTransactionHash(record.txHash)}';
+    }
+    if (hasHash) {
+      return '${record.status} ${shortTransactionHash(record.txHash)}';
+    }
+    return record.status;
   }
 
   Future<void> _openTransaction(BuildContext context) async {

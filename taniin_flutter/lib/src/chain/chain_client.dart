@@ -113,6 +113,34 @@ class ChainResult {
   final String txHash;
 }
 
+class ChainReceiptState {
+  const ChainReceiptState({
+    required this.confirmed,
+    required this.success,
+    required this.message,
+  });
+
+  factory ChainReceiptState.ok(String message) {
+    return ChainReceiptState(confirmed: true, success: true, message: message);
+  }
+
+  factory ChainReceiptState.failed(String message) {
+    return ChainReceiptState(confirmed: true, success: false, message: message);
+  }
+
+  factory ChainReceiptState.pending(String message) {
+    return ChainReceiptState(
+      confirmed: false,
+      success: false,
+      message: message,
+    );
+  }
+
+  final bool confirmed;
+  final bool success;
+  final String message;
+}
+
 class ChainWalletState {
   const ChainWalletState({
     required this.success,
@@ -183,6 +211,8 @@ class ChainClient {
   static const String sepoliaChainIdLabel = '11155111';
   static final BigInt _weiPerEth = BigInt.parse('1000000000000000000');
   static const Duration _timeout = Duration(seconds: 45);
+  static const Duration _receiptTimeout = Duration(seconds: 90);
+  static const Duration _receiptPollDelay = Duration(seconds: 3);
 
   final ChainConfig config;
 
@@ -297,14 +327,56 @@ class ChainClient {
     }
   }
 
+  Future<ChainReceiptState> waitForTransaction(String txHash) async {
+    final hash = txHash.trim();
+    if (!isValidTransactionHash(hash)) {
+      return ChainReceiptState.failed('Tx hash Sepolia tidak valid.');
+    }
+    final deadline = DateTime.now().add(_receiptTimeout);
+    Object? lastError;
+    while (DateTime.now().isBefore(deadline)) {
+      try {
+        final receipt = await _transactionReceipt(hash);
+        if (receipt != null) {
+          final status = receipt['status']?.toString().toLowerCase() ?? '';
+          if (status == '0x1') {
+            return ChainReceiptState.ok(
+              'Transaksi Sepolia confirmed: ${shortTransactionHash(hash)}.',
+            );
+          }
+          if (status == '0x0') {
+            return ChainReceiptState.failed(
+              'Transaksi Sepolia gagal: ${shortTransactionHash(hash)}.',
+            );
+          }
+          return ChainReceiptState.ok(
+            'Transaksi Sepolia sudah punya receipt: ${shortTransactionHash(hash)}.',
+          );
+        }
+      } on Object catch (error) {
+        lastError = error;
+      }
+      await Future<void>.delayed(_receiptPollDelay);
+    }
+    final suffix = lastError == null ? '' : ' ${_compactError(lastError)}';
+    return ChainReceiptState.pending(
+      'Transaksi ${shortTransactionHash(hash)} belum confirmed.$suffix',
+    );
+  }
+
   Future<String> _rpcResult(Map<String, Object> payload) async {
+    final result = await _rpcRawResult(payload);
+    return result?.toString() ?? '';
+  }
+
+  Future<Object?> _rpcRawResult(Map<String, Object> payload) async {
     final response = await _postJson(config.rpcUrl, jsonEncode(payload));
     final object = jsonDecode(response) as Map<String, dynamic>;
     final error = object['error'];
     if (error is Map<String, dynamic>) {
       throw StateError(error['message']?.toString() ?? error.toString());
     }
-    return object['result']?.toString() ?? '';
+    return object['result'];
   }
 
   Future<BigInt> _ethGetBalance(String walletAddress) async {
@@ -315,6 +387,19 @@ class ChainClient {
       'id': 2,
     });
     return _hexToBigInt(result);
+  }
+
+  Future<Map<String, dynamic>?> _transactionReceipt(String txHash) async {
+    final result = await _rpcRawResult(<String, Object>{
+      'jsonrpc': '2.0',
+      'method': 'eth_getTransactionReceipt',
+      'params': <Object>[txHash],
+      'id': 4,
+    });
+    if (result is Map<String, dynamic>) {
+      return result;
+    }
+    return null;
   }
 
   Future<BigInt> _erc20BalanceOf(

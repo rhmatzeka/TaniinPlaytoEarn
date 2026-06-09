@@ -1616,7 +1616,8 @@ class FarmStateController extends ChangeNotifier {
   }) async {
     final result = await _chainClient.submitGameAction(walletAddress, action);
     if (result.success) {
-      if (requiresTxHash && !isValidTransactionHash(result.txHash)) {
+      final hasValidHash = isValidTransactionHash(result.txHash);
+      if (requiresTxHash && !hasValidHash) {
         _handleChainActionFailure(
           entryId,
           action,
@@ -1626,21 +1627,62 @@ class FarmStateController extends ChangeNotifier {
         );
         return;
       }
+      if (hasValidHash) {
+        _updateHistory(
+          entryId,
+          status: 'menunggu konfirmasi',
+          txHash: result.txHash,
+        );
+        chainStatus =
+            'Transaksi ${shortTransactionHash(result.txHash)} terkirim. Menunggu konfirmasi Sepolia...';
+        _commitState();
+        final receipt = await _chainClient.waitForTransaction(result.txHash);
+        if (!receipt.confirmed) {
+          _updateHistory(
+            entryId,
+            status: 'menunggu konfirmasi',
+            txHash: result.txHash,
+          );
+          chainStatus = receipt.message;
+          showMessage(
+            'Transaksi masih menunggu konfirmasi Sepolia.',
+            success: false,
+            notify: false,
+          );
+          _commitState();
+          return;
+        }
+        if (!receipt.success) {
+          if (refundCoinsOnFailure > 0 || refundTaniOnFailure > 0) {
+            _handleChainActionFailure(
+              entryId,
+              action,
+              refundCoinsOnFailure,
+              refundTaniOnFailure,
+              receipt.message,
+            );
+          } else {
+            _handleConfirmedChainFailure(entryId, action, receipt.message);
+          }
+          return;
+        }
+        chainStatus = receipt.message;
+      }
       _updateHistory(
         entryId,
-        status: isValidTransactionHash(result.txHash) ? 'on-chain' : 'dikirim',
+        status: hasValidHash ? 'on-chain' : 'dikirim',
         txHash: result.txHash,
       );
-      chainStatus = result.message;
-      if (action.type == 'SWAP_COIN' && isValidTransactionHash(result.txHash)) {
+      if (!hasValidHash) {
+        chainStatus = result.message;
+      }
+      if (action.type == 'SWAP_COIN' && hasValidHash) {
         tani += action.amount;
       }
-      if (action.type == 'SWAP_TANI_COIN' &&
-          isValidTransactionHash(result.txHash)) {
+      if (action.type == 'SWAP_TANI_COIN' && hasValidHash) {
         coins = math.min(0x7fffffff, coins + action.amount);
       }
-      if (action.type == 'SWAP_ETH_COIN' &&
-          isValidTransactionHash(result.txHash)) {
+      if (action.type == 'SWAP_ETH_COIN' && hasValidHash) {
         coins = math.min(0x7fffffff, coins + action.amount);
       }
       if (_actionUpdatesCoinBalance(action)) {
@@ -1656,6 +1698,18 @@ class FarmStateController extends ChangeNotifier {
       refundTaniOnFailure,
       result.message,
     );
+  }
+
+  void _handleConfirmedChainFailure(
+    int entryId,
+    ChainAction action,
+    String reason,
+  ) {
+    _updateHistory(entryId, status: 'gagal on-chain');
+    chainStatus =
+        '${action.label} gagal on-chain: ${_conciseChainError(reason)}';
+    showMessage('Transaksi Sepolia gagal.', success: false, notify: false);
+    _commitState();
   }
 
   void _handleChainActionFailure(
