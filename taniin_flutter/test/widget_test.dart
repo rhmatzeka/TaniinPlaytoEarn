@@ -20,6 +20,11 @@ class _FakeChainClient extends ChainClient {
 
   final List<ChainAction> actions = <ChainAction>[];
   ChainReceiptState receiptState = ChainReceiptState.ok('Confirmed fake.');
+  String nativeEth = '0.001';
+  String nativeWei = '1000000000000000';
+  String ethWeiPerCoin = '10000000000';
+  String maxEthPayoutWei = '1000000000000';
+  int walletLoads = 0;
 
   @override
   Future<ChainResult> submitGameAction(
@@ -37,15 +42,16 @@ class _FakeChainClient extends ChainClient {
 
   @override
   Future<ChainWalletState> loadWalletState(String walletAddress) async {
+    walletLoads += 1;
     return ChainWalletState.ok(
       message: 'Wallet fake tersync Sepolia.',
       coinBalance: 0,
       coinBalanceAvailable: false,
-      nativeEth: '0.001',
-      nativeWei: '1000000000000000',
+      nativeEth: nativeEth,
+      nativeWei: nativeWei,
       signerAddress: '0x0000000000000000000000000000000000000002',
-      ethWeiPerCoin: '10000000000',
-      maxEthPayoutWei: '1000000000000',
+      ethWeiPerCoin: ethWeiPerCoin,
+      maxEthPayoutWei: maxEthPayoutWei,
     );
   }
 }
@@ -419,5 +425,50 @@ void main() {
     expect(farmState.history.first.txHash, _validTxHash);
     expect(farmState.history.first.status, 'menunggu konfirmasi');
     expect(farmState.chainStatus, contains('belum confirmed'));
+  });
+
+  test('confirms ETH payout after wallet Sepolia balance increases', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    _FakeChainClient? fakeClient;
+    final farmState = FarmStateController(
+      chainClientFactory: (config) {
+        fakeClient = _FakeChainClient(config)
+          ..nativeEth = '0.003'
+          ..nativeWei = '3000000000000000'
+          ..ethWeiPerCoin = '100000000000000'
+          ..maxEthPayoutWei = '100000000000000000';
+        return fakeClient!;
+      },
+    );
+    addTearDown(farmState.dispose);
+
+    farmState.configureChain(const ChainConfig(gameApiUrl: 'https://api.test'));
+    farmState
+      ..walletConnected = true
+      ..walletAddress = '0x0000000000000000000000000000000000000001'
+      ..walletNativeBalance = '0.001'
+      ..walletNativeWei = '1000000000000000'
+      ..ethWeiPerCoin = '100000000000000'
+      ..maxEthPayoutWei = '100000000000000000';
+
+    farmState.setSwapFromAsset(SwapAsset.gameCoin);
+    farmState.setSwapToAsset(SwapAsset.ethSepolia);
+    farmState.setSwapAmount(20);
+
+    expect(
+      farmState.swapCardAmountLabel(SwapAsset.ethSepolia, 20, to: true),
+      '+0.002 ETH',
+    );
+    expect(farmState.swapSelectedAssets(), isTrue);
+    expect(farmState.coins, 600);
+
+    await pumpEventQueue();
+
+    expect(fakeClient?.actions.single.type, 'SWAP_COIN_ETH');
+    expect(fakeClient?.walletLoads, 1);
+    expect(farmState.walletNativeBalance, '0.003');
+    expect(farmState.history.first.txHash, _validTxHash);
+    expect(farmState.history.first.status, 'on-chain');
+    expect(farmState.chainStatus, contains('Payout +0.002 ETH confirmed'));
   });
 }

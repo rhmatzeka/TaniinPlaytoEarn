@@ -6,8 +6,8 @@ const CROP_ITEM_ID = 2n;
 const LAND_SELL_REWARD = 175;
 const CROP_REWARD = 35;
 const COIN_SWAP_RATE = 1;
-const DEFAULT_ETH_WEI_PER_COIN = "10000000000";
-const DEFAULT_MAX_ETH_PAYOUT_WEI = "10000000000000000";
+const DEFAULT_ETH_WEI_PER_COIN = "100000000000000";
+const DEFAULT_MAX_ETH_PAYOUT_WEI = "100000000000000000";
 
 const coinAbi = [
   "function mint(address to, uint256 amount) external",
@@ -93,6 +93,7 @@ async function submitGameAction(body) {
   const amount = toPositiveInt(body.amount || 1, "amount");
   const tokenUri = landTokenUri(walletAddress, plotId);
   const txHashes = [];
+  let ethPayoutAmountWei = 0n;
   const { coin, land, items } = service.contracts;
 
   switch (type) {
@@ -142,6 +143,7 @@ async function submitGameAction(body) {
     }
     case "SWAP_COIN_ETH": {
       const payoutWei = ethPayoutWei(amount);
+      ethPayoutAmountWei = payoutWei;
       ensureRecipientIsNotSigner(service, walletAddress);
       await ensureSignerCanPayEth(service, payoutWei);
       txHashes.push(await sendTransaction("ETH swap payout", service.signer.sendTransaction({
@@ -161,6 +163,8 @@ async function submitGameAction(body) {
     wallet: walletAddress,
     txHash,
     txHashes,
+    ethPayoutWei: ethPayoutAmountWei > 0n ? ethPayoutAmountWei.toString() : "",
+    ethPayoutEth: ethPayoutAmountWei > 0n ? ethers.formatEther(ethPayoutAmountWei) : "",
     etherscanUrl: txHash ? `https://sepolia.etherscan.io/tx/${txHash}` : ""
   };
 }
@@ -176,7 +180,9 @@ async function health() {
     signerBalanceWei: signerBalanceWei.toString(),
     signerBalanceEth: ethers.formatEther(signerBalanceWei),
     ethWeiPerCoin: weiPerCoin.toString(),
+    ethPerCoin: ethers.formatEther(weiPerCoin),
     maxEthPayoutWei: maxPayoutWei.toString(),
+    maxEthPayoutEth: ethers.formatEther(maxPayoutWei),
     contracts: service.addresses
   };
 }
@@ -208,10 +214,16 @@ function ethPayoutWei(amount) {
 }
 
 function ethSwapConfig() {
+  const configuredWeiPerCoin = envBigInt("TANIIN_ETH_WEI_PER_COIN", DEFAULT_ETH_WEI_PER_COIN);
+  const configuredMaxPayoutWei = envBigInt("TANIIN_MAX_ETH_PAYOUT_WEI", DEFAULT_MAX_ETH_PAYOUT_WEI);
   return {
-    weiPerCoin: envBigInt("TANIIN_ETH_WEI_PER_COIN", DEFAULT_ETH_WEI_PER_COIN),
-    maxPayoutWei: envBigInt("TANIIN_MAX_ETH_PAYOUT_WEI", DEFAULT_MAX_ETH_PAYOUT_WEI)
+    weiPerCoin: maxBigInt(configuredWeiPerCoin, BigInt(DEFAULT_ETH_WEI_PER_COIN)),
+    maxPayoutWei: maxBigInt(configuredMaxPayoutWei, BigInt(DEFAULT_MAX_ETH_PAYOUT_WEI))
   };
+}
+
+function maxBigInt(left, right) {
+  return left > right ? left : right;
 }
 
 function ensureRecipientIsNotSigner(service, walletAddress) {

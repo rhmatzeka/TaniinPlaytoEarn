@@ -257,6 +257,9 @@ class _HistoryRow extends StatelessWidget {
       return 'Confirmed ${shortTransactionHash(record.txHash)}';
     }
     if (isPendingHash) {
+      if (record.status.toLowerCase().contains('saldo eth')) {
+        return 'Menunggu saldo ETH ${shortTransactionHash(record.txHash)}';
+      }
       return 'Menunggu Sepolia ${shortTransactionHash(record.txHash)}';
     }
     if (hasHash) {

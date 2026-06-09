@@ -1291,6 +1291,7 @@ class _SwapControl extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final vertical = constraints.maxWidth < 760;
+            final rateHint = farmState.swapRateHintLabel;
             final fromCard = _SwapAssetCard(
               label: 'DARI',
               selectedAsset: farmState.swapFromAsset,
@@ -1348,6 +1349,34 @@ class _SwapControl extends StatelessWidget {
                         ],
                       ),
                 const SizedBox(height: 18),
+                if (rateHint.isNotEmpty) ...[
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF5E2C0D),
+                      borderRadius: BorderRadius.circular(7),
+                      border: Border.all(
+                        color: const Color(0x99FFFF99),
+                        width: 2,
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 9,
+                      ),
+                      child: Text(
+                        rateHint,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: const Color(0xFFFFF0D4),
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ],
                 Row(
                   children: [
                     Expanded(

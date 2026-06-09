@@ -177,6 +177,9 @@ class FarmStateController extends ChangeNotifier {
   static const int maxShopBundleQuantity = 9;
   static const String _saveKey = 'taniin.farmState.v1';
   static const int _saveVersion = 1;
+  static const Duration _payoutBalancePollDelay = Duration(seconds: 2);
+  static const int _payoutBalancePollAttempts = 8;
+  static final BigInt _weiPerEth = BigInt.parse('1000000000000000000');
 
   int coins = 620;
   int tani = 86;
@@ -310,7 +313,12 @@ class FarmStateController extends ChangeNotifier {
       ? 0
       : swapAmount.clamp(0, swapSourceBalance).toInt();
 
-  int get swapSourceBalance => balanceForSwapAsset(swapFromAsset);
+  int get swapSourceBalance {
+    if (swappingGameCoinToEth) {
+      return gameCoinEthPayoutCapacity;
+    }
+    return balanceForSwapAsset(swapFromAsset);
+  }
 
   int get swapTargetBalance => balanceForSwapAsset(swapToAsset);
 
@@ -329,6 +337,16 @@ class FarmStateController extends ChangeNotifier {
       }
     }
     return _clampBigIntToGameInt(capacity);
+  }
+
+  int get gameCoinEthPayoutCapacity {
+    final weiPerCoin = _readWei(ethWeiPerCoin);
+    final maxPayout = _readWei(maxEthPayoutWei);
+    if (weiPerCoin <= BigInt.zero || maxPayout <= BigInt.zero) {
+      return coins;
+    }
+    final cappedCoins = _clampBigIntToGameInt(maxPayout ~/ weiPerCoin);
+    return math.min(coins, cappedCoins);
   }
 
   bool get swappingGameCoinToTani =>
@@ -374,6 +392,23 @@ class FarmStateController extends ChangeNotifier {
     return '$selectedSwapAmount / $swapSourceBalance $unit';
   }
 
+  String get swapRateHintLabel {
+    if (!swappingEthToGameCoin && !swappingGameCoinToEth) {
+      return '';
+    }
+    final weiPerCoin = _readWei(ethWeiPerCoin);
+    if (weiPerCoin <= BigInt.zero) {
+      return 'Sync harga ETH Sepolia';
+    }
+    final rate = _formatEthWei(weiPerCoin);
+    if (swappingGameCoinToEth) {
+      final maxCoin = gameCoinEthPayoutCapacity;
+      final maxEth = _formatEthWei(_ethWeiForCoinAmount(maxCoin));
+      return 'Rate 1 coin = $rate ETH | max payout $maxCoin coin ($maxEth ETH)';
+    }
+    return 'Rate 1 coin = $rate ETH';
+  }
+
   int balanceForSwapAsset(SwapAsset asset) {
     return switch (asset) {
       SwapAsset.gameCoin => coins,
@@ -399,7 +434,8 @@ class FarmStateController extends ChangeNotifier {
     }
     final sign = to ? '+' : '-';
     if (asset == SwapAsset.ethSepolia) {
-      return '${sign}ETH';
+      final ethAmount = _formatEthWei(_ethWeiForCoinAmount(amount));
+      return ethAmount.isEmpty ? '${sign}ETH' : '$sign$ethAmount ETH';
     }
     return '$sign$amount ${asset.shortLabel}';
   }
@@ -430,6 +466,33 @@ class FarmStateController extends ChangeNotifier {
       return BigInt.zero;
     }
     return BigInt.tryParse(cleaned) ?? BigInt.zero;
+  }
+
+  BigInt _ethWeiForCoinAmount(int amount) {
+    if (amount <= 0) {
+      return BigInt.zero;
+    }
+    final weiPerCoin = _readWei(ethWeiPerCoin);
+    if (weiPerCoin <= BigInt.zero) {
+      return BigInt.zero;
+    }
+    return BigInt.from(amount) * weiPerCoin;
+  }
+
+  String _formatEthWei(BigInt wei) {
+    if (wei <= BigInt.zero) {
+      return '';
+    }
+    final whole = wei ~/ _weiPerEth;
+    final fraction = wei.remainder(_weiPerEth);
+    if (fraction == BigInt.zero) {
+      return whole.toString();
+    }
+    final fractionText = fraction.toString().padLeft(18, '0').substring(0, 12);
+    final compactFraction = fractionText.replaceFirst(RegExp(r'0+$'), '');
+    return compactFraction.isEmpty
+        ? whole.toString()
+        : '$whole.$compactFraction';
   }
 
   int _clampBigIntToGameInt(BigInt value) {
@@ -955,8 +1018,22 @@ class FarmStateController extends ChangeNotifier {
           : ChainWalletState.error('Gagal sync wallet.');
     }
     checkingChain = false;
+    _applyWalletState(state);
+    if (revealMessage) {
+      showMessage(
+        state.success ? 'Wallet tersync Sepolia.' : state.message,
+        success: state.success,
+        notify: false,
+      );
+    }
+    _commitState();
+  }
+
+  void _applyWalletState(
+    ChainWalletState state, {
+    bool updateChainStatus = true,
+  }) {
     chainSignerAddress = state.signerAddress;
-    chainStatus = state.message;
     walletNativeBalance = state.nativeEth;
     walletNativeWei = state.nativeWei;
     ethWeiPerCoin = state.ethWeiPerCoin;
@@ -967,18 +1044,14 @@ class FarmStateController extends ChangeNotifier {
     } else if (state.success) {
       walletTaniBalanceAvailable = false;
     }
+    if (!updateChainStatus) {
+      return;
+    }
+    chainStatus = state.message;
     if (state.success && walletIsBackendSigner) {
       chainStatus =
           '${state.message} Wallet ini signer backend; pakai wallet pemain untuk payout ETH.';
     }
-    if (revealMessage) {
-      showMessage(
-        state.success ? 'Wallet tersync Sepolia.' : state.message,
-        success: state.success,
-        notify: false,
-      );
-    }
-    _commitState();
   }
 
   void setShopBundleQuantity(int quantity) {
@@ -1388,16 +1461,41 @@ class FarmStateController extends ChangeNotifier {
       );
       return false;
     }
+    if (walletNativeWei.isEmpty || walletNativeBalance.isEmpty) {
+      showMessage('Sync wallet dulu supaya saldo ETH kebaca.', success: false);
+      return false;
+    }
+    if (ethWeiPerCoin.isEmpty) {
+      showMessage('Sync wallet dulu supaya rate ETH kebaca.', success: false);
+      return false;
+    }
+    final payoutCapacity = gameCoinEthPayoutCapacity;
+    if (payoutCapacity <= 0) {
+      showMessage('Limit payout ETH Sepolia belum tersedia.', success: false);
+      return false;
+    }
+    if (amount > payoutCapacity) {
+      showMessage(
+        'Payout ETH maksimal $payoutCapacity coin sekali swap.',
+        success: false,
+      );
+      return false;
+    }
     coins -= amount;
     _clampSwapAmountToSource();
+    final payoutEth = _formatEthWei(_ethWeiForCoinAmount(amount));
     _queueChainAction(
       ChainAction(type: 'SWAP_COIN_ETH', plotId: 0, amount: amount),
       title: 'Payout Game Coin ke ETH',
-      valueLabel: '-$amount coin',
+      valueLabel: payoutEth.isEmpty ? '-$amount coin' : '+$payoutEth ETH',
       refundCoinsOnFailure: amount,
       requiresTxHash: true,
     );
-    showMessage('Mengirim payout ETH Sepolia dari $amount Game Coin.');
+    showMessage(
+      payoutEth.isEmpty
+          ? 'Mengirim payout ETH Sepolia dari $amount Game Coin.'
+          : 'Mengirim payout +$payoutEth ETH Sepolia dari $amount Game Coin.',
+    );
     _commitState();
     return true;
   }
@@ -1614,6 +1712,9 @@ class FarmStateController extends ChangeNotifier {
     required int refundTaniOnFailure,
     required bool requiresTxHash,
   }) async {
+    final nativeWeiBeforeAction = action.type == 'SWAP_COIN_ETH'
+        ? _readWei(walletNativeWei)
+        : BigInt.zero;
     final result = await _chainClient.submitGameAction(walletAddress, action);
     if (result.success) {
       final hasValidHash = isValidTransactionHash(result.txHash);
@@ -1667,6 +1768,18 @@ class FarmStateController extends ChangeNotifier {
           return;
         }
         chainStatus = receipt.message;
+        if (action.type == 'SWAP_COIN_ETH') {
+          final payoutVisible = await _confirmEthPayoutBalance(
+            entryId,
+            action,
+            result.txHash,
+            nativeWeiBeforeAction,
+          );
+          if (!payoutVisible) {
+            _commitState();
+            return;
+          }
+        }
       }
       _updateHistory(
         entryId,
@@ -1685,7 +1798,7 @@ class FarmStateController extends ChangeNotifier {
       if (action.type == 'SWAP_ETH_COIN' && hasValidHash) {
         coins = math.min(0x7fffffff, coins + action.amount);
       }
-      if (_actionUpdatesCoinBalance(action)) {
+      if (_actionUpdatesCoinBalance(action) && action.type != 'SWAP_COIN_ETH') {
         unawaited(refreshWalletState(revealMessage: false));
       }
       _commitState();
@@ -1698,6 +1811,57 @@ class FarmStateController extends ChangeNotifier {
       refundTaniOnFailure,
       result.message,
     );
+  }
+
+  Future<bool> _confirmEthPayoutBalance(
+    int entryId,
+    ChainAction action,
+    String txHash,
+    BigInt nativeWeiBeforeAction,
+  ) async {
+    final expectedWei = _ethWeiForCoinAmount(action.amount);
+    for (var attempt = 0; attempt < _payoutBalancePollAttempts; attempt += 1) {
+      try {
+        final state = await _chainClient.loadWalletState(walletAddress);
+        if (!state.success) {
+          continue;
+        }
+        _applyWalletState(state, updateChainStatus: false);
+        final nativeWeiAfterAction = _readWei(state.nativeWei);
+        if (nativeWeiAfterAction > nativeWeiBeforeAction) {
+          final deltaWei = nativeWeiAfterAction - nativeWeiBeforeAction;
+          final deltaEth = _formatEthWei(deltaWei);
+          final expectedEth = _formatEthWei(expectedWei);
+          _updateHistory(entryId, status: 'on-chain', txHash: txHash);
+          chainStatus = expectedEth.isEmpty
+              ? 'Payout ETH confirmed. Saldo wallet naik ke ${state.nativeEth} ETH.'
+              : 'Payout +$deltaEth ETH confirmed. Saldo wallet ${state.nativeEth} ETH.';
+          showMessage(
+            expectedEth.isEmpty
+                ? 'Payout ETH masuk ke wallet.'
+                : 'Payout +$expectedEth ETH masuk ke wallet.',
+            notify: false,
+          );
+          return true;
+        }
+      } on Object {
+        // Receipt sudah confirmed; RPC balance bisa tertinggal beberapa detik.
+      }
+      if (attempt < _payoutBalancePollAttempts - 1) {
+        await Future<void>.delayed(_payoutBalancePollDelay);
+      }
+    }
+    final expectedEth = _formatEthWei(expectedWei);
+    _updateHistory(entryId, status: 'menunggu saldo ETH', txHash: txHash);
+    chainStatus = expectedEth.isEmpty
+        ? 'Receipt Sepolia confirmed, tapi saldo ETH wallet belum naik. Tap Sync Wallet atau cek Etherscan ${shortTransactionHash(txHash)}.'
+        : 'Receipt confirmed untuk +$expectedEth ETH, tapi saldo wallet belum naik di RPC. Tap Sync Wallet atau cek Etherscan ${shortTransactionHash(txHash)}.';
+    showMessage(
+      'Receipt confirmed, menunggu saldo ETH wallet naik.',
+      success: false,
+      notify: false,
+    );
+    return false;
   }
 
   void _handleConfirmedChainFailure(
