@@ -20,54 +20,61 @@ class HistoryPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.sizeOf(context);
+    final compact = media.width < 560 || media.height < 720;
+    final margin = compact ? 28.0 : 92.0;
+    final maxWidth = math.min(
+      math.max(292.0, media.width - margin),
+      960.0,
+    );
+    final maxHeight = math.min(
+      math.max(420.0, media.height - margin),
+      620.0,
+    );
     return ConstrainedBox(
-      constraints: BoxConstraints(
-        maxWidth: math.max(360.0, media.width - 92),
-        maxHeight: math.max(300.0, media.height - 92),
-      ),
-      child: SizedBox(
-        width: 960,
-        height: 620,
-        child: PixelPanel(
-          color: const Color(0xFFA34A1C),
-          borderColor: const Color(0xFF633010),
-          padding: EdgeInsets.zero,
-          child: Column(
-            children: [
-              _PanelHeader(
-                icon: Icons.history,
-                title: 'RIWAYAT',
-                onClose: onClose,
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(30, 26, 30, 32),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF7A2D0E),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: const Color(0xFFE07B20),
-                        width: 5,
-                      ),
+      constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
+      child: PixelPanel(
+        color: const Color(0xFFA34A1C),
+        borderColor: const Color(0xFF633010),
+        padding: EdgeInsets.zero,
+        child: Column(
+          children: [
+            _PanelHeader(
+              icon: Icons.history,
+              title: 'RIWAYAT',
+              onClose: onClose,
+              compact: compact,
+            ),
+            Expanded(
+              child: Padding(
+                padding: compact
+                    ? const EdgeInsets.fromLTRB(14, 14, 14, 16)
+                    : const EdgeInsets.fromLTRB(30, 26, 30, 32),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF7A2D0E),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: const Color(0xFFE07B20),
+                      width: compact ? 4 : 5,
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(18),
-                      child: ListView.separated(
-                        padding: EdgeInsets.zero,
-                        itemCount: farmState.history.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 14),
-                        itemBuilder: (context, index) => _HistoryRow(
-                          record: farmState.history[index],
-                          farmState: farmState,
-                        ),
+                  ),
+                  child: Padding(
+                    padding: compact ? const EdgeInsets.all(10) : const EdgeInsets.all(18),
+                    child: ListView.separated(
+                      padding: EdgeInsets.zero,
+                      itemCount: farmState.history.length,
+                      separatorBuilder: (_, _) => SizedBox(height: compact ? 8 : 14),
+                      itemBuilder: (context, index) => _HistoryRow(
+                        record: farmState.history[index],
+                        farmState: farmState,
+                        compact: compact,
                       ),
                     ),
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -79,37 +86,54 @@ class _PanelHeader extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.onClose,
+    required this.compact,
   });
 
   final IconData icon;
   final String title;
   final VoidCallback onClose;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 116,
-      padding: const EdgeInsets.fromLTRB(24, 18, 22, 18),
-      decoration: const BoxDecoration(
-        color: Color(0xFFA94F1E),
-        border: Border(bottom: BorderSide(color: Color(0xFF763513), width: 5)),
+      height: compact ? 76 : 116,
+      padding: compact
+          ? const EdgeInsets.fromLTRB(14, 10, 14, 10)
+          : const EdgeInsets.fromLTRB(24, 18, 22, 18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFA94F1E),
+        border: Border(
+          bottom: BorderSide(
+            color: const Color(0xFF763513),
+            width: compact ? 4 : 5,
+          ),
+        ),
       ),
       child: Row(
         children: [
-          const _YellowPixelDot(),
-          const SizedBox(width: 24),
-          Icon(icon, size: 50, color: const Color(0xFFFFF0CE)),
-          const SizedBox(width: 22),
+          _YellowPixelDot(compact: compact),
+          SizedBox(width: compact ? 12 : 24),
+          Icon(
+            icon,
+            size: compact ? 28 : 50,
+            color: const Color(0xFFFFF0CE),
+          ),
+          SizedBox(width: compact ? 12 : 22),
           Expanded(
             child: Text(
               title,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 color: const Color(0xFFFFDE19),
-                fontSize: 42,
+                fontSize: compact ? 24 : 42,
               ),
             ),
           ),
-          PanelCloseButton(onPressed: onClose),
+          PanelCloseButton(
+            onPressed: onClose,
+            dimension: compact ? 46 : 62,
+            iconSize: compact ? 30 : 44,
+          ),
         ],
       ),
     );
@@ -117,10 +141,15 @@ class _PanelHeader extends StatelessWidget {
 }
 
 class _HistoryRow extends StatelessWidget {
-  const _HistoryRow({required this.record, required this.farmState});
+  const _HistoryRow({
+    required this.record,
+    required this.farmState,
+    required this.compact,
+  });
 
   final HistoryRecord record;
   final FarmStateController farmState;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -160,32 +189,41 @@ class _HistoryRow extends StatelessWidget {
               : isPendingHash
               ? const Color(0xFF6F4A1C)
               : const Color(0xFF8C3A14),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(compact ? 6 : 10),
           border: Border.all(
             color: isConfirmed
                 ? const Color(0xFF66CF7B)
                 : isPendingHash
                 ? const Color(0xFFFFC857)
                 : const Color(0xFF5D260E),
-            width: 4,
+            width: compact ? 3 : 4,
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          padding: compact
+              ? const EdgeInsets.symmetric(horizontal: 12, vertical: 10)
+              : const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
           child: Row(
             children: [
               DecoratedBox(
                 decoration: BoxDecoration(
                   color: boxColor,
-                  borderRadius: BorderRadius.circular(5),
-                  border: Border.all(color: const Color(0xFF4C230B), width: 3),
+                  borderRadius: BorderRadius.circular(compact ? 4 : 5),
+                  border: Border.all(
+                    color: const Color(0xFF4C230B),
+                    width: compact ? 2 : 3,
+                  ),
                 ),
                 child: SizedBox.square(
-                  dimension: 26,
-                  child: Icon(iconData, size: 17, color: iconColor),
+                  dimension: compact ? 22 : 26,
+                  child: Icon(
+                    iconData,
+                    size: compact ? 13 : 17,
+                    color: iconColor,
+                  ),
                 ),
               ),
-              const SizedBox(width: 18),
+              SizedBox(width: compact ? 12 : 18),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -196,10 +234,10 @@ class _HistoryRow extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: const Color(0xFFFFF0CE),
-                        fontSize: 26,
+                        fontSize: compact ? 17 : 26,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: compact ? 2 : 4),
                     Text(
                       _statusText(
                         hasHash: hasHash,
@@ -214,13 +252,13 @@ class _HistoryRow extends StatelessWidget {
                             : isPendingHash
                             ? const Color(0xFFFFE7A8)
                             : const Color(0xFFE9C692),
-                        fontSize: 18,
+                        fontSize: compact ? 12 : 18,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 18),
+              SizedBox(width: compact ? 12 : 18),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -228,15 +266,15 @@ class _HistoryRow extends StatelessWidget {
                     record.valueLabel,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: const Color(0xFFFFDE19),
-                      fontSize: 26,
+                      fontSize: compact ? 17 : 26,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: compact ? 2 : 4),
                   Text(
                     record.timeLabel,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: const Color(0xFFE9C692),
-                      fontSize: 18,
+                      fontSize: compact ? 12 : 18,
                     ),
                   ),
                 ],
@@ -290,16 +328,18 @@ class _HistoryRow extends StatelessWidget {
 }
 
 class _YellowPixelDot extends StatelessWidget {
-  const _YellowPixelDot();
+  const _YellowPixelDot({required this.compact});
+
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: const Color(0xFFFFD51C),
-        borderRadius: BorderRadius.circular(5),
+        borderRadius: BorderRadius.circular(compact ? 3 : 5),
       ),
-      child: const SizedBox.square(dimension: 20),
+      child: SizedBox.square(dimension: compact ? 12 : 20),
     );
   }
 }
