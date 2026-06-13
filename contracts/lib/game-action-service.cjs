@@ -146,6 +146,7 @@ async function submitGameAction(body) {
       ethPayoutAmountWei = payoutWei;
       ensureRecipientIsNotSigner(service, walletAddress);
       await ensureSignerCanPayEth(service, payoutWei);
+      txHashes.push(await sendTransaction("TANI swap burn", coin.gameSpend(walletAddress, toTani(amount))));
       txHashes.push(await sendTransaction("ETH swap payout", service.signer.sendTransaction({
         to: walletAddress,
         value: payoutWei

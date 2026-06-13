@@ -1040,6 +1040,7 @@ class FarmStateController extends ChangeNotifier {
     maxEthPayoutWei = state.maxEthPayoutWei;
     if (state.success && state.coinBalanceAvailable) {
       tani = state.coinBalance;
+      coins = state.coinBalance;
       walletTaniBalanceAvailable = true;
     } else if (state.success) {
       walletTaniBalanceAvailable = false;

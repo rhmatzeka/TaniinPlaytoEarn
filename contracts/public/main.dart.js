@@ -90471,7 +90471,7 @@ q.Q=a.f
 q.as=a.w
 q.at=a.x
 s=a.a
-if(s&&a.d){q.b=a.c
+if(s&&a.d){q.a=q.b=a.c
 q.ay=!0}else if(s)q.ay=!1
 if(!b)return
 r=a.b
