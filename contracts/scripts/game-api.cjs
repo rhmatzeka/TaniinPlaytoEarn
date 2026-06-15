@@ -7,6 +7,7 @@ const {
   health,
   normalizeError
 } = require("../lib/game-action-service.cjs");
+const { initMultiplayer } = require("../lib/multiplayer-service.cjs");
 
 const DEFAULT_PORT = 8787;
 const HOST = process.env.TANIIN_GAME_API_HOST || "0.0.0.0";
@@ -24,6 +25,10 @@ async function main() {
 
   const healthState = await health();
   const server = http.createServer(handleRequest);
+  
+  // Attach Socket.io multiplayer & AI agent service
+  initMultiplayer(server);
+
   server.listen(PORT, HOST, () => {
     console.log(`[game-api] signer ${healthState.signer}`);
     console.log(`[game-api] listening http://${HOST}:${PORT}`);

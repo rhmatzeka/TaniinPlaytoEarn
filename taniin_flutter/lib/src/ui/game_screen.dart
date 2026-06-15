@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../chain/platform_bridge.dart';
+import '../chain/multiplayer_client.dart';
 import '../audio/game_audio.dart';
 import '../game/taniin_game.dart';
 import '../state/farm_state.dart';
@@ -25,6 +26,7 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   late final FarmStateController _farmState;
+  late final MultiplayerClient _multiplayerClient;
   late final TaniinGame _game;
   late final GameAudioController _audio;
   final FocusNode _gameFocusNode = FocusNode(debugLabel: 'Taniin game input');
@@ -43,10 +45,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _audio.preload();
     _farmState = FarmStateController(onSfx: () => _audio.playClick());
     _farmState.addListener(_syncAudio);
+    _multiplayerClient = MultiplayerClient(_farmState);
     PlatformBridge.setWalletAddressHandler(
       _farmState.connectWalletFromDeepLink,
     );
-    _game = TaniinGame(_farmState);
+    _game = TaniinGame(_farmState, _multiplayerClient);
     _game.walkingNotifier.addListener(_syncWalkAudio);
     _syncAudio();
     unawaited(_restoreStartupState());
@@ -65,6 +68,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _gameFocusNode.dispose();
     _audio.release();
     unawaited(_farmState.saveNow());
+    _multiplayerClient.dispose();
     _farmState.dispose();
     super.dispose();
   }

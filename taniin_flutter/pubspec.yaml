@@ -38,6 +38,7 @@ dependencies:
   xml: ^6.6.1
   shared_preferences: ^2.5.5
   web: ^1.1.1
+  socket_io_client: ^3.1.2
 
 dev_dependencies:
   flutter_test:

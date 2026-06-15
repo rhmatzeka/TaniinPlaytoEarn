@@ -5,12 +5,13 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../chain/multiplayer_client.dart';
 import '../state/farm_state.dart';
 import '../ui/taniin_theme.dart';
 import 'tmx_map.dart';
 
 class TaniinGame extends FlameGame {
-  TaniinGame(this.farmState);
+  TaniinGame(this.farmState, this.multiplayerClient);
 
   static const double _tile = 128;
   static const double _playerSpeed = _tile * 3.9;
@@ -42,6 +43,7 @@ class TaniinGame extends FlameGame {
   static const int _dirLeft = 3;
 
   final FarmStateController farmState;
+  final MultiplayerClient multiplayerClient;
   final ValueNotifier<int> hudNotifier = ValueNotifier<int>(0);
   final ValueNotifier<int> miniMapNotifier = ValueNotifier<int>(0);
   final ValueNotifier<bool> loadingComplete = ValueNotifier<bool>(false);
@@ -234,6 +236,27 @@ class TaniinGame extends FlameGame {
   @override
   Future<void> onLoad() async {
     await super.onLoad();
+    
+    // Bind AI Farmer Agent callbacks to local game actions
+    multiplayerClient.onAiPlanted = (plotIndex, seedIndex) {
+      if (plotIndex >= 0 && plotIndex < farmState.plots.length) {
+        final plot = farmState.plots[plotIndex];
+        plot.seedIndex = seedIndex;
+        plot.status = PlotStatus.growing;
+        plot.plantedAt = DateTime.now();
+        farmState.notifyListeners();
+      }
+    };
+    
+    multiplayerClient.onAiHarvested = (plotIndex) {
+      if (plotIndex >= 0 && plotIndex < farmState.plots.length) {
+        final plot = farmState.plots[plotIndex];
+        plot.status = PlotStatus.empty;
+        plot.plantedAt = null;
+        farmState.notifyListeners();
+      }
+    };
+
     try {
       _tmxMap = await _tryLoadMap();
       _buildCollisionRects();
@@ -260,6 +283,14 @@ class TaniinGame extends FlameGame {
     super.update(dt);
     _clock += dt;
     _updatePlayer(dt);
+    
+    // Broadcast player coordinates to WebSocket server
+    multiplayerClient.sendMove(
+      _playerX,
+      _playerY,
+      _moving ? 'walk' : 'idle',
+    );
+
     _hudTick += dt;
     if (_hudTick >= 0.12) {
       _hudTick = 0;
@@ -290,6 +321,8 @@ class TaniinGame extends FlameGame {
     _drawFarmPlots(canvas);
     _drawPlotActionMarkers(canvas);
     _drawShopNpc(canvas);
+    _drawRemotePlayers(canvas);
+    _drawAiAgent(canvas);
     _drawPlayer(canvas);
     map?.drawForeground(canvas, _cameraX, _cameraY, _tile, viewport);
     _drawHouseSigns(canvas);
@@ -1662,5 +1695,152 @@ class TaniinGame extends FlameGame {
     double h,
   ) {
     rects.add(Rect.fromLTWH(x, y, w, h));
+  }
+
+  void _drawRemotePlayers(Canvas canvas) {
+    final playerSize = _tile * 1.35;
+    final idleS = _idleSheet;
+    final walkS = _walkSheet;
+
+    if (idleS == null) return;
+
+    multiplayerClient.remotePlayers.forEach((id, player) {
+      final isWalking = player.anim == 'walk';
+      final sheet = isWalking ? (walkS ?? idleS) : idleS;
+
+      final screenX = player.x - _cameraX - playerSize * 0.5;
+      final screenY = player.y - _cameraY - playerSize * 0.78;
+      final target = Rect.fromLTWH(screenX, screenY, playerSize, playerSize);
+
+      if (_isOffscreen(target)) return;
+
+      // Draw shadow
+      final footX = player.x - _cameraX;
+      final footY = player.y - _cameraY + _tile * 0.05;
+      _paint
+        ..style = PaintingStyle.fill
+        ..color = const Color(0x50000000);
+      canvas.drawOval(
+        Rect.fromLTRB(
+          footX - _tile * 0.22,
+          footY - _tile * 0.06,
+          footX + _tile * 0.22,
+          footY + _tile * 0.07,
+        ),
+        _paint,
+      );
+
+      // Draw sprite with color filter to distinguish other players (e.g. blue tint)
+      final remotePaint = Paint()
+        ..isAntiAlias = false
+        ..filterQuality = FilterQuality.none
+        ..colorFilter = const ColorFilter.mode(
+          Color(0x334466FF),
+          BlendMode.srcATop,
+        );
+
+      const frameW = 32;
+      const frameH = 32;
+      final columns = math.max(1, sheet.width ~/ frameW);
+      final frame = isWalking ? _walkFrame : ((_clock * 1000) ~/ 240) % 6;
+      final frameIndex = frame % columns;
+      final row = 0; // Down direction default or simple animation
+
+      final source = Rect.fromLTWH(
+        (frameIndex * frameW).toDouble(),
+        (row * frameH).toDouble(),
+        frameW.toDouble(),
+        frameH.toDouble(),
+      );
+
+      canvas.drawImageRect(sheet, source, target, remotePaint);
+
+      // Draw Name tag
+      _drawNameTag(canvas, player.name, player.x, player.y - playerSize * 0.8, Colors.blue);
+    });
+  }
+
+  void _drawAiAgent(Canvas canvas) {
+    final ai = multiplayerClient.aiAgent;
+    if (ai == null) return;
+
+    final playerSize = _tile * 1.35;
+    final idleS = _idleSheet;
+    final walkS = _walkSheet;
+
+    if (idleS == null) return;
+
+    final isWalking = ai.anim == 'walk';
+    final sheet = isWalking ? (walkS ?? idleS) : idleS;
+
+    final screenX = ai.x - _cameraX - playerSize * 0.5;
+    final screenY = ai.y - _cameraY - playerSize * 0.78;
+    final target = Rect.fromLTWH(screenX, screenY, playerSize, playerSize);
+
+    if (_isOffscreen(target)) return;
+
+    // Draw shadow
+    final footX = ai.x - _cameraX;
+    final footY = ai.y - _cameraY + _tile * 0.05;
+    _paint
+      ..style = PaintingStyle.fill
+      ..color = const Color(0x50000000);
+    canvas.drawOval(
+      Rect.fromLTRB(
+        footX - _tile * 0.22,
+        footY - _tile * 0.06,
+        footX + _tile * 0.22,
+        footY + _tile * 0.07,
+      ),
+      _paint,
+    );
+
+    // Draw sprite with color filter to distinguish AI Agent (e.g. green/gold tint)
+    final aiPaint = Paint()
+      ..isAntiAlias = false
+      ..filterQuality = FilterQuality.none
+      ..colorFilter = const ColorFilter.mode(
+        Color(0x3344FF66),
+        BlendMode.srcATop,
+      );
+
+    const frameW = 32;
+    const frameH = 32;
+    final columns = math.max(1, sheet.width ~/ frameW);
+    final frame = isWalking ? _walkFrame : ((_clock * 1000) ~/ 240) % 6;
+    final frameIndex = frame % columns;
+    final row = 0; // Down direction
+
+    final source = Rect.fromLTWH(
+      (frameIndex * frameW).toDouble(),
+      (row * frameH).toDouble(),
+      frameW.toDouble(),
+      frameH.toDouble(),
+    );
+
+    canvas.drawImageRect(sheet, source, target, aiPaint);
+
+    // Draw Name tag
+    _drawNameTag(canvas, ai.name, ai.x, ai.y - playerSize * 0.8, Colors.green);
+  }
+
+  void _drawNameTag(Canvas canvas, String name, double worldX, double worldY, Color tagColor) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: name,
+        style: const TextStyle(
+          fontFamily: 'monospace',
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+          backgroundColor: Colors.black54,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    final x = worldX - _cameraX - painter.width * 0.5;
+    final y = worldY - _cameraY - painter.height * 0.5;
+    painter.paint(canvas, Offset(x, y));
   }
 }

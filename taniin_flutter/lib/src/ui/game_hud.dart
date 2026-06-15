@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../game/taniin_game.dart';
 import '../state/farm_state.dart';
+import '../chain/multiplayer_client.dart';
 import 'physical_viewport.dart';
 import 'pixel_panel.dart';
 import 'web_input_capability.dart'
@@ -178,6 +179,14 @@ class GameHud extends StatelessWidget {
                         top: joystickTop,
                         child: _Joystick(game: game, radius: joystickRadius),
                       ),
+                    // Chat / AI Agent Panel
+                    Positioned(
+                      left: showTouchJoystick ? joystickLeft + joystickSize + 16 : 32,
+                      bottom: compact ? 20 : 32,
+                      width: compact ? 260 : 320,
+                      height: compact ? 160 : 200,
+                      child: _ChatHud(multiplayerClient: game.multiplayerClient),
+                    ),
                     Positioned(
                       left: compact ? 194 : 260,
                       right: compact ? 330 : 320,
@@ -2309,4 +2318,162 @@ class _SeedPacketPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _SeedPacketPainter oldDelegate) =>
       oldDelegate.color != color;
+}
+
+class _ChatHud extends StatefulWidget {
+  const _ChatHud({required this.multiplayerClient});
+
+  final MultiplayerClient multiplayerClient;
+
+  @override
+  State<_ChatHud> createState() => _ChatHudState();
+}
+
+class _ChatHudState extends State<_ChatHud> {
+  final TextEditingController _textController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+
+  void _submitMessage() {
+    final text = _textController.text;
+    if (text.trim().isNotEmpty) {
+      widget.multiplayerClient.sendChat(text);
+      _textController.clear();
+      // Scroll to bottom
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: widget.multiplayerClient,
+      builder: (context, _) {
+        final messages = widget.multiplayerClient.chatMessages;
+        return Material(
+          color: Colors.transparent,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: const Color(0x99000000),
+                    border: Border.all(color: const Color(0xFF6B4527), width: 3),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    itemCount: messages.length,
+                    itemBuilder: (context, index) {
+                      final msg = messages[index];
+                      final isAi = msg.sender == "Pak Tani AI";
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2.0),
+                        child: RichText(
+                          text: TextSpan(
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            children: [
+                              TextSpan(
+                                text: '[${msg.time}] ',
+                                style: const TextStyle(color: Colors.grey),
+                              ),
+                              TextSpan(
+                                text: '${msg.sender}: ',
+                                style: TextStyle(
+                                  color: isAi ? const Color(0xFF45FF66) : const Color(0xFF4488FF),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              TextSpan(
+                                text: msg.text,
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E1E1E),
+                        border: Border.all(color: const Color(0xFF6B4527), width: 2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: TextField(
+                        controller: _textController,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontFamily: 'monospace',
+                        ),
+                        decoration: const InputDecoration(
+                          hintText: 'Ketik pesan/perintah AI...',
+                          hintStyle: TextStyle(color: Colors.grey, fontSize: 12),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                          border: InputBorder.none,
+                        ),
+                        onSubmitted: (_) => _submitMessage(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  GestureDetector(
+                    onTap: _submitMessage,
+                    child: Container(
+                      height: 38,
+                      width: 50,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6B4527),
+                        border: Border.all(color: const Color(0xFFE9C67B), width: 2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'KIRIM',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
