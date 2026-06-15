@@ -1,5 +1,6 @@
 const { Server } = require("socket.io");
 const { enqueueGameAction } = require("./game-action-service.cjs");
+const { interpret } = require("./ai-brain.cjs");
 
 // AI Agent State
 // Valid checksummed Sepolia address used as the AI Farmer Agent's smart account.
@@ -97,10 +98,9 @@ function initMultiplayer(server) {
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       });
 
-      // If addressed to AI, parse and respond
-      if (text.toLowerCase().includes("ai") || text.toLowerCase().startsWith("tolong") || text.toLowerCase().startsWith("pak tani")) {
-        processAiCommand(text, socket.id);
-      }
+      // Route every player chat to the AI so it can respond conversationally
+      // and act on natural-language farming commands.
+      processAiCommand(text, socket.id);
     });
 
     socket.on("disconnect", () => {
@@ -116,85 +116,47 @@ function initMultiplayer(server) {
   setInterval(updateAiAgent, 100);
 }
 
-// Simple NLP / Command Parser for AI Agent
+// LLM-powered command handler for the AI Farmer Agent.
 async function processAiCommand(text, playerId) {
-  const clean = text.toLowerCase();
-  const player = players[playerId] || { name: "Player", wallet: AI_WALLET_ADDRESS };
-  
-  let response = "";
-  let action = null; // { type, target, arg }
-
-  // 1. GREETING
-  if (clean.includes("halo") || clean.includes("hi") || clean.includes("hello")) {
-    response = `Halo ${player.name}! Saya Pak Tani AI. Saya bisa disuruh bertani. Contoh perintah: "AI tolong tanam kentang di lahan 2" atau "AI tolong panen lahan 1".`;
+  let decision;
+  try {
+    decision = await interpret(text);
+  } catch (err) {
+    console.log(`[ai-brain] interpret error: ${err.message || err}`);
+    decision = { intent: "chat", seed: null, plot: 1, reply: "Maaf, saya lagi bingung. Coba lagi ya." };
   }
-  // 2. STATUS
-  else if (clean.includes("status") || clean.includes("koin") || clean.includes("benih")) {
-    response = `Status saya: Koin: ${aiState.inventory.coins}, Benih Kentang: ${aiState.inventory.seeds.Kentang}, Hasil Panen: ${aiState.inventory.crops.Kentang} Kentang.`;
-  }
-  // 3. BELI BENIH (contoh: "ai tolong beli kentang")
-  else if (clean.includes("beli") || clean.includes("shop")) {
-    let seedType = "Kentang";
-    if (clean.includes("bawang")) seedType = "Bawang";
-    if (clean.includes("stroberi") || clean.includes("strawberry")) seedType = "Stroberi";
-    if (clean.includes("bit") || clean.includes("beet")) seedType = "Bit";
 
-    response = `Baik, saya akan pergi ke Toko Ucup untuk membeli benih ${seedType} terlebih dahulu.`;
-    action = { type: "buy", target: "shop", arg: seedType };
-  }
-  // 4. TANAM (contoh: "ai tolong tanam kentang di lahan 2")
-  else if (clean.includes("tanam") || clean.includes("plant")) {
-    let seedType = "Kentang";
-    if (clean.includes("bawang")) seedType = "Bawang";
-    if (clean.includes("stroberi") || clean.includes("strawberry")) seedType = "Stroberi";
-    if (clean.includes("bit") || clean.includes("beet")) seedType = "Bit";
+  const { intent, seed, plot } = decision;
 
-    // Parse plot number (1 to 5)
-    let plotNum = 1;
-    const match = clean.match(/lahan\s*([1-5])/);
-    if (match) {
-      plotNum = parseInt(match[1]);
+  // STATUS: build a live reply from current inventory.
+  if (intent === "status") {
+    speakAi(
+      `Status saya: ${aiState.inventory.coins} koin, benih Kentang ${aiState.inventory.seeds.Kentang}, ` +
+      `hasil panen ${aiState.inventory.crops.Kentang} Kentang.`
+    );
+    return;
+  }
+
+  // Always speak the friendly reply first.
+  if (decision.reply) speakAi(decision.reply);
+
+  // Map the intent to a queued world action.
+  let action = null;
+  if (intent === "plant") {
+    const seedType = seed || "Kentang";
+    if ((aiState.inventory.seeds[seedType] || 0) <= 0) {
+      action = { type: "buy_then_plant", target: "shop", arg: { seedType, plotNum: plot } };
     } else {
-      const matchNum = clean.match(/([1-5])/);
-      if (matchNum) plotNum = parseInt(matchNum[1]);
+      action = { type: "plant", target: `plot_${plot}`, arg: { seedType, plotNum: plot } };
     }
-
-    if (aiState.inventory.seeds[seedType] <= 0) {
-      response = `Saya tidak punya benih ${seedType}. Saya beli di Toko dulu ya, lalu saya tanam di Lahan ${plotNum}.`;
-      // Queue buying first, then planting
-      action = { type: "buy_then_plant", target: "shop", arg: { seedType, plotNum } };
-    } else {
-      response = `Siap! Saya jalan ke Lahan ${plotNum} untuk menanam ${seedType}.`;
-      action = { type: "plant", target: `plot_${plotNum}`, arg: { seedType, plotNum } };
-    }
-  }
-  // 5. PANEN (contoh: "ai tolong panen lahan 2")
-  else if (clean.includes("panen") || clean.includes("harvest") || clean.includes("ambil")) {
-    let plotNum = 1;
-    const match = clean.match(/lahan\s*([1-5])/);
-    if (match) {
-      plotNum = parseInt(match[1]);
-    } else {
-      const matchNum = clean.match(/([1-5])/);
-      if (matchNum) plotNum = parseInt(matchNum[1]);
-    }
-
-    response = `Oke, saya akan ke Lahan ${plotNum} untuk memanen hasil tanaman.`;
-    action = { type: "harvest", target: `plot_${plotNum}`, arg: { plotNum } };
-  }
-  // 6. JUAL PANEN (contoh: "ai tolong jual hasil")
-  else if (clean.includes("jual") || clean.includes("sell")) {
-    response = `Baik, saya akan ke rumah pengepul untuk menjual seluruh hasil panen saya.`;
+  } else if (intent === "harvest") {
+    action = { type: "harvest", target: `plot_${plot}`, arg: { plotNum: plot } };
+  } else if (intent === "buy") {
+    action = { type: "buy", target: "shop", arg: seed || "Kentang" };
+  } else if (intent === "sell") {
     action = { type: "sell", target: "sell", arg: null };
   }
-  else {
-    response = `Maaf ${player.name}, saya kurang paham perintah itu. Coba katakan: "AI tanam kentang di lahan 1" atau "AI panen lahan 1".`;
-  }
 
-  // Speak response
-  speakAi(response);
-
-  // If there's an action, queue it
   if (action) {
     queueAiAction(action);
   }

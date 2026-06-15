@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../state/farm_state.dart';
 
 class RemotePlayer {
@@ -58,7 +58,7 @@ class MultiplayerClient extends ChangeNotifier {
   }
 
   final FarmStateController farmState;
-  IO.Socket? _socket;
+  io.Socket? _socket;
   bool connected = false;
 
   final Map<String, RemotePlayer> remotePlayers = <String, RemotePlayer>{};
@@ -79,9 +79,9 @@ class MultiplayerClient extends ChangeNotifier {
     debugPrint('[multiplayer] Connecting to WebSocket: $apiHost');
 
     try {
-      _socket = IO.io(
+      _socket = io.io(
         apiHost,
-        IO.OptionBuilder()
+        io.OptionBuilder()
             .setTransports(<String>['websocket'])
             .disableAutoConnect()
             .enableForceNew()

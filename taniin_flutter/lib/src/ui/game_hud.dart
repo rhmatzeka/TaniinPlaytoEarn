@@ -179,13 +179,14 @@ class GameHud extends StatelessWidget {
                         top: joystickTop,
                         child: _Joystick(game: game, radius: joystickRadius),
                       ),
-                    // Chat / AI Agent Panel
+                    // Chat / AI Agent Panel (collapsible, anchored under minimap)
                     Positioned(
-                      left: showTouchJoystick ? joystickLeft + joystickSize + 16 : 32,
-                      bottom: compact ? 20 : 32,
-                      width: compact ? 260 : 320,
-                      height: compact ? 160 : 200,
-                      child: _ChatHud(multiplayerClient: game.multiplayerClient),
+                      left: 32,
+                      top: 26 + miniMapWidth * game.miniMapAspectRatio + 12,
+                      child: _ChatHud(
+                        multiplayerClient: game.multiplayerClient,
+                        compact: compact,
+                      ),
                     ),
                     Positioned(
                       left: compact ? 194 : 260,
@@ -2321,9 +2322,10 @@ class _SeedPacketPainter extends CustomPainter {
 }
 
 class _ChatHud extends StatefulWidget {
-  const _ChatHud({required this.multiplayerClient});
+  const _ChatHud({required this.multiplayerClient, required this.compact});
 
   final MultiplayerClient multiplayerClient;
+  final bool compact;
 
   @override
   State<_ChatHud> createState() => _ChatHudState();
@@ -2332,81 +2334,282 @@ class _ChatHud extends StatefulWidget {
 class _ChatHudState extends State<_ChatHud> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final FocusNode _inputFocus = FocusNode();
+  bool _expanded = false;
+  int _lastSeenCount = 0;
+
+  static const Color _kAi = Color(0xFF52E07A);
+  static const Color _kPlayer = Color(0xFF6FB7FF);
+  static const Color _kPanel = Color(0xF21B2418);
+  static const Color _kBorder = Color(0xFF7A5430);
+  static const Color _kAccent = Color(0xFFE9C67B);
+
+  @override
+  void initState() {
+    super.initState();
+    widget.multiplayerClient.addListener(_onChat);
+    _lastSeenCount = widget.multiplayerClient.chatMessages.length;
+  }
+
+  void _onChat() {
+    if (!mounted) return;
+    if (_expanded) {
+      _lastSeenCount = widget.multiplayerClient.chatMessages.length;
+      _scrollToBottom();
+    } else {
+      setState(() {}); // refresh unread badge
+    }
+  }
+
+  void _toggle() {
+    setState(() {
+      _expanded = !_expanded;
+      if (_expanded) {
+        _lastSeenCount = widget.multiplayerClient.chatMessages.length;
+        _scrollToBottom();
+      }
+    });
+  }
+
+  void _scrollToBottom() {
+    Future.delayed(const Duration(milliseconds: 80), () {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
 
   void _submitMessage() {
     final text = _textController.text;
     if (text.trim().isNotEmpty) {
       widget.multiplayerClient.sendChat(text);
       _textController.clear();
-      // Scroll to bottom
-      Future.delayed(const Duration(milliseconds: 100), () {
-        if (_scrollController.hasClients) {
-          _scrollController.animateTo(
-            _scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOut,
-          );
-        }
-      });
+      _lastSeenCount = widget.multiplayerClient.chatMessages.length;
+      _scrollToBottom();
     }
+    _inputFocus.requestFocus();
   }
 
   @override
   void dispose() {
+    widget.multiplayerClient.removeListener(_onChat);
     _textController.dispose();
     _scrollController.dispose();
+    _inputFocus.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: widget.multiplayerClient,
-      builder: (context, _) {
-        final messages = widget.multiplayerClient.chatMessages;
-        return Material(
-          color: Colors.transparent,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: const Color(0x99000000),
-                    border: Border.all(color: const Color(0xFF6B4527), width: 3),
-                    borderRadius: BorderRadius.circular(6),
+    return Material(
+      color: Colors.transparent,
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        alignment: Alignment.topLeft,
+        child: _expanded ? _buildExpanded(context) : _buildCollapsed(),
+      ),
+    );
+  }
+
+  // Compact floating button with unread badge.
+  Widget _buildCollapsed() {
+    final unread =
+        (widget.multiplayerClient.chatMessages.length - _lastSeenCount)
+            .clamp(0, 99);
+    return GestureDetector(
+      onTap: _toggle,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            decoration: BoxDecoration(
+              color: _kPanel,
+              border: Border.all(color: _kBorder, width: 2),
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: const [
+                BoxShadow(color: Color(0x66000000), blurRadius: 6, offset: Offset(0, 3)),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                _AiAvatar(size: 22),
+                SizedBox(width: 8),
+                Text(
+                  'Pak Tani AI',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12.5,
                   ),
-                  child: ListView.builder(
+                ),
+                SizedBox(width: 6),
+                Icon(Icons.chat_bubble_outline, color: _kAccent, size: 16),
+              ],
+            ),
+          ),
+          if (unread > 0)
+            Positioned(
+              right: -6,
+              top: -6,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE3453B),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.white, width: 1.5),
+                ),
+                child: Text(
+                  '$unread',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExpanded(BuildContext context) {
+    final messages = widget.multiplayerClient.chatMessages;
+    final width = widget.compact ? 260.0 : 320.0;
+    final listHeight = widget.compact ? 140.0 : 178.0;
+    final connected = widget.multiplayerClient.connected;
+
+    return Container(
+      width: width,
+      decoration: BoxDecoration(
+        color: _kPanel,
+        border: Border.all(color: _kBorder, width: 2),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(color: Color(0x80000000), blurRadius: 10, offset: Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
+            decoration: const BoxDecoration(
+              color: Color(0xFF2C3A24),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(10),
+                topRight: Radius.circular(10),
+              ),
+            ),
+            child: Row(
+              children: [
+                const _AiAvatar(size: 24),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Pak Tani AI',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13.5,
+                    ),
+                  ),
+                ),
+                Container(
+                  width: 8,
+                  height: 8,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: connected ? _kAi : const Color(0xFFB55555),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: _toggle,
+                  child: const Padding(
+                    padding: EdgeInsets.all(2),
+                    child: Icon(Icons.close, color: Color(0xFFE9C67B), size: 18),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Messages
+          SizedBox(
+            height: listHeight,
+            child: messages.isEmpty
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(14),
+                      child: Text(
+                        'Suruh AI bertani!\nContoh: "tanam stroberi di lahan 2"',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Color(0xFF9DAE8B),
+                          fontFamily: 'monospace',
+                          fontSize: 12,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  )
+                : ListView.builder(
                     controller: _scrollController,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     itemCount: messages.length,
                     itemBuilder: (context, index) {
                       final msg = messages[index];
-                      final isAi = msg.sender == "Pak Tani AI";
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2.0),
-                        child: RichText(
-                          text: TextSpan(
-                            style: const TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
+                      final isAi = msg.sender == 'Pak Tani AI';
+                      return Align(
+                        alignment:
+                            isAi ? Alignment.centerLeft : Alignment.centerRight,
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 9, vertical: 6),
+                          constraints: BoxConstraints(maxWidth: width * 0.82),
+                          decoration: BoxDecoration(
+                            color: isAi
+                                ? const Color(0xFF24351F)
+                                : const Color(0xFF1E2C3A),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: (isAi ? _kAi : _kPlayer).withValues(alpha: 0.45),
+                              width: 1,
                             ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              TextSpan(
-                                text: '[${msg.time}] ',
-                                style: const TextStyle(color: Colors.grey),
-                              ),
-                              TextSpan(
-                                text: '${msg.sender}: ',
+                              Text(
+                                msg.sender,
                                 style: TextStyle(
-                                  color: isAi ? const Color(0xFF45FF66) : const Color(0xFF4488FF),
+                                  color: isAi ? _kAi : _kPlayer,
+                                  fontFamily: 'monospace',
                                   fontWeight: FontWeight.bold,
+                                  fontSize: 10.5,
                                 ),
                               ),
-                              TextSpan(
-                                text: msg.text,
-                                style: const TextStyle(color: Colors.white),
+                              const SizedBox(height: 2),
+                              Text(
+                                msg.text,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontFamily: 'monospace',
+                                  fontSize: 12.5,
+                                  height: 1.25,
+                                ),
                               ),
                             ],
                           ),
@@ -2414,66 +2617,86 @@ class _ChatHudState extends State<_ChatHud> {
                       );
                     },
                   ),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1E1E1E),
-                        border: Border.all(color: const Color(0xFF6B4527), width: 2),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: TextField(
-                        controller: _textController,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontFamily: 'monospace',
-                        ),
-                        decoration: const InputDecoration(
-                          hintText: 'Ketik pesan/perintah AI...',
-                          hintStyle: TextStyle(color: Colors.grey, fontSize: 12),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                          border: InputBorder.none,
-                        ),
-                        onSubmitted: (_) => _submitMessage(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  GestureDetector(
-                    onTap: _submitMessage,
-                    child: Container(
-                      height: 38,
-                      width: 50,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF6B4527),
-                        border: Border.all(color: const Color(0xFFE9C67B), width: 2),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'KIRIM',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'monospace',
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
           ),
-        );
-      },
+          // Input row
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF12160F),
+                      border: Border.all(color: _kBorder, width: 1.5),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    alignment: Alignment.center,
+                    child: TextField(
+                      controller: _textController,
+                      focusNode: _inputFocus,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12.5,
+                        fontFamily: 'monospace',
+                      ),
+                      decoration: const InputDecoration(
+                        isCollapsed: true,
+                        hintText: 'Ketik perintah ke AI...',
+                        hintStyle: TextStyle(color: Color(0xFF6F7B62), fontSize: 12),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 10),
+                        border: InputBorder.none,
+                      ),
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => _submitMessage(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: _submitMessage,
+                  child: Container(
+                    height: 38,
+                    width: 42,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF8A5E32), Color(0xFF6B4527)],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                      border: Border.all(color: _kAccent, width: 1.5),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.send, color: Colors.white, size: 17),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Small pixel-styled avatar for the AI agent (green farmer badge).
+class _AiAvatar extends StatelessWidget {
+  const _AiAvatar({required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: const Color(0xFF52E07A),
+        borderRadius: BorderRadius.circular(size * 0.28),
+        border: Border.all(color: const Color(0xFF1B2A16), width: 1.5),
+      ),
+      alignment: Alignment.center,
+      child: Icon(Icons.smart_toy, color: const Color(0xFF15240F), size: size * 0.62),
     );
   }
 }

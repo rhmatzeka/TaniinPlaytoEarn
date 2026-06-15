@@ -244,7 +244,7 @@ class TaniinGame extends FlameGame {
         plot.seedIndex = seedIndex;
         plot.status = PlotStatus.growing;
         plot.plantedAt = DateTime.now();
-        farmState.notifyListeners();
+        farmState.notifyExternalChange();
       }
     };
     
@@ -253,7 +253,7 @@ class TaniinGame extends FlameGame {
         final plot = farmState.plots[plotIndex];
         plot.status = PlotStatus.empty;
         plot.plantedAt = null;
-        farmState.notifyListeners();
+        farmState.notifyExternalChange();
       }
     };
 

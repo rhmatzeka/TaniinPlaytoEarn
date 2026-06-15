@@ -883,8 +883,13 @@ class FarmStateController extends ChangeNotifier {
     return fallback;
   }
 
-  void refreshGrowth() {
-    final now = DateTime.now();
+  /// Notifies listeners after an external (AI agent / multiplayer) change to
+  /// plot state so the HUD and game can repaint.
+  void notifyExternalChange() {
+    notifyListeners();
+  }
+
+  void refreshGrowth() {    final now = DateTime.now();
     var changed = false;
     for (final plot in plots) {
       if (plot.isReady(now)) {
