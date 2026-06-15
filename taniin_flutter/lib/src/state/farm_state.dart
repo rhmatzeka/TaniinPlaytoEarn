@@ -901,6 +901,21 @@ class FarmStateController extends ChangeNotifier {
     }
   }
 
+  /// Exposes direct HTTP POST game actions for Local AI Mode (Vercel serverless compatible).
+  Future<String> submitChainActionDirectly(
+    String wallet,
+    String type,
+    int plotId,
+    int amount,
+  ) async {
+    final action = ChainAction(type: type, plotId: plotId, amount: amount);
+    final result = await _chainClient.submitGameAction(wallet, action);
+    if (!result.success) {
+      throw Exception(result.message);
+    }
+    return result.txHash;
+  }
+
   void selectSeed(int index) {
     if (index == selectedSeedIndex || index < 0 || index >= seeds.length) {
       return;

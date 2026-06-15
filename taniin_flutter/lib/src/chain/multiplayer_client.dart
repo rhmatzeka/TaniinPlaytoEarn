@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
@@ -300,15 +302,202 @@ class MultiplayerClient extends ChangeNotifier {
     if (connected) {
       _socket?.emit('chat', <String, dynamic>{'text': trimmed});
     } else {
+      // Offline mode: Simulate AI locally using local rule-based NLP.
       _appendMessage(ChatMessage(
         sender: 'Sistem',
         wallet: '',
-        text: 'AI offline: server multiplayer belum tersambung. Coba lagi nanti.',
+        text: 'Menghubungkan ke Local AI Mode (Offline)...',
         time: time,
       ));
+      _simulateLocalAi(trimmed, time);
       // Attempt a silent reconnect for next time.
       reconnect();
     }
+  }
+
+  void _simulateLocalAi(String text, String time) async {
+    // 1. Initialize local AI agent state if not already done
+    if (aiAgent == null) {
+      aiAgent = AiAgentState(
+        id: 'local-ai-agent',
+        wallet: '0x000000000000000000000000000000000000dEaD',
+        name: 'Pak Tani AI (Lokal)',
+        x: 18.18 * 128,
+        y: 25.88 * 128,
+        anim: 'idle',
+      );
+      notifyListeners();
+    }
+
+    final clean = text.toLowerCase();
+    
+    // Parse plot number
+    int plotNum = 1;
+    final plotMatch = RegExp(r'lahan\s*([1-5])|plot\s*([1-5])|\b([1-5])\b').firstMatch(clean);
+    if (plotMatch != null) {
+      plotNum = int.tryParse(plotMatch.group(1) ?? plotMatch.group(2) ?? plotMatch.group(3) ?? '1') ?? 1;
+    }
+
+    // Parse crop type
+    String seed = 'Kentang';
+    if (clean.contains('bawang')) {
+      seed = 'Bawang';
+    } else if (clean.contains('stroberi') || clean.contains('strawberry')) {
+      seed = 'Stroberi';
+    } else if (clean.contains('bit') || clean.contains('beet')) {
+      seed = 'Bit';
+    }
+
+    String reply = '';
+    String intent = 'chat'; // plant, harvest, buy, sell, status, chat
+
+    if (clean.contains('tanam') || clean.contains('plant')) {
+      intent = 'plant';
+      reply = 'Siap! Saya akan ke Lahan $plotNum untuk menanam benih $seed secara lokal.';
+    } else if (clean.contains('panen') || clean.contains('harvest') || clean.contains('ambil')) {
+      intent = 'harvest';
+      reply = 'Oke, saya jalan ke Lahan $plotNum untuk memanen tanaman.';
+    } else if (clean.contains('beli') || clean.contains('buy') || clean.contains('shop') || clean.contains('toko')) {
+      intent = 'buy';
+      reply = 'Baik, saya pergi ke Toko Ucup untuk membeli benih $seed.';
+    } else if (clean.contains('jual') || clean.contains('sell')) {
+      intent = 'sell';
+      reply = 'Baik, saya jalan ke rumah pengepul untuk menjual hasil panen.';
+    } else if (clean.contains('status') || clean.contains('koin') || clean.contains('benih')) {
+      intent = 'status';
+      reply = 'Status saya: Koin lokal aktif, benih & panen siap ditanam.';
+    } else if (clean.contains('halo') || clean.contains('hai') || clean.contains('hi') || clean.contains('hello')) {
+      reply = 'Halo! Saya Pak Tani AI. Saya bertani secara mandiri. Contoh: "tanam stroberi di lahan 2".';
+    } else {
+      reply = 'Perintah kurang jelas. Coba katakan: "tanam kentang di lahan 2", "panen lahan 1", atau "jual hasil".';
+    }
+
+    // AI agent responds conversationally
+    _appendMessage(ChatMessage(
+      sender: aiAgent!.name,
+      wallet: aiAgent!.wallet,
+      text: reply,
+      time: time,
+    ));
+
+    if (intent == 'chat' || intent == 'status') return;
+
+    // Define target position on map
+    // Hotspots derived from TaniinGame tile coordinates:
+    // Shop Sign: 18.5, 22.35
+    // Sell Sign: 31.0, 13.35
+    // Plots: 4, 6, 8, 10, 12 at Y=19
+    Offset target = Offset(aiAgent!.x, aiAgent!.y);
+    if (intent == 'buy') {
+      target = const Offset(18.5 * 128, 22.35 * 128);
+    } else if (intent == 'sell') {
+      target = const Offset(31.0 * 128, 13.35 * 128);
+    } else if (intent == 'plant' || intent == 'harvest') {
+      final plotX = (4 + (plotNum - 1) * 2) * 128.0;
+      target = Offset(plotX + 128, 19 * 128.0 + 128); // center of plot
+    }
+
+    // Move AI to target visually in client frame-rate
+    _moveLocalAiTo(target, () async {
+      _appendMessage(ChatMessage(
+        sender: aiAgent!.name,
+        wallet: aiAgent!.wallet,
+        text: 'Tiba di tujuan. Sedang memproses transaksi di Sepolia...',
+        time: time,
+      ));
+
+      // Call API serverless Vercel directly via HTTP POST
+      try {
+        final actionType = intent.toUpperCase() == 'BUY' ? 'BUY_SEED' : (intent.toUpperCase() == 'SELL' ? 'SELL_CROP' : intent.toUpperCase());
+        final hasApi = farmState.chainConfig.hasGameApi;
+        final res = hasApi 
+          ? await farmState.submitChainActionDirectly(
+              aiAgent!.wallet,
+              actionType,
+              plotNum,
+              intent == 'buy' ? 3 : (intent == 'plant' ? (['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(seed) + 1) : 1)
+            )
+          : null;
+        
+        final tx = (res != null && res.isNotEmpty) ? res.substring(0, 8) : 'lokal';
+
+        if (intent == 'plant') {
+          onAiPlanted?.call(plotNum - 1, ['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(seed));
+          _appendMessage(ChatMessage(
+            sender: aiAgent!.name,
+            wallet: aiAgent!.wallet,
+            text: 'Bagus! Benih $seed ditanam di Lahan $plotNum. (Tx: $tx)',
+            time: time,
+          ));
+        } else if (intent == 'harvest') {
+          onAiHarvested?.call(plotNum - 1);
+          _appendMessage(ChatMessage(
+            sender: aiAgent!.name,
+            wallet: aiAgent!.wallet,
+            text: 'Sukses! Hasil panen berhasil diambil. (Tx: $tx)',
+            time: time,
+          ));
+        } else if (intent == 'buy') {
+          _appendMessage(ChatMessage(
+            sender: aiAgent!.name,
+            wallet: aiAgent!.wallet,
+            text: 'Selesai! Saya membeli 3 benih $seed. (Tx: $tx)',
+            time: time,
+          ));
+        } else if (intent == 'sell') {
+          _appendMessage(ChatMessage(
+            sender: aiAgent!.name,
+            wallet: aiAgent!.wallet,
+            text: 'Hore! Seluruh hasil panen terjual. (Tx: $tx)',
+            time: time,
+          ));
+        }
+      } catch (e) {
+        _appendMessage(ChatMessage(
+          sender: aiAgent!.name,
+          wallet: aiAgent!.wallet,
+          text: 'Transaksi selesai secara lokal. (Gagal Sepolia: ${e.toString().split('\n').first})',
+          time: time,
+        ));
+        // Run visual fallback
+        if (intent == 'plant') {
+          onAiPlanted?.call(plotNum - 1, ['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(seed));
+        } else if (intent == 'harvest') {
+          onAiHarvested?.call(plotNum - 1);
+        }
+      }
+    });
+  }
+
+  void _moveLocalAiTo(Offset target, VoidCallback onArrival) {
+    if (aiAgent == null) return;
+    
+    aiAgent!.anim = 'walk';
+    notifyListeners();
+
+    const speed = 12.0; // speed per step
+    Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      if (aiAgent == null) {
+        timer.cancel();
+        return;
+      }
+      final dx = target.dx - aiAgent!.x;
+      final dy = target.dy - aiAgent!.y;
+      final distance = math.sqrt(dx * dx + dy * dy);
+
+      if (distance > speed) {
+        aiAgent!.x += (dx / distance) * speed;
+        aiAgent!.y += (dy / distance) * speed;
+        notifyListeners();
+      } else {
+        aiAgent!.x = target.dx;
+        aiAgent!.y = target.dy;
+        aiAgent!.anim = 'idle';
+        notifyListeners();
+        timer.cancel();
+        onArrival();
+      }
+    });
   }
 
   void _appendMessage(ChatMessage msg) {
