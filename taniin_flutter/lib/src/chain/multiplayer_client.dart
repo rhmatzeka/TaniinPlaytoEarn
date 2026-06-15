@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../state/farm_state.dart';
@@ -60,6 +61,7 @@ class MultiplayerClient extends ChangeNotifier {
   final FarmStateController farmState;
   io.Socket? _socket;
   bool connected = false;
+  String _connectedHost = '';
 
   final Map<String, RemotePlayer> remotePlayers = <String, RemotePlayer>{};
   AiAgentState? aiAgent;
@@ -69,13 +71,37 @@ class MultiplayerClient extends ChangeNotifier {
   void Function(int plotIndex, int seedIndex)? onAiPlanted;
   void Function(int plotIndex)? onAiHarvested;
 
+  String _resolveHost() {
+    final configured = farmState.chainConfig.gameApiUrl.trim();
+    if (configured.isNotEmpty) {
+      return configured;
+    }
+    // On web with no explicit API URL, use the current site origin.
+    if (kIsWeb) {
+      final origin = Uri.base.origin;
+      if (origin.isNotEmpty && !origin.startsWith('file')) {
+        return origin;
+      }
+    }
+    return 'http://127.0.0.1:8787';
+  }
+
+  /// Reconnects using the latest chain config (call after chain config loads).
+  void start() {
+    final host = _resolveHost();
+    if (connected && host == _connectedHost) {
+      return;
+    }
+    _socket?.dispose();
+    _socket = null;
+    _initConnection();
+  }
+
   void _initConnection() {
     // Determine the API server URL
-    String apiHost = 'http://127.0.0.1:8787';
-    if (farmState.chainConfig.gameApiUrl.isNotEmpty) {
-      apiHost = farmState.chainConfig.gameApiUrl;
-    }
-    
+    final apiHost = _resolveHost();
+    _connectedHost = apiHost;
+
     debugPrint('[multiplayer] Connecting to WebSocket: $apiHost');
 
     try {
@@ -254,11 +280,43 @@ class MultiplayerClient extends ChangeNotifier {
   }
 
   void sendChat(String text) {
-    if (connected && text.trim().isNotEmpty) {
-      _socket?.emit('chat', <String, dynamic>{
-        'text': text.trim(),
-      });
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) {
+      return;
     }
+    final now = TimeOfDay.now();
+    final time =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
+    // Optimistic local echo so the player always sees their own message,
+    // even before the server round-trip (or if offline).
+    _appendMessage(ChatMessage(
+      sender: 'Kamu',
+      wallet: farmState.walletAddress,
+      text: trimmed,
+      time: time,
+    ));
+
+    if (connected) {
+      _socket?.emit('chat', <String, dynamic>{'text': trimmed});
+    } else {
+      _appendMessage(ChatMessage(
+        sender: 'Sistem',
+        wallet: '',
+        text: 'AI offline: server multiplayer belum tersambung. Coba lagi nanti.',
+        time: time,
+      ));
+      // Attempt a silent reconnect for next time.
+      reconnect();
+    }
+  }
+
+  void _appendMessage(ChatMessage msg) {
+    chatMessages.add(msg);
+    if (chatMessages.length > 50) {
+      chatMessages.removeAt(0);
+    }
+    notifyListeners();
   }
 
   void reconnect() {

@@ -36,6 +36,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   bool _loadingFinished = false;
   bool _audioStarted = false;
   bool _appInForeground = true;
+  bool _chatTyping = false;
 
   @override
   void initState() {
@@ -88,6 +89,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       return;
     }
     _farmState.configureChain(config);
+    _multiplayerClient.start();
     final launchWalletAddress = PlatformBridge.launchWalletAddress();
     if (launchWalletAddress.isNotEmpty) {
       unawaited(_farmState.connectWalletFromDeepLink(launchWalletAddress));
@@ -180,17 +182,35 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       _loadingFinished &&
       _appInForeground &&
       _farmState.walletConnected &&
-      _activePanel == null;
+      _activePanel == null &&
+      !_chatTyping;
 
   void _requestGameFocus() {
     if (!mounted || !_canUseKeyboardMovement) {
       return;
     }
+    // Do not steal focus away from the chat text field while the player types.
+    if (_chatTyping) {
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _canUseKeyboardMovement) {
+      if (mounted && _canUseKeyboardMovement && !_chatTyping) {
         _gameFocusNode.requestFocus();
       }
     });
+  }
+
+  void _handleChatTypingChanged(bool typing) {
+    if (_chatTyping == typing) {
+      return;
+    }
+    setState(() => _chatTyping = typing);
+    if (typing) {
+      // Stop any in-progress movement and release the game focus node.
+      _clearMovementInput();
+    } else {
+      _requestGameFocus();
+    }
   }
 
   KeyEventResult _handleGameKeyEvent(FocusNode node, KeyEvent event) {
@@ -198,7 +218,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     if (!_isMovementKey(key)) {
       return KeyEventResult.ignored;
     }
-    if (!_canUseKeyboardMovement) {
+    if (!_canUseKeyboardMovement || _chatTyping) {
       _clearMovementInput();
       return KeyEventResult.ignored;
     }
@@ -253,7 +273,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         },
         onKeyEvent: _handleGameKeyEvent,
         child: Listener(
-          onPointerDown: (_) => _requestGameFocus(),
+          onPointerDown: (_) {
+            if (!_chatTyping) {
+              _requestGameFocus();
+            }
+          },
           child: AnimatedBuilder(
             animation: _farmState,
             builder: (context, _) {
@@ -272,6 +296,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                           farmState: _farmState,
                           activePanel: _activePanel,
                           onPanelSelected: _togglePanel,
+                          onChatTypingChanged: _handleChatTypingChanged,
                         ),
                       ),
                       Positioned.fill(

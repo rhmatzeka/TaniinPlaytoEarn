@@ -90,8 +90,9 @@ function initMultiplayer(server) {
       const wallet = players[socket.id] ? players[socket.id].wallet : "0x";
       console.log(`[chat] ${players[socket.id]?.name || "Anon"}: ${text}`);
 
-      // Broadcast the chat message to everyone
-      io.emit("chat_message", {
+      // Broadcast the player's message to OTHER players only; the sender shows
+      // their own message via an optimistic local echo on the client.
+      socket.broadcast.emit("chat_message", {
         sender: players[socket.id]?.name || "Anon",
         wallet: wallet,
         text: text,

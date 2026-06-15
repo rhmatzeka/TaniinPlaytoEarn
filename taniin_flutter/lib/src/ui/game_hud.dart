@@ -19,6 +19,7 @@ class GameHud extends StatelessWidget {
     required this.farmState,
     required this.activePanel,
     required this.onPanelSelected,
+    this.onChatTypingChanged,
     super.key,
   });
 
@@ -26,6 +27,7 @@ class GameHud extends StatelessWidget {
   final FarmStateController farmState;
   final GamePanel? activePanel;
   final ValueChanged<GamePanel> onPanelSelected;
+  final ValueChanged<bool>? onChatTypingChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -186,6 +188,7 @@ class GameHud extends StatelessWidget {
                       child: _ChatHud(
                         multiplayerClient: game.multiplayerClient,
                         compact: compact,
+                        onTypingChanged: onChatTypingChanged,
                       ),
                     ),
                     Positioned(
@@ -2322,10 +2325,15 @@ class _SeedPacketPainter extends CustomPainter {
 }
 
 class _ChatHud extends StatefulWidget {
-  const _ChatHud({required this.multiplayerClient, required this.compact});
+  const _ChatHud({
+    required this.multiplayerClient,
+    required this.compact,
+    this.onTypingChanged,
+  });
 
   final MultiplayerClient multiplayerClient;
   final bool compact;
+  final ValueChanged<bool>? onTypingChanged;
 
   @override
   State<_ChatHud> createState() => _ChatHudState();
@@ -2348,7 +2356,12 @@ class _ChatHudState extends State<_ChatHud> {
   void initState() {
     super.initState();
     widget.multiplayerClient.addListener(_onChat);
+    _inputFocus.addListener(_onInputFocusChange);
     _lastSeenCount = widget.multiplayerClient.chatMessages.length;
+  }
+
+  void _onInputFocusChange() {
+    widget.onTypingChanged?.call(_inputFocus.hasFocus);
   }
 
   void _onChat() {
@@ -2367,6 +2380,13 @@ class _ChatHudState extends State<_ChatHud> {
       if (_expanded) {
         _lastSeenCount = widget.multiplayerClient.chatMessages.length;
         _scrollToBottom();
+        // Focus the input shortly after the panel expands.
+        Future.delayed(const Duration(milliseconds: 120), () {
+          if (mounted && _expanded) _inputFocus.requestFocus();
+        });
+      } else {
+        _inputFocus.unfocus();
+        widget.onTypingChanged?.call(false);
       }
     });
   }
@@ -2397,6 +2417,7 @@ class _ChatHudState extends State<_ChatHud> {
   @override
   void dispose() {
     widget.multiplayerClient.removeListener(_onChat);
+    _inputFocus.removeListener(_onInputFocusChange);
     _textController.dispose();
     _scrollController.dispose();
     _inputFocus.dispose();
@@ -2571,6 +2592,25 @@ class _ChatHudState extends State<_ChatHud> {
                     itemBuilder: (context, index) {
                       final msg = messages[index];
                       final isAi = msg.sender == 'Pak Tani AI';
+                      final isSystem = msg.sender == 'Sistem';
+                      if (isSystem) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Center(
+                            child: Text(
+                              msg.text,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Color(0xFFE0A24B),
+                                fontFamily: 'monospace',
+                                fontSize: 11,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+                      final accent = isAi ? _kAi : _kPlayer;
                       return Align(
                         alignment:
                             isAi ? Alignment.centerLeft : Alignment.centerRight,
@@ -2585,7 +2625,7 @@ class _ChatHudState extends State<_ChatHud> {
                                 : const Color(0xFF1E2C3A),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: (isAi ? _kAi : _kPlayer).withValues(alpha: 0.45),
+                              color: accent.withValues(alpha: 0.45),
                               width: 1,
                             ),
                           ),
@@ -2595,7 +2635,7 @@ class _ChatHudState extends State<_ChatHud> {
                               Text(
                                 msg.sender,
                                 style: TextStyle(
-                                  color: isAi ? _kAi : _kPlayer,
+                                  color: accent,
                                   fontFamily: 'monospace',
                                   fontWeight: FontWeight.bold,
                                   fontSize: 10.5,
