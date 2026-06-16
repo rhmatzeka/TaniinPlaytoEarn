@@ -302,15 +302,8 @@ class MultiplayerClient extends ChangeNotifier {
     if (connected) {
       _socket?.emit('chat', <String, dynamic>{'text': trimmed});
     } else {
-      // Offline mode: Simulate AI locally using local rule-based NLP.
-      _appendMessage(ChatMessage(
-        sender: 'Sistem',
-        wallet: '',
-        text: 'Menghubungkan ke Local AI Mode (Offline)...',
-        time: time,
-      ));
+      // Offline mode: Simulate AI locally without posting offline alert messages.
       _simulateLocalAi(trimmed, time);
-      // Attempt a silent reconnect for next time.
       reconnect();
     }
   }

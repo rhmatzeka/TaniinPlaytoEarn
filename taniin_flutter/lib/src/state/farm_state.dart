@@ -134,6 +134,7 @@ class HistoryRecord {
     required this.valueLabel,
     this.id = 0,
     this.txHash = '',
+    this.errorMessage = '',
   });
 
   final int id;
@@ -142,10 +143,15 @@ class HistoryRecord {
   final String timeLabel;
   final String valueLabel;
   final String txHash;
+  final String errorMessage;
 
   bool get hasTxHash => isValidTransactionHash(txHash);
 
-  HistoryRecord copyWith({String? status, String? txHash}) {
+  HistoryRecord copyWith({
+    String? status,
+    String? txHash,
+    String? errorMessage,
+  }) {
     return HistoryRecord(
       id: id,
       title: title,
@@ -153,6 +159,7 @@ class HistoryRecord {
       timeLabel: timeLabel,
       valueLabel: valueLabel,
       txHash: txHash ?? this.txHash,
+      errorMessage: errorMessage ?? this.errorMessage,
     );
   }
 }
@@ -634,6 +641,7 @@ class FarmStateController extends ChangeNotifier {
               'timeLabel': record.timeLabel,
               'valueLabel': record.valueLabel,
               'txHash': record.txHash,
+              'errorMessage': record.errorMessage,
             },
           )
           .toList(),
@@ -760,6 +768,7 @@ class FarmStateController extends ChangeNotifier {
               timeLabel: _readString(record['timeLabel'], 'now'),
               valueLabel: _readString(record['valueLabel'], ''),
               txHash: _readString(record['txHash'], ''),
+              errorMessage: _readString(record['errorMessage'], ''),
             ),
           );
         }
@@ -1890,9 +1899,14 @@ class FarmStateController extends ChangeNotifier {
     ChainAction action,
     String reason,
   ) {
-    _updateHistory(entryId, status: 'gagal on-chain');
+    final cleanReason = _conciseChainError(reason);
+    _updateHistory(
+      entryId,
+      status: 'gagal on-chain',
+      errorMessage: cleanReason,
+    );
     chainStatus =
-        '${action.label} gagal on-chain: ${_conciseChainError(reason)}';
+        '${action.label} gagal on-chain: $cleanReason';
     showMessage('Transaksi Sepolia gagal.', success: false, notify: false);
     _commitState();
   }
@@ -1904,6 +1918,7 @@ class FarmStateController extends ChangeNotifier {
     int refundTaniOnFailure,
     String reason,
   ) {
+    final cleanReason = _conciseChainError(reason);
     if (refundCoinsOnFailure > 0 || refundTaniOnFailure > 0) {
       if (refundCoinsOnFailure > 0) {
         coins = math.min(0x7fffffff, coins + refundCoinsOnFailure);
@@ -1912,12 +1927,16 @@ class FarmStateController extends ChangeNotifier {
         tani = math.min(0x7fffffff, tani + refundTaniOnFailure);
       }
       _clampSwapAmountToSource();
-      _updateHistory(entryId, status: 'gagal; saldo kembali');
+      _updateHistory(
+        entryId,
+        status: 'gagal; saldo kembali',
+        errorMessage: cleanReason,
+      );
       final returned = refundCoinsOnFailure > 0
           ? '+$refundCoinsOnFailure coin'
           : '+$refundTaniOnFailure TANI';
       chainStatus =
-          '${action.label} gagal; saldo dikembalikan $returned: ${_conciseChainError(reason)}';
+          '${action.label} gagal; saldo dikembalikan $returned: $cleanReason';
       showMessage(
         'Swap gagal, saldo dikembalikan.',
         success: false,
@@ -1926,9 +1945,13 @@ class FarmStateController extends ChangeNotifier {
       _commitState();
       return;
     }
-    _updateHistory(entryId, status: 'belum sync');
+    _updateHistory(
+      entryId,
+      status: 'belum sync',
+      errorMessage: cleanReason,
+    );
     chainStatus =
-        '${action.label} tersimpan lokal. ${_conciseChainError(reason)}';
+        '${action.label} tersimpan lokal. $cleanReason';
     _commitState();
   }
 
@@ -1952,7 +1975,12 @@ class FarmStateController extends ChangeNotifier {
     return id;
   }
 
-  void _updateHistory(int entryId, {String? status, String? txHash}) {
+  void _updateHistory(
+    int entryId, {
+    String? status,
+    String? txHash,
+    String? errorMessage,
+  }) {
     final index = history.indexWhere((record) => record.id == entryId);
     if (index < 0) {
       return;
@@ -1960,6 +1988,7 @@ class FarmStateController extends ChangeNotifier {
     history[index] = history[index].copyWith(
       status: status == null ? null : _normalizeHistoryStatus(status),
       txHash: txHash,
+      errorMessage: errorMessage,
     );
   }
 

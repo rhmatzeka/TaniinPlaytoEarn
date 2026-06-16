@@ -291,6 +291,10 @@ class _HistoryRow extends StatelessWidget {
     required bool isConfirmed,
     required bool isPendingHash,
   }) {
+    final status = record.status.trim().toLowerCase();
+    if (status.contains('gagal') && record.errorMessage.isNotEmpty) {
+      return record.errorMessage;
+    }
     if (isConfirmed) {
       return 'Confirmed ${shortTransactionHash(record.txHash)}';
     }
