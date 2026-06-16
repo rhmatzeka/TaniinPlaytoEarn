@@ -51,6 +51,11 @@ class _WalletPanelState extends State<WalletPanel> {
 
   @override
   Widget build(BuildContext context) {
+    // Keep text controller synchronized if the wallet address changes externally (e.g. via deep link).
+    if (farmState.walletConnected && _controller.text != farmState.walletAddress) {
+      _controller.text = farmState.walletAddress;
+    }
+    
     final media = MediaQuery.sizeOf(context);
     final compact = media.width < 560 || media.height < 720;
     final contentProminent = widget.prominent && !compact;
@@ -246,13 +251,16 @@ class _WalletPanelState extends State<WalletPanel> {
     );
   }
 
-  void _saveWallet() {
+  void _saveWallet() async {
     final address = _controller.text.trim();
     if (!isValidAddress(address)) {
       farmState.showMessage('Wallet address tidak valid.', success: false);
       return;
     }
-    unawaited(farmState.connectWallet(address));
+    await farmState.connectWallet(address);
+    if (widget.showCloseButton) {
+      widget.onClose();
+    }
   }
 
   Future<void> _openWalletConnect({required bool metaMask}) async {

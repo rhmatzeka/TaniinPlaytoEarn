@@ -57,6 +57,8 @@ class ChatMessage {
 
 class MultiplayerClient extends ChangeNotifier {
   MultiplayerClient(this.farmState) {
+    _lastWalletAddress = farmState.walletAddress;
+    farmState.addListener(_onWalletAddressChanged);
     _initConnection();
   }
 
@@ -64,6 +66,7 @@ class MultiplayerClient extends ChangeNotifier {
   io.Socket? _socket;
   bool connected = false;
   String _connectedHost = '';
+  late String _lastWalletAddress;
 
   final Map<String, RemotePlayer> remotePlayers = <String, RemotePlayer>{};
   AiAgentState? aiAgent;
@@ -72,6 +75,14 @@ class MultiplayerClient extends ChangeNotifier {
   // Callbacks for game to react
   void Function(int plotIndex, int seedIndex)? onAiPlanted;
   void Function(int plotIndex)? onAiHarvested;
+
+  void _onWalletAddressChanged() {
+    if (farmState.walletAddress != _lastWalletAddress) {
+      _lastWalletAddress = farmState.walletAddress;
+      debugPrint('[multiplayer] Player wallet address changed, reconnecting...');
+      reconnect();
+    }
+  }
 
   String _resolveHost() {
     final configured = farmState.chainConfig.gameApiUrl.trim();
@@ -508,6 +519,7 @@ class MultiplayerClient extends ChangeNotifier {
 
   @override
   void dispose() {
+    farmState.removeListener(_onWalletAddressChanged);
     _socket?.disconnect();
     _socket?.dispose();
     super.dispose();
