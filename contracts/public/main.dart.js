@@ -27197,7 +27197,9 @@ _.b=a
 _.c=b
 _.d=c
 _.e=d
-_.f=e},
+_.f=e
+_.r=2
+_.w=!1},
 is:function is(a,b){this.a=a
 this.c=b},
 BI:function BI(a,b,c,d){var _=this
@@ -27207,7 +27209,7 @@ _.c=!1
 _.d=""
 _.e=$
 _.f=b
-_.w=_.r=null
+_.r=null
 _.x=c
 _.z=_.y=null
 _.M$=0
@@ -91842,12 +91844,11 @@ else if(l==="plant"||l==="harvest")h=new A.f((4+(m-1)*2)*128+128,2560)
 p.aiV(h,new A.aem(g,p,b))
 case 1:return A.G(q,r)}})
 return A.H($async$HV,r)},
-aiV(a,b){var s=this,r=s.r
-if(r==null)return
-s.w=a
-r.f="walk"
-s.N()
-A.aCN(B.hx,new A.ael(s,a,b))},
+aiV(a,b){var s=this.r
+if(s==null)return
+s.f="walk"
+this.N()
+A.aCN(B.hx,new A.ael(this,a,b))},
 mm(a){var s=this.x
 s.push(a)
 if(s.length>50)B.b.dL(s,0)
@@ -92103,20 +92104,24 @@ $S:25}
 A.ael.prototype={
 $1(a){var s,r,q,p,o,n=this.a,m=n.r
 if(m==null){a.aX()
-n.w=null
 return}s=this.b
 r=s.a
 q=r-m.d
 s=s.b
 p=s-m.e
 o=Math.sqrt(q*q+p*p)
-m=n.r
-if(o>12){m.d=m.d+q/o*12
+if(o>12){m=n.r
+if(Math.abs(p)>Math.abs(q)){m.toString
+m.r=p<0?1:0
+m.w=!1}else{m.r=2
+m.w=q<0}m.d=m.d+q/o*12
 m.e=m.e+p/o*12
-n.N()}else{m.d=r
+n.N()}else{m=n.r
+m.d=r
 m.e=s
 m.f="idle"
-n.w=null
+m.r=0
+m.w=!1
 n.N()
 a.aX()
 this.c.$0()}},
@@ -92726,24 +92731,24 @@ a.push(new A.n(r,s,r+79.36,s+92.16))},
 acq(a){var s=this,r=s.bu,q=s.bf
 if(r==null)return
 s.am.f.ad(0,new A.alE(s,q,r,172.8,a))},
-ach(a2){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,c,b,a=this,a0=a.am,a1=a0.r
-if(a1==null)return
-s=a.bu
-r=a.bf
+ach(a0){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,c,b=this,a=b.am.r
+if(a==null)return
+s=b.bu
+r=b.bf
 if(s==null)return
-q=a1.f==="walk"
+q=a.f==="walk"
 if(q)p=r==null?s:r
 else p=s
-o=a1.d-a.d3-86.4
-n=a1.e-a.e8-134.78400000000002
+o=a.d-b.d3-86.4
+n=a.e-b.e8-134.78400000000002
 m=new A.n(o,n,o+172.8,n+172.8)
-if(a.oc(m))return
-l=a1.d-a.d3
-k=a1.e-a.e8+6.4
-j=a.a5
+if(b.oc(m))return
+l=a.d-b.d3
+k=a.e-b.e8+6.4
+j=b.a5
 j.b=B.T
 j.r=B.k8.gn()
-a2.lH(new A.n(l-28.16,k-7.68,l+28.16,k+8.96),j)
+a0.lH(new A.n(l-28.16,k-7.68,l+28.16,k+8.96),j)
 $.X()
 i=A.av()
 i.f=!1
@@ -92753,24 +92758,19 @@ j===$&&A.a()
 j=j.a
 j===$&&A.a()
 h=Math.max(1,B.f.bN(J.ab(j.a.width()),32))
-g=B.f.aU(q?a.eQ:B.f.aU(B.e.bN(a.eP*1000,240),6),h)
-f=!1
-if(q&&a0.w!=null){a0=a0.w
-e=a0.a-a1.d
-d=a0.b-a1.e
-if(Math.abs(d)>Math.abs(e))c=d<0?1:0
-else{f=e<0
-c=2}}else c=0
-a0=g*32
-j=c*32
-b=new A.n(a0,j,a0+32,j+32)
-j=a2.a
-J.ab(j.save())
-if(f){j.translate(m.gaI().a,m.gaI().b)
-a2.nJ(-1,1)
-a2.h8(p,b,A.el(B.h,172.8,172.8),i)}else a2.h8(p,b,m,i)
-j.restore()
-a.R_(a2,a1.c,a1.d,a1.e-138.24,B.hb)},
+g=B.f.aU(q?b.eQ:B.f.aU(B.e.bN(b.eP*1000,240),6),h)
+f=a.r
+e=a.w
+j=g*32
+d=f*32
+c=new A.n(j,d,j+32,d+32)
+d=a0.a
+J.ab(d.save())
+if(e){d.translate(m.gaI().a,m.gaI().b)
+a0.nJ(-1,1)
+a0.h8(p,c,A.el(B.h,172.8,172.8),i)}else a0.h8(p,c,m,i)
+d.restore()
+b.R_(a0,a.c,a.d,a.e-138.24,B.hb)},
 R_(a,b,c,d,e){var s,r,q,p,o,n=null,m=A.mk(n,n,n,n,A.dF(n,n,n,n,n,n,n,n,n,A.fQ(n,B.G0,e,n,n,n,n,n,"monospace",n,n,16,n,n,B.bv,n,n,!0,n,n,n,n,n,n,n,n)," "+b+" "),B.aN,B.P,n,B.cz,B.aS)
 m.t1()
 s=this.d3

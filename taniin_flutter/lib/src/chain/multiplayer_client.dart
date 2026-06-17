@@ -31,6 +31,8 @@ class AiAgentState {
     required this.x,
     required this.y,
     required this.anim,
+    this.facingDirection = 2, // 0: down, 1: up, 2: side
+    this.flipLeft = false,
   });
 
   final String id;
@@ -39,6 +41,8 @@ class AiAgentState {
   double x;
   double y;
   String anim;
+  int facingDirection;
+  bool flipLeft;
 }
 
 class ChatMessage {
@@ -493,6 +497,15 @@ class MultiplayerClient extends ChangeNotifier {
       final distance = math.sqrt(dx * dx + dy * dy);
 
       if (distance > speed) {
+        // Calculate facing direction before moving
+        if (dy.abs() > dx.abs()) {
+          aiAgent!.facingDirection = dy < 0 ? 1 : 0; // 1: up, 0: down
+          aiAgent!.flipLeft = false;
+        } else {
+          aiAgent!.facingDirection = 2; // 2: side
+          aiAgent!.flipLeft = dx < 0;
+        }
+
         aiAgent!.x += (dx / distance) * speed;
         aiAgent!.y += (dy / distance) * speed;
         notifyListeners();
@@ -500,6 +513,8 @@ class MultiplayerClient extends ChangeNotifier {
         aiAgent!.x = target.dx;
         aiAgent!.y = target.dy;
         aiAgent!.anim = 'idle';
+        aiAgent!.facingDirection = 0; // face down when idle
+        aiAgent!.flipLeft = false;
         aiTarget = null;
         notifyListeners();
         timer.cancel();

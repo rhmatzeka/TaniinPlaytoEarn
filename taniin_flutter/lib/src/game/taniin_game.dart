@@ -1808,20 +1808,8 @@ class TaniinGame extends FlameGame {
     final frameIndex = frame % columns;
     
     // Determine dynamically facing direction row for AI agent (down=0, up=1, side=2)
-    int row = 0;
-    bool flipLeft = false;
-    
-    // Calculate vector for direction if it's walking
-    if (isWalking && multiplayerClient.aiTarget != null) {
-      final dx = multiplayerClient.aiTarget!.dx - ai.x;
-      final dy = multiplayerClient.aiTarget!.dy - ai.y;
-      if (dy.abs() > dx.abs()) {
-        row = dy < 0 ? 1 : 0; // up=1, down=0
-      } else {
-        row = 2; // side=2
-        flipLeft = dx < 0; // flip if walking left
-      }
-    }
+    int row = ai.facingDirection;
+    bool flipLeft = ai.flipLeft;
 
     final source = Rect.fromLTWH(
       (frameIndex * frameW).toDouble(),
