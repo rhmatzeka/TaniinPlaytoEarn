@@ -497,8 +497,8 @@ class MultiplayerClient extends ChangeNotifier {
     const farmGateX = 10.0 * 128.0;
     const farmGateY = 19.5 * 128.0;
 
-    // Check if target is a farm plot
-    final isPlotTarget = target.dy > 18.0 * 128.0 && target.dx < 15.0 * 128.0;
+    // Check if target is a farm plot (plots are located in Y range of 19 tiles, X from 4 to 13 tiles)
+    final isPlotTarget = target.dy > 18.0 * 128.0 && target.dy < 24.0 * 128.0 && target.dx < 16.0 * 128.0;
     
     // Check if target is the sell crop house (Pengepul)
     final isSellTarget = (target.dx - 31.0 * 128.0).abs() < 128.0 && target.dy < 17.0 * 128.0;
@@ -536,8 +536,17 @@ class MultiplayerClient extends ChangeNotifier {
   }
 
   void _followWaypoints(List<Offset> path, int index, VoidCallback onArrival) {
-    if (aiAgent == null || index >= path.length) {
+    if (aiAgent == null) {
       aiTarget = null;
+      return;
+    }
+    
+    if (index >= path.length) {
+      aiTarget = null;
+      aiAgent!.anim = 'idle';
+      aiAgent!.facingDirection = 0; // face down when arrived/idle
+      aiAgent!.flipLeft = false;
+      notifyListeners();
       onArrival();
       return;
     }

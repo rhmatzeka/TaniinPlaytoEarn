@@ -91852,7 +91852,7 @@ if(m==null)return
 m=m.e
 s=A.b([],t.yv)
 r=a.b
-q=r>2304&&a.a<1920
+q=r>2304&&r<3072&&a.a<2048
 p=a.a
 o=Math.abs(p-3968)<128&&r<2176
 n=Math.abs(p-2368)<128&&r>2688
@@ -91866,12 +91866,17 @@ s.push(B.RJ)
 s.push(a)}else if(n){s.push(new A.f(2368,m))
 s.push(a)}else s.push(a)
 this.Rw(s,0,b)},
-Rw(a,b,c){var s,r=this.r
-if(r==null||b>=a.length){c.$0()
+Rw(a,b,c){var s,r=this,q=r.r
+if(q==null)return
+if(b>=a.length){q.f="idle"
+q.r=0
+q.w=!1
+r.N()
+c.$0()
 return}s=a[b]
-r.f="walk"
-this.N()
-A.aCN(B.hx,new A.ae9(this,s,a,b,c))},
+q.f="walk"
+r.N()
+A.aCN(B.hx,new A.ae9(r,s,a,b,c))},
 mm(a){var s=this.x
 s.push(a)
 if(s.length>50)B.b.dL(s,0)
