@@ -478,9 +478,71 @@ class MultiplayerClient extends ChangeNotifier {
     });
   }
 
-  void _moveLocalAiTo(Offset target, VoidCallback onArrival) {
+  void _moveLocalAiTo(Offset finalTarget, VoidCallback onArrival) {
     if (aiAgent == null) return;
+
+    // Generate waypoints path to follow the roads and avoid fences/obstacles
+    final waypoints = _calculateAiPath(Offset(aiAgent!.x, aiAgent!.y), finalTarget);
+    _followWaypoints(waypoints, 0, onArrival);
+  }
+
+  List<Offset> _calculateAiPath(Offset start, Offset target) {
+    final path = <Offset>[];
     
+    // Main Road Intersection (horizontal connector road)
+    const mainCrossX = 18.5 * 128.0;
+    const mainCrossY = 19.5 * 128.0;
+
+    // Gate entry to the Farm Plots area
+    const farmGateX = 10.0 * 128.0;
+    const farmGateY = 19.5 * 128.0;
+
+    // Check if target is a farm plot
+    final isPlotTarget = target.dy > 18.0 * 128.0 && target.dx < 15.0 * 128.0;
+    
+    // Check if target is the sell crop house (Pengepul)
+    final isSellTarget = (target.dx - 31.0 * 128.0).abs() < 128.0 && target.dy < 17.0 * 128.0;
+
+    // Check if target is the shop (Toko Ucup)
+    final isShopTarget = (target.dx - 18.5 * 128.0).abs() < 128.0 && target.dy > 21.0 * 128.0;
+
+    // Routing Logic using Waypoints:
+    if (isPlotTarget) {
+      // Route: Start -> Main Crossroads -> Farm Gate -> Target Plot
+      path.add(Offset(mainCrossX, start.dy)); // Go to main road x first
+      path.add(const Offset(mainCrossX, mainCrossY)); // Move to crossroads
+      path.add(const Offset(farmGateX, farmGateY)); // Walk along road to gate
+      path.add(Offset(target.dx, farmGateY)); // Align with plot x
+      path.add(target); // Enter plot
+    } 
+    else if (isSellTarget) {
+      // Route: Start -> Main Crossroads -> Pengepul entry -> Target House
+      path.add(Offset(mainCrossX, start.dy)); 
+      path.add(const Offset(mainCrossX, mainCrossY));
+      path.add(const Offset(31.0 * 128.0, mainCrossY)); // Move right to sell lane
+      path.add(target); // Walk up to house
+    }
+    else if (isShopTarget) {
+      // Route: Start -> Align X -> Walk down/up to Shop
+      path.add(Offset(mainCrossX, start.dy));
+      path.add(target);
+    }
+    else {
+      // Direct path fallback for any other targets
+      path.add(target);
+    }
+
+    return path;
+  }
+
+  void _followWaypoints(List<Offset> path, int index, VoidCallback onArrival) {
+    if (aiAgent == null || index >= path.length) {
+      aiTarget = null;
+      onArrival();
+      return;
+    }
+
+    final target = path[index];
     aiTarget = target;
     aiAgent!.anim = 'walk';
     notifyListeners();
@@ -512,13 +574,11 @@ class MultiplayerClient extends ChangeNotifier {
       } else {
         aiAgent!.x = target.dx;
         aiAgent!.y = target.dy;
-        aiAgent!.anim = 'idle';
-        aiAgent!.facingDirection = 0; // face down when idle
-        aiAgent!.flipLeft = false;
-        aiTarget = null;
         notifyListeners();
         timer.cancel();
-        onArrival();
+        
+        // Move to the next waypoint in path
+        _followWaypoints(path, index + 1, onArrival);
       }
     });
   }
