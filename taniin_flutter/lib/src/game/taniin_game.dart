@@ -1730,21 +1730,22 @@ class TaniinGame extends FlameGame {
         _paint,
       );
 
-      // Draw sprite with color filter to distinguish other players (e.g. blue tint)
+      // Draw sprite solid (no transparent color filter)
       final remotePaint = Paint()
         ..isAntiAlias = false
-        ..filterQuality = FilterQuality.none
-        ..colorFilter = const ColorFilter.mode(
-          Color(0x334466FF),
-          BlendMode.srcATop,
-        );
+        ..filterQuality = FilterQuality.none;
 
       const frameW = 32;
       const frameH = 32;
       final columns = math.max(1, sheet.width ~/ frameW);
       final frame = isWalking ? _walkFrame : ((_clock * 1000) ~/ 240) % 6;
       final frameIndex = frame % columns;
-      final row = 0; // Down direction default or simple animation
+      
+      // Determine facing direction row for remote player (down=0, up=1, side=2)
+      int row = 0;
+      if (isWalking) {
+        row = 0;
+      }
 
       final source = Rect.fromLTWH(
         (frameIndex * frameW).toDouble(),
@@ -1756,7 +1757,7 @@ class TaniinGame extends FlameGame {
       canvas.drawImageRect(sheet, source, target, remotePaint);
 
       // Draw Name tag
-      _drawNameTag(canvas, player.name, player.x, player.y - playerSize * 0.8, Colors.blue);
+      _drawNameTag(canvas, player.name, player.x, player.y - playerSize * 0.8, const Color(0xFF6FB7FF));
     });
   }
 
@@ -1795,21 +1796,32 @@ class TaniinGame extends FlameGame {
       _paint,
     );
 
-    // Draw sprite with color filter to distinguish AI Agent (e.g. green/gold tint)
+    // Draw sprite solid (no transparent color filter)
     final aiPaint = Paint()
       ..isAntiAlias = false
-      ..filterQuality = FilterQuality.none
-      ..colorFilter = const ColorFilter.mode(
-        Color(0x3344FF66),
-        BlendMode.srcATop,
-      );
+      ..filterQuality = FilterQuality.none;
 
     const frameW = 32;
     const frameH = 32;
     final columns = math.max(1, sheet.width ~/ frameW);
     final frame = isWalking ? _walkFrame : ((_clock * 1000) ~/ 240) % 6;
     final frameIndex = frame % columns;
-    final row = 0; // Down direction
+    
+    // Determine dynamically facing direction row for AI agent (down=0, up=1, side=2)
+    int row = 0;
+    bool flipLeft = false;
+    
+    // Calculate vector for direction if it's walking
+    if (isWalking && multiplayerClient.aiTarget != null) {
+      final dx = multiplayerClient.aiTarget!.dx - ai.x;
+      final dy = multiplayerClient.aiTarget!.dy - ai.y;
+      if (dy.abs() > dx.abs()) {
+        row = dy < 0 ? 1 : 0; // up=1, down=0
+      } else {
+        row = 2; // side=2
+        flipLeft = dx < 0; // flip if walking left
+      }
+    }
 
     final source = Rect.fromLTWH(
       (frameIndex * frameW).toDouble(),
@@ -1818,22 +1830,39 @@ class TaniinGame extends FlameGame {
       frameH.toDouble(),
     );
 
-    canvas.drawImageRect(sheet, source, target, aiPaint);
+    canvas.save();
+    if (flipLeft) {
+      canvas.translate(target.center.dx, target.center.dy);
+      canvas.scale(-1, 1);
+      canvas.drawImageRect(
+        sheet,
+        source,
+        Rect.fromCenter(
+          center: Offset.zero,
+          width: playerSize,
+          height: playerSize,
+        ),
+        aiPaint,
+      );
+    } else {
+      canvas.drawImageRect(sheet, source, target, aiPaint);
+    }
+    canvas.restore();
 
     // Draw Name tag
-    _drawNameTag(canvas, ai.name, ai.x, ai.y - playerSize * 0.8, Colors.green);
+    _drawNameTag(canvas, ai.name, ai.x, ai.y - playerSize * 0.8, const Color(0xFF52E07A));
   }
 
   void _drawNameTag(Canvas canvas, String name, double worldX, double worldY, Color tagColor) {
     final painter = TextPainter(
       text: TextSpan(
-        text: name,
-        style: const TextStyle(
+        text: ' $name ',
+        style: TextStyle(
           fontFamily: 'monospace',
-          fontSize: 20,
+          fontSize: 16,
           fontWeight: FontWeight.bold,
-          color: Colors.white,
-          backgroundColor: Colors.black54,
+          color: tagColor,
+          backgroundColor: const Color(0xE60F1A12),
         ),
       ),
       textDirection: TextDirection.ltr,
@@ -1841,6 +1870,16 @@ class TaniinGame extends FlameGame {
 
     final x = worldX - _cameraX - painter.width * 0.5;
     final y = worldY - _cameraY - painter.height * 0.5;
+    
+    // Draw small green/blue accent bar under name tag
+    final borderPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = tagColor;
+    canvas.drawRect(
+      Rect.fromLTWH(x, y + painter.height - 2, painter.width, 2.5),
+      borderPaint,
+    );
+
     painter.paint(canvas, Offset(x, y));
   }
 }

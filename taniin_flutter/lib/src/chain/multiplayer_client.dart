@@ -70,6 +70,7 @@ class MultiplayerClient extends ChangeNotifier {
 
   final Map<String, RemotePlayer> remotePlayers = <String, RemotePlayer>{};
   AiAgentState? aiAgent;
+  Offset? aiTarget; // Track target coordinate to determine walking direction
   final List<ChatMessage> chatMessages = <ChatMessage>[];
 
   // Callbacks for game to react
@@ -325,7 +326,7 @@ class MultiplayerClient extends ChangeNotifier {
       aiAgent = AiAgentState(
         id: 'local-ai-agent',
         wallet: '0x000000000000000000000000000000000000dEaD',
-        name: 'Pak Tani AI (Lokal)',
+        name: 'Pak Tani AI',
         x: 18.18 * 128,
         y: 25.88 * 128,
         anim: 'idle',
@@ -476,6 +477,7 @@ class MultiplayerClient extends ChangeNotifier {
   void _moveLocalAiTo(Offset target, VoidCallback onArrival) {
     if (aiAgent == null) return;
     
+    aiTarget = target;
     aiAgent!.anim = 'walk';
     notifyListeners();
 
@@ -483,6 +485,7 @@ class MultiplayerClient extends ChangeNotifier {
     Timer.periodic(const Duration(milliseconds: 50), (timer) {
       if (aiAgent == null) {
         timer.cancel();
+        aiTarget = null;
         return;
       }
       final dx = target.dx - aiAgent!.x;
@@ -497,6 +500,7 @@ class MultiplayerClient extends ChangeNotifier {
         aiAgent!.x = target.dx;
         aiAgent!.y = target.dy;
         aiAgent!.anim = 'idle';
+        aiTarget = null;
         notifyListeners();
         timer.cancel();
         onArrival();
