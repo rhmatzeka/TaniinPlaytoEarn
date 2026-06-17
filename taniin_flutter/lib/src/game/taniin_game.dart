@@ -1796,14 +1796,10 @@ class TaniinGame extends FlameGame {
       _paint,
     );
 
-    // Draw sprite solid (no transparent color filter)
-    final aiPaint = Paint()
-      ..isAntiAlias = false
-      ..filterQuality = FilterQuality.none;
-
     const frameW = 32;
     const frameH = 32;
     final columns = math.max(1, sheet.width ~/ frameW);
+    // Use walk frame index for walking, idle frame index for idle
     final frame = isWalking ? _walkFrame : ((_clock * 1000) ~/ 240) % 6;
     final frameIndex = frame % columns;
     
@@ -1830,10 +1826,10 @@ class TaniinGame extends FlameGame {
           width: playerSize,
           height: playerSize,
         ),
-        aiPaint,
+        _pixelPaint,
       );
     } else {
-      canvas.drawImageRect(sheet, source, target, aiPaint);
+      canvas.drawImageRect(sheet, source, target, _pixelPaint);
     }
     canvas.restore();
 
