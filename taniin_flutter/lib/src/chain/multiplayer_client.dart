@@ -506,25 +506,40 @@ class MultiplayerClient extends ChangeNotifier {
     // Check if target is the shop (Toko Ucup)
     final isShopTarget = (target.dx - 18.5 * 128.0).abs() < 128.0 && target.dy > 21.0 * 128.0;
 
-    // Routing Logic using Waypoints:
+    // Routing Logic using Waypoints to avoid cutting corner fences:
     if (isPlotTarget) {
-      // Route: Start -> Main Crossroads -> Farm Gate -> Target Plot
-      path.add(Offset(mainCrossX, start.dy)); // Go to main road x first
-      path.add(const Offset(mainCrossX, mainCrossY)); // Move to crossroads
+      // If AI is currently in the lower shop area, it must walk UP to the main crossroads first
+      if (start.dy > 20.0 * 128.0) {
+        path.add(const Offset(mainCrossX, mainCrossY));
+      } else {
+        path.add(Offset(mainCrossX, start.dy)); // Go to main road axis
+        path.add(const Offset(mainCrossX, mainCrossY)); // Move to crossroads
+      }
       path.add(const Offset(farmGateX, farmGateY)); // Walk along road to gate
-      path.add(Offset(target.dx, farmGateY)); // Align with plot x
+      path.add(Offset(target.dx, farmGateY)); // Align with plot X
       path.add(target); // Enter plot
     } 
     else if (isSellTarget) {
-      // Route: Start -> Main Crossroads -> Pengepul entry -> Target House
-      path.add(Offset(mainCrossX, start.dy)); 
-      path.add(const Offset(mainCrossX, mainCrossY));
+      if (start.dy > 20.0 * 128.0) {
+        path.add(const Offset(mainCrossX, mainCrossY));
+      } else {
+        path.add(Offset(mainCrossX, start.dy));
+        path.add(const Offset(mainCrossX, mainCrossY));
+      }
       path.add(const Offset(31.0 * 128.0, mainCrossY)); // Move right to sell lane
       path.add(target); // Walk up to house
     }
     else if (isShopTarget) {
-      // Route: Start -> Align X -> Walk down/up to Shop
-      path.add(Offset(mainCrossX, start.dy));
+      // First, get out of farm plot gate to avoid cutting through the fence
+      if (start.dx < 16.0 * 128.0 && start.dy > 18.0 * 128.0 && start.dy < 24.0 * 128.0) {
+        path.add(Offset(start.dx, farmGateY));
+        path.add(const Offset(farmGateX, farmGateY));
+        path.add(const Offset(mainCrossX, mainCrossY));
+      } else if (start.dx > 25.0 * 128.0) { // Coming from Pengepul
+        path.add(const Offset(31.0 * 128.0, mainCrossY));
+        path.add(const Offset(mainCrossX, mainCrossY));
+      }
+      path.add(Offset(mainCrossX, target.dy)); // Align with shop X and go down
       path.add(target);
     }
     else {
