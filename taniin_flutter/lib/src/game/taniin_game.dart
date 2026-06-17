@@ -282,6 +282,15 @@ class TaniinGame extends FlameGame {
   void update(double dt) {
     super.update(dt);
     _clock += dt;
+    
+    // Update the walk animation frame independently so that remote players
+    // and AI agents animate their walking correctly even when the local player is still.
+    _walkTick += dt;
+    if (_walkTick > 0.08) {
+      _walkFrame = (_walkFrame + 1) % 6;
+      _walkTick = 0;
+    }
+    
     _updatePlayer(dt);
     
     // Broadcast player coordinates to WebSocket server
@@ -391,11 +400,6 @@ class TaniinGame extends FlameGame {
       miniMapNotifier.value++;
     } else if (_clock - _lastPlayerMoveClock > 0.08) {
       _setWalking(false);
-    }
-    _walkTick += dt;
-    if (_walkTick > 0.048) {
-      _walkFrame = (_walkFrame + 1) % 6;
-      _walkTick = 0;
     }
   }
 

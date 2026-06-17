@@ -92218,7 +92218,8 @@ return A.H($async$eS,r)},
 bT(a){var s,r,q,p,o=this
 o.a5e(a)
 o.eP+=a
-o.aoT(a)
+if((o.jW+=a)>0.08){o.eQ=(o.eQ+1)%6
+o.jW=0}o.aoT(a)
 s=o.am
 r=o.ej
 q=o.ek
@@ -92379,9 +92380,7 @@ else if(o>=0.3)n.e9=q<0?1:2
 if(n.aiW(n.ej+r*499.2*a,n.ek+q*499.2*a)){n.e7=n.eP
 n.zs(!0)
 l=n.cV
-l.sn(l.a+1)}else if(n.eP-n.e7>0.08)n.zs(!1)
-if((n.jW+=a)>0.048){n.eQ=(n.eQ+1)%6
-n.jW=0}},
+l.sn(l.a+1)}else if(n.eP-n.e7>0.08)n.zs(!1)},
 zs(a){var s=this.cW
 if(J.d(s.a,a))return
 s.sn(a)},
