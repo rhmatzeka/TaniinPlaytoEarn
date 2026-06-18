@@ -362,7 +362,7 @@ class MultiplayerClient extends ChangeNotifier {
       defaultPlotNum = int.tryParse(mainPlotMatch.group(1) ?? mainPlotMatch.group(2) ?? mainPlotMatch.group(3) ?? '1') ?? 1;
     }
 
-    final commands = text.split(RegExp(r'\bkemudian\b|\blalu\b|\bdan\b|;|\||,'));
+    final commands = text.split(RegExp(r'\bkemudian\b|\blalu\b|\bdan\b|\bterus\b|;|\||,'));
     for (final cmd in commands) {
       final clean = cmd.trim().toLowerCase();
       if (clean.isEmpty) continue;
@@ -387,8 +387,17 @@ class MultiplayerClient extends ChangeNotifier {
       String reply = '';
       String intent = 'chat'; // plant, harvest, buy, sell, status, withdraw, chat
 
-      // Check harvest/panen first to avoid conflicts, and check tanam/plant with a strict word-level match or excluding "tanaman"
-      if (clean.contains('panen') || clean.contains('harvest') || clean.contains('ambil')) {
+      // Check intents in prioritized order to avoid noun matching conflicts (e.g. "jual hasil panen" matching panen)
+      if (clean.contains('jual') || clean.contains('sell')) {
+        intent = 'sell';
+        reply = 'Baik, saya jalan ke rumah pengepul untuk menjual hasil panen.';
+      } else if (clean.contains('beli') || clean.contains('buy') || clean.contains('shop') || clean.contains('toko')) {
+        intent = 'buy';
+        reply = 'Baik, saya pergi ke Toko Ucup untuk membeli benih $seed.';
+      } else if (clean.contains('withdraw') || clean.contains('payout') || clean.contains('swap') || clean.contains('tukar') || clean.contains('tarik')) {
+        intent = 'withdraw';
+        reply = 'Baik, saya jalan ke rumah swap untuk withdraw koin ke ETH Sepolia.';
+      } else if (clean.contains('panen') || clean.contains('harvest') || clean.contains('ambil')) {
         final plotIdx = plotNum - 1;
         if (plotIdx >= 0 && plotIdx < farmState.plots.length) {
           final plot = farmState.plots[plotIdx];
@@ -432,15 +441,6 @@ class MultiplayerClient extends ChangeNotifier {
             intent = 'chat';
           }
         }
-      } else if (clean.contains('beli') || clean.contains('buy') || clean.contains('shop') || clean.contains('toko')) {
-        intent = 'buy';
-        reply = 'Baik, saya pergi ke Toko Ucup untuk membeli benih $seed.';
-      } else if (clean.contains('jual') || clean.contains('sell')) {
-        intent = 'sell';
-        reply = 'Baik, saya jalan ke rumah pengepul untuk menjual hasil panen.';
-      } else if (clean.contains('withdraw') || clean.contains('payout') || clean.contains('swap') || clean.contains('tukar') || clean.contains('tarik')) {
-        intent = 'withdraw';
-        reply = 'Baik, saya jalan ke rumah swap untuk withdraw koin ke ETH Sepolia.';
       } else if (clean.contains('status') || clean.contains('koin') || clean.contains('benih')) {
         intent = 'status';
         reply = 'Status saya: Koin lokal aktif, benih & panen siap ditanam.';

@@ -91846,7 +91846,7 @@ if(n==null)n=o[2]
 o=n==null?o[3]:n
 m=A.iF(o==null?"1":o,null)
 if(m==null)m=1}else m=1
-l=B.c.mg(a2,A.bJ("\\bkemudian\\b|\\blalu\\b|\\bdan\\b|;|\\||,",!0,!1))
+l=B.c.mg(a2,A.bJ("\\bkemudian\\b|\\blalu\\b|\\bdan\\b|\\bterus\\b|;|\\||,",!0,!1))
 for(o=l.length,n=q.Q,k=q.a.p4,j=0;j<l.length;l.length===o||(0,A.v)(l),++j){i=B.c.aO(l[j]).toLowerCase()
 if(i.length===0)continue
 h=A.bJ(u.n,!0,!1).n7(i)
@@ -91859,35 +91859,35 @@ if(e==null)e=1}else e=m
 if(B.c.p(i,"bawang"))d="Bawang"
 else if(B.c.p(i,"stroberi")||B.c.p(i,"strawberry"))d="Stroberi"
 else d=B.c.p(i,"bit")||B.c.p(i,"beet")?"Bit":"Kentang"
-c="chat"
-if(B.c.p(i,"panen")||B.c.p(i,"harvest")||B.c.p(i,"ambil")){b=e-1
-if(b>=0&&b<5){a=k[b]
-if(!a.e)a0="Lahan "+e+" belum dibeli, tidak ada yang bisa dipanen."
-else if(a.r===B.dj)a0="Lahan "+e+" kosong, tidak ada tanaman untuk dipanen."
+if(B.c.p(i,"jual")||B.c.p(i,"sell")){c="Baik, saya jalan ke rumah pengepul untuk menjual hasil panen."
+b="sell"}else{c=""
+b="chat"
+if(B.c.p(i,"beli")||B.c.p(i,"buy")||B.c.p(i,"shop")||B.c.p(i,"toko")){c="Baik, saya pergi ke Toko Ucup untuk membeli benih "+d+"."
+b="buy"}else if(B.c.p(i,"withdraw")||B.c.p(i,"payout")||B.c.p(i,"swap")||B.c.p(i,"tukar")||B.c.p(i,"tarik")){c="Baik, saya jalan ke rumah swap untuk withdraw koin ke ETH Sepolia."
+b="withdraw"}else if(B.c.p(i,"panen")||B.c.p(i,"harvest")||B.c.p(i,"ambil")){a=e-1
+if(a>=0&&a<5){a0=k[a]
+if(!a0.e)c="Lahan "+e+" belum dibeli, tidak ada yang bisa dipanen."
+else if(a0.r===B.dj)c="Lahan "+e+" kosong, tidak ada tanaman untuk dipanen."
 else{g=Date.now()
-a1=a.w
+a1=a0.w
 f=!1
-if(a.r===B.c6)if(a1!=null){f=a1.a
+if(a0.r===B.c6)if(a1!=null){f=a1.a
 f=A.d1(0-a1.b,g-f).a>=12e6
 g=f}else g=f
 else g=f
 f=""+e
-if(!g)a0="Tanaman di Lahan "+f+" masih tumbuh dan belum siap dipanen."
-else{a0="Oke, saya jalan ke Lahan "+f+" untuk memanen tanaman."
-c="harvest"}}}else a0="Nomor lahan "+e+" tidak valid."}else{a0=""
-if(B.c.p(i,"tanam")||B.c.p(i,"plant")){g=A.bJ("\\btanam\\b|\\btanamkan\\b|\\bplant\\b",!0,!1)
-if(g.b.test(i)){b=e-1
-if(b>=0&&b<5){a=k[b]
-if(!a.e)a0="Saya tidak bisa menanam di Lahan "+e+" karena lahan tersebut belum dibeli."
+if(!g)c="Tanaman di Lahan "+f+" masih tumbuh dan belum siap dipanen."
+else{c="Oke, saya jalan ke Lahan "+f+" untuk memanen tanaman."
+b="harvest"}}}else c="Nomor lahan "+e+" tidak valid."}else if(B.c.p(i,"tanam")||B.c.p(i,"plant")){g=A.bJ("\\btanam\\b|\\btanamkan\\b|\\bplant\\b",!0,!1)
+if(g.b.test(i)){a=e-1
+if(a>=0&&a<5){a0=k[a]
+if(!a0.e)c="Saya tidak bisa menanam di Lahan "+e+" karena lahan tersebut belum dibeli."
 else{g=""+e
-if(a.r===B.c6)a0="Lahan "+g+" sudah ditanami tanaman lain yang sedang tumbuh. Silakan panen atau pilih lahan kosong."
-else{a0="Siap! Saya akan ke Lahan "+g+" untuk menanam benih "+d+" secara lokal."
-c="plant"}}}else a0="Nomor lahan "+e+" tidak valid. Lahan yang tersedia adalah 1 sampai 5."}}else if(B.c.p(i,"beli")||B.c.p(i,"buy")||B.c.p(i,"shop")||B.c.p(i,"toko")){a0="Baik, saya pergi ke Toko Ucup untuk membeli benih "+d+"."
-c="buy"}else if(B.c.p(i,"jual")||B.c.p(i,"sell")){a0="Baik, saya jalan ke rumah pengepul untuk menjual hasil panen."
-c="sell"}else if(B.c.p(i,"withdraw")||B.c.p(i,"payout")||B.c.p(i,"swap")||B.c.p(i,"tukar")||B.c.p(i,"tarik")){a0="Baik, saya jalan ke rumah swap untuk withdraw koin ke ETH Sepolia."
-c="withdraw"}else if(B.c.p(i,"status")||B.c.p(i,"koin")||B.c.p(i,"benih")){a0="Status saya: Koin lokal aktif, benih & panen siap ditanam."
-c="status"}}if(c==="chat"&&a0.length===0)a0=B.c.p(i,"halo")||B.c.p(i,"hai")||B.c.p(i,"hi")||B.c.p(i,"hello")?'Halo! Saya Pak Tani AI. Saya bertani secara mandiri. Contoh: "tanam stroberi di lahan 2".':'Perintah kurang jelas. Coba katakan: "tanam kentang di lahan 2", "panen lahan 1", atau "jual hasil".'
-n.push(new A.O6(c,e,d,a0))}q.v1(a3)
+if(a0.r===B.c6)c="Lahan "+g+" sudah ditanami tanaman lain yang sedang tumbuh. Silakan panen atau pilih lahan kosong."
+else{c="Siap! Saya akan ke Lahan "+g+" untuk menanam benih "+d+" secara lokal."
+b="plant"}}}else c="Nomor lahan "+e+" tidak valid. Lahan yang tersedia adalah 1 sampai 5."}}else if(B.c.p(i,"status")||B.c.p(i,"koin")||B.c.p(i,"benih")){c="Status saya: Koin lokal aktif, benih & panen siap ditanam."
+b="status"}}if(b==="chat"&&c.length===0)c=B.c.p(i,"halo")||B.c.p(i,"hai")||B.c.p(i,"hi")||B.c.p(i,"hello")?'Halo! Saya Pak Tani AI. Saya bertani secara mandiri. Contoh: "tanam stroberi di lahan 2".':'Perintah kurang jelas. Coba katakan: "tanam kentang di lahan 2", "panen lahan 1", atau "jual hasil".'
+n.push(new A.O6(b,e,d,c))}q.v1(a3)
 return A.G(null,r)}})
 return A.H($async$HW,r)},
 v1(a){return this.al4(a)},
