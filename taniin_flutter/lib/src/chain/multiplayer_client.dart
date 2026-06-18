@@ -355,13 +355,20 @@ class MultiplayerClient extends ChangeNotifier {
       notifyListeners();
     }
 
+    // Determine a shared/default plot number from the entire instruction text first
+    int defaultPlotNum = 1;
+    final mainPlotMatch = RegExp(r'lahan\s*([1-5])|plot\s*([1-5])|\b([1-5])\b').firstMatch(text.toLowerCase());
+    if (mainPlotMatch != null) {
+      defaultPlotNum = int.tryParse(mainPlotMatch.group(1) ?? mainPlotMatch.group(2) ?? mainPlotMatch.group(3) ?? '1') ?? 1;
+    }
+
     final commands = text.split(RegExp(r'\bkemudian\b|\blalu\b|\bdan\b|;|\||,'));
     for (final cmd in commands) {
       final clean = cmd.trim().toLowerCase();
       if (clean.isEmpty) continue;
 
-      // Parse plot number
-      int plotNum = 1;
+      // Parse plot number for this specific command, defaulting to defaultPlotNum if not specified
+      int plotNum = defaultPlotNum;
       final plotMatch = RegExp(r'lahan\s*([1-5])|plot\s*([1-5])|\b([1-5])\b').firstMatch(clean);
       if (plotMatch != null) {
         plotNum = int.tryParse(plotMatch.group(1) ?? plotMatch.group(2) ?? plotMatch.group(3) ?? '1') ?? 1;
