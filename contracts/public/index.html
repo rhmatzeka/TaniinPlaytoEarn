@@ -2,20 +2,29 @@
 <html lang="id">
 <head>
   <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for(let registration of registrations) {
-          registration.unregister();
+    (function() {
+      const version = 'v12';
+      if (localStorage.getItem('taniin_cache_version') !== version) {
+        localStorage.setItem('taniin_cache_version', version);
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for (let r of registrations) {
+              r.unregister();
+            }
+          });
         }
-      });
-    }
-    if ('caches' in window) {
-      caches.keys().then(function(names) {
-        for (let name of names) {
-          caches.delete(name);
+        if ('caches' in window) {
+          caches.keys().then(function(names) {
+            for (let name of names) {
+              caches.delete(name);
+            }
+          });
         }
-      });
-    }
+        setTimeout(function() {
+          window.location.reload(true);
+        }, 250);
+      }
+    })();
   </script>
   <base href="/">
 
