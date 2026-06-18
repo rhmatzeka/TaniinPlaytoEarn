@@ -1955,6 +1955,27 @@ class FarmStateController extends ChangeNotifier {
     _commitState();
   }
 
+  void addExternalHistory(String title, String valueLabel, String status, {String txHash = ''}) {
+    final now = DateTime.now();
+    final id = _nextHistoryId++;
+    history.insert(
+      0,
+      HistoryRecord(
+        id: id,
+        title: title,
+        status: _normalizeHistoryStatus(status),
+        timeLabel:
+            '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
+        valueLabel: valueLabel,
+        txHash: txHash,
+      ),
+    );
+    if (history.length > 8) {
+      history.removeRange(8, history.length);
+    }
+    _commitState();
+  }
+
   int _addHistory(String title, String valueLabel, {required String status}) {
     final now = DateTime.now();
     final id = _nextHistoryId++;
