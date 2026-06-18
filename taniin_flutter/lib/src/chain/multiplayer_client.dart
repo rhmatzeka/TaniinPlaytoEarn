@@ -360,25 +360,68 @@ class MultiplayerClient extends ChangeNotifier {
     String reply = '';
     String intent = 'chat'; // plant, harvest, buy, sell, status, chat
 
+    // Pre-validate plot state for planting and harvesting to prevent AI from overwrite planting
     if (clean.contains('tanam') || clean.contains('plant')) {
-      intent = 'plant';
-      reply = 'Siap! Saya akan ke Lahan $plotNum untuk menanam benih $seed secara lokal.';
+      final plotIdx = plotNum - 1;
+      if (plotIdx >= 0 && plotIdx < farmState.plots.length) {
+        final plot = farmState.plots[plotIdx];
+        if (!plot.owned) {
+          reply = 'Saya tidak bisa menanam di Lahan $plotNum karena lahan tersebut belum dibeli.';
+          intent = 'chat'; // Downgrade to chat to prevent movement and action
+        } else if (plot.status == PlotStatus.growing) {
+          reply = 'Lahan $plotNum sudah ditanami tanaman lain yang sedang tumbuh. Silakan panen atau pilih lahan kosong.';
+          intent = 'chat';
+        }
+      } else {
+        reply = 'Nomor lahan $plotNum tidak valid. Lahan yang tersedia adalah 1 sampai 5.';
+        intent = 'chat';
+      }
     } else if (clean.contains('panen') || clean.contains('harvest') || clean.contains('ambil')) {
-      intent = 'harvest';
-      reply = 'Oke, saya jalan ke Lahan $plotNum untuk memanen tanaman.';
-    } else if (clean.contains('beli') || clean.contains('buy') || clean.contains('shop') || clean.contains('toko')) {
-      intent = 'buy';
-      reply = 'Baik, saya pergi ke Toko Ucup untuk membeli benih $seed.';
-    } else if (clean.contains('jual') || clean.contains('sell')) {
-      intent = 'sell';
-      reply = 'Baik, saya jalan ke rumah pengepul untuk menjual hasil panen.';
-    } else if (clean.contains('status') || clean.contains('koin') || clean.contains('benih')) {
-      intent = 'status';
-      reply = 'Status saya: Koin lokal aktif, benih & panen siap ditanam.';
-    } else if (clean.contains('halo') || clean.contains('hai') || clean.contains('hi') || clean.contains('hello')) {
-      reply = 'Halo! Saya Pak Tani AI. Saya bertani secara mandiri. Contoh: "tanam stroberi di lahan 2".';
+      final plotIdx = plotNum - 1;
+      if (plotIdx >= 0 && plotIdx < farmState.plots.length) {
+        final plot = farmState.plots[plotIdx];
+        if (!plot.owned) {
+          reply = 'Lahan $plotNum belum dibeli, tidak ada yang bisa dipanen.';
+          intent = 'chat';
+        } else if (plot.status == PlotStatus.empty) {
+          reply = 'Lahan $plotNum kosong, tidak ada tanaman untuk dipanen.';
+          intent = 'chat';
+        } else if (!plot.isReady(DateTime.now())) {
+          reply = 'Tanaman di Lahan $plotNum masih tumbuh dan belum siap dipanen.';
+          intent = 'chat';
+        }
+      } else {
+        reply = 'Nomor lahan $plotNum tidak valid.';
+        intent = 'chat';
+      }
+    }
+
+    if (intent == 'chat') {
+      // If we intercepted a failed action, set the response
+      if (reply.isEmpty) {
+        if (clean.contains('halo') || clean.contains('hai') || clean.contains('hi') || clean.contains('hello')) {
+          reply = 'Halo! Saya Pak Tani AI. Saya bertani secara mandiri. Contoh: "tanam stroberi di lahan 2".';
+        } else {
+          reply = 'Perintah kurang jelas. Coba katakan: "tanam kentang di lahan 2", "panen lahan 1", atau "jual hasil".';
+        }
+      }
     } else {
-      reply = 'Perintah kurang jelas. Coba katakan: "tanam kentang di lahan 2", "panen lahan 1", atau "jual hasil".';
+      if (clean.contains('tanam') || clean.contains('plant')) {
+        intent = 'plant';
+        reply = 'Siap! Saya akan ke Lahan $plotNum untuk menanam benih $seed secara lokal.';
+      } else if (clean.contains('panen') || clean.contains('harvest') || clean.contains('ambil')) {
+        intent = 'harvest';
+        reply = 'Oke, saya jalan ke Lahan $plotNum untuk memanen tanaman.';
+      } else if (clean.contains('beli') || clean.contains('buy') || clean.contains('shop') || clean.contains('toko')) {
+        intent = 'buy';
+        reply = 'Baik, saya pergi ke Toko Ucup untuk membeli benih $seed.';
+      } else if (clean.contains('jual') || clean.contains('sell')) {
+        intent = 'sell';
+        reply = 'Baik, saya jalan ke rumah pengepul untuk menjual hasil panen.';
+      } else if (clean.contains('status') || clean.contains('koin') || clean.contains('benih')) {
+        intent = 'status';
+        reply = 'Status saya: Koin lokal aktif, benih & panen siap ditanam.';
+      }
     }
 
     // AI agent responds conversationally
