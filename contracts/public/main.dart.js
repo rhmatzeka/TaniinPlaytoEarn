@@ -92307,7 +92307,7 @@ return A.H($async$eS,r)},
 bT(a){var s,r,q,p,o=this
 o.a5g(a)
 o.eP+=a
-if((o.jX+=a)>0.08){o.eQ=(o.eQ+1)%6
+if((o.jX+=a)>0.045){o.eQ=(o.eQ+1)%6
 o.jX=0}o.aoY(a)
 s=o.am
 r=o.ej
