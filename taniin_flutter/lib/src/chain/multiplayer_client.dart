@@ -380,25 +380,8 @@ class MultiplayerClient extends ChangeNotifier {
       String reply = '';
       String intent = 'chat'; // plant, harvest, buy, sell, status, withdraw, chat
 
-      if (clean.contains('tanam') || clean.contains('plant')) {
-        final plotIdx = plotNum - 1;
-        if (plotIdx >= 0 && plotIdx < farmState.plots.length) {
-          final plot = farmState.plots[plotIdx];
-          if (!plot.owned) {
-            reply = 'Saya tidak bisa menanam di Lahan $plotNum karena lahan tersebut belum dibeli.';
-            intent = 'chat'; // Downgrade to chat to prevent movement and action
-          } else if (plot.status == PlotStatus.growing) {
-            reply = 'Lahan $plotNum sudah ditanami tanaman lain yang sedang tumbuh. Silakan panen atau pilih lahan kosong.';
-            intent = 'chat';
-          } else {
-            intent = 'plant';
-            reply = 'Siap! Saya akan ke Lahan $plotNum untuk menanam benih $seed secara lokal.';
-          }
-        } else {
-          reply = 'Nomor lahan $plotNum tidak valid. Lahan yang tersedia adalah 1 sampai 5.';
-          intent = 'chat';
-        }
-      } else if (clean.contains('panen') || clean.contains('harvest') || clean.contains('ambil')) {
+      // Check harvest/panen first to avoid conflicts, and check tanam/plant with a strict word-level match or excluding "tanaman"
+      if (clean.contains('panen') || clean.contains('harvest') || clean.contains('ambil')) {
         final plotIdx = plotNum - 1;
         if (plotIdx >= 0 && plotIdx < farmState.plots.length) {
           final plot = farmState.plots[plotIdx];
@@ -418,6 +401,29 @@ class MultiplayerClient extends ChangeNotifier {
         } else {
           reply = 'Nomor lahan $plotNum tidak valid.';
           intent = 'chat';
+        }
+      } else if (clean.contains('tanam') || clean.contains('plant')) {
+        // Double check it's not matching the noun "tanaman" as a verb instruction "tanam"
+        // If the clean string has "tanam" but it was part of "tanaman" and there's no other tanam/plant verb, we check:
+        final hasTanamVerb = RegExp(r'\btanam\b|\btanamkan\b|\bplant\b').hasMatch(clean);
+        if (hasTanamVerb) {
+          final plotIdx = plotNum - 1;
+          if (plotIdx >= 0 && plotIdx < farmState.plots.length) {
+            final plot = farmState.plots[plotIdx];
+            if (!plot.owned) {
+              reply = 'Saya tidak bisa menanam di Lahan $plotNum karena lahan tersebut belum dibeli.';
+              intent = 'chat'; // Downgrade to chat to prevent movement and action
+            } else if (plot.status == PlotStatus.growing) {
+              reply = 'Lahan $plotNum sudah ditanami tanaman lain yang sedang tumbuh. Silakan panen atau pilih lahan kosong.';
+              intent = 'chat';
+            } else {
+              intent = 'plant';
+              reply = 'Siap! Saya akan ke Lahan $plotNum untuk menanam benih $seed secara lokal.';
+            }
+          } else {
+            reply = 'Nomor lahan $plotNum tidak valid. Lahan yang tersedia adalah 1 sampai 5.';
+            intent = 'chat';
+          }
         }
       } else if (clean.contains('beli') || clean.contains('buy') || clean.contains('shop') || clean.contains('toko')) {
         intent = 'buy';
