@@ -286,7 +286,7 @@ class TaniinGame extends FlameGame {
     // Update the walk animation frame independently so that remote players
     // and AI agents animate their walking correctly even when the local player is still.
     _walkTick += dt;
-    if (_walkTick > 0.045) {
+    if (_walkTick > 0.02) {
       _walkFrame = (_walkFrame + 1) % 6;
       _walkTick = 0;
     }

@@ -380,7 +380,6 @@ class MultiplayerClient extends ChangeNotifier {
       String reply = '';
       String intent = 'chat'; // plant, harvest, buy, sell, status, withdraw, chat
 
-      // Pre-validate plot state for planting and harvesting to prevent AI from overwrite planting
       if (clean.contains('tanam') || clean.contains('plant')) {
         final plotIdx = plotNum - 1;
         if (plotIdx >= 0 && plotIdx < farmState.plots.length) {
@@ -391,6 +390,9 @@ class MultiplayerClient extends ChangeNotifier {
           } else if (plot.status == PlotStatus.growing) {
             reply = 'Lahan $plotNum sudah ditanami tanaman lain yang sedang tumbuh. Silakan panen atau pilih lahan kosong.';
             intent = 'chat';
+          } else {
+            intent = 'plant';
+            reply = 'Siap! Saya akan ke Lahan $plotNum untuk menanam benih $seed secara lokal.';
           }
         } else {
           reply = 'Nomor lahan $plotNum tidak valid. Lahan yang tersedia adalah 1 sampai 5.';
@@ -409,41 +411,33 @@ class MultiplayerClient extends ChangeNotifier {
           } else if (!plot.isReady(DateTime.now())) {
             reply = 'Tanaman di Lahan $plotNum masih tumbuh dan belum siap dipanen.';
             intent = 'chat';
+          } else {
+            intent = 'harvest';
+            reply = 'Oke, saya jalan ke Lahan $plotNum untuk memanen tanaman.';
           }
         } else {
           reply = 'Nomor lahan $plotNum tidak valid.';
           intent = 'chat';
         }
+      } else if (clean.contains('beli') || clean.contains('buy') || clean.contains('shop') || clean.contains('toko')) {
+        intent = 'buy';
+        reply = 'Baik, saya pergi ke Toko Ucup untuk membeli benih $seed.';
+      } else if (clean.contains('jual') || clean.contains('sell')) {
+        intent = 'sell';
+        reply = 'Baik, saya jalan ke rumah pengepul untuk menjual hasil panen.';
+      } else if (clean.contains('withdraw') || clean.contains('payout') || clean.contains('swap') || clean.contains('tukar') || clean.contains('tarik')) {
+        intent = 'withdraw';
+        reply = 'Baik, saya jalan ke rumah swap untuk withdraw koin ke ETH Sepolia.';
+      } else if (clean.contains('status') || clean.contains('koin') || clean.contains('benih')) {
+        intent = 'status';
+        reply = 'Status saya: Koin lokal aktif, benih & panen siap ditanam.';
       }
 
-      if (intent == 'chat') {
-        // If we intercepted a failed action, set the response
-        if (reply.isEmpty) {
-          if (clean.contains('halo') || clean.contains('hai') || clean.contains('hi') || clean.contains('hello')) {
-            reply = 'Halo! Saya Pak Tani AI. Saya bertani secara mandiri. Contoh: "tanam stroberi di lahan 2".';
-          } else if (clean.contains('withdraw') || clean.contains('payout') || clean.contains('swap') || clean.contains('tukar') || clean.contains('tarik')) {
-            intent = 'withdraw';
-            reply = 'Baik, saya jalan ke rumah swap untuk withdraw koin ke ETH Sepolia.';
-          } else {
-            reply = 'Perintah kurang jelas. Coba katakan: "tanam kentang di lahan 2", "panen lahan 1", atau "jual hasil".';
-          }
-        }
-      } else {
-        if (clean.contains('tanam') || clean.contains('plant')) {
-          intent = 'plant';
-          reply = 'Siap! Saya akan ke Lahan $plotNum untuk menanam benih $seed secara lokal.';
-        } else if (clean.contains('panen') || clean.contains('harvest') || clean.contains('ambil')) {
-          intent = 'harvest';
-          reply = 'Oke, saya jalan ke Lahan $plotNum untuk memanen tanaman.';
-        } else if (clean.contains('beli') || clean.contains('buy') || clean.contains('shop') || clean.contains('toko')) {
-          intent = 'buy';
-          reply = 'Baik, saya pergi ke Toko Ucup untuk membeli benih $seed.';
-        } else if (clean.contains('jual') || clean.contains('sell')) {
-          intent = 'sell';
-          reply = 'Baik, saya jalan ke rumah pengepul untuk menjual hasil panen.';
-        } else if (clean.contains('status') || clean.contains('koin') || clean.contains('benih')) {
-          intent = 'status';
-          reply = 'Status saya: Koin lokal aktif, benih & panen siap ditanam.';
+      if (intent == 'chat' && reply.isEmpty) {
+        if (clean.contains('halo') || clean.contains('hai') || clean.contains('hi') || clean.contains('hello')) {
+          reply = 'Halo! Saya Pak Tani AI. Saya bertani secara mandiri. Contoh: "tanam stroberi di lahan 2".';
+        } else {
+          reply = 'Perintah kurang jelas. Coba katakan: "tanam kentang di lahan 2", "panen lahan 1", atau "jual hasil".';
         }
       }
 
@@ -639,6 +633,9 @@ class MultiplayerClient extends ChangeNotifier {
     // Check if target is the shop (Toko Ucup)
     final isShopTarget = (target.dx - 18.5 * 128.0).abs() < 128.0 && target.dy > 21.0 * 128.0;
 
+    // Check if target is the swap house (Toko Swap)
+    final isSwapTarget = (target.dx - 10.85 * 128.0).abs() < 128.0 && target.dy < 17.0 * 128.0;
+
     // Routing Logic using Waypoints to avoid cutting corner fences:
     if (isPlotTarget) {
       // If AI is currently in the lower shop area, it must walk UP to the main crossroads first
@@ -662,6 +659,25 @@ class MultiplayerClient extends ChangeNotifier {
       path.add(const Offset(31.0 * 128.0, mainCrossY)); // Move right to sell lane
       path.add(target); // Walk up to house
     }
+    else if (isSwapTarget) {
+      if (start.dy > 20.0 * 128.0) {
+        path.add(const Offset(mainCrossX, mainCrossY));
+        path.add(const Offset(10.85 * 128.0, mainCrossY));
+      } else if (start.dx > 25.0 * 128.0) { // Coming from Pengepul
+        path.add(const Offset(31.0 * 128.0, mainCrossY));
+        path.add(const Offset(mainCrossX, mainCrossY));
+        path.add(const Offset(10.85 * 128.0, mainCrossY));
+      } else if (start.dx < 16.0 * 128.0 && start.dy > 18.0 * 128.0 && start.dy < 24.0 * 128.0) {
+        // Coming from farm plots, go through gate first
+        path.add(Offset(start.dx, farmGateY));
+        path.add(const Offset(farmGateX, farmGateY));
+        path.add(const Offset(10.85 * 128.0, farmGateY));
+      } else {
+        path.add(Offset(10.85 * 128.0, start.dy));
+        path.add(const Offset(10.85 * 128.0, mainCrossY));
+      }
+      path.add(target); // Walk up to house
+    }
     else if (isShopTarget) {
       // First, get out of farm plot gate to avoid cutting through the fence
       if (start.dx < 16.0 * 128.0 && start.dy > 18.0 * 128.0 && start.dy < 24.0 * 128.0) {
@@ -670,6 +686,9 @@ class MultiplayerClient extends ChangeNotifier {
         path.add(const Offset(mainCrossX, mainCrossY));
       } else if (start.dx > 25.0 * 128.0) { // Coming from Pengepul
         path.add(const Offset(31.0 * 128.0, mainCrossY));
+        path.add(const Offset(mainCrossX, mainCrossY));
+      } else if (start.dx < 16.0 * 128.0 && start.dy < 18.0 * 128.0) { // Coming from Swap
+        path.add(const Offset(10.85 * 128.0, mainCrossY));
         path.add(const Offset(mainCrossX, mainCrossY));
       }
       path.add(Offset(mainCrossX, target.dy)); // Align with shop X and go down
