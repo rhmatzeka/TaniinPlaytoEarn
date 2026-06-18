@@ -59,6 +59,20 @@ class ChatMessage {
   final String time;
 }
 
+class LocalAiAction {
+  LocalAiAction({
+    required this.intent,
+    required this.plotNum,
+    required this.seed,
+    required this.reply,
+  });
+
+  final String intent;
+  final int plotNum;
+  final String seed;
+  final String reply;
+}
+
 class MultiplayerClient extends ChangeNotifier {
   MultiplayerClient(this.farmState) {
     _lastWalletAddress = farmState.walletAddress;
@@ -287,6 +301,9 @@ class MultiplayerClient extends ChangeNotifier {
     });
   }
 
+  final List<LocalAiAction> _localAiActionQueue = [];
+  bool _isProcessingLocalAi = false;
+
   void sendMove(double x, double y, String anim) {
     if (connected) {
       _socket?.emit('move', <String, dynamic>{
@@ -338,114 +355,145 @@ class MultiplayerClient extends ChangeNotifier {
       notifyListeners();
     }
 
-    final clean = text.toLowerCase();
-    
-    // Parse plot number
-    int plotNum = 1;
-    final plotMatch = RegExp(r'lahan\s*([1-5])|plot\s*([1-5])|\b([1-5])\b').firstMatch(clean);
-    if (plotMatch != null) {
-      plotNum = int.tryParse(plotMatch.group(1) ?? plotMatch.group(2) ?? plotMatch.group(3) ?? '1') ?? 1;
-    }
+    final commands = text.split(RegExp(r'\bkemudian\b|\blalu\b|\bdan\b|;|\||,'));
+    for (final cmd in commands) {
+      final clean = cmd.trim().toLowerCase();
+      if (clean.isEmpty) continue;
 
-    // Parse crop type
-    String seed = 'Kentang';
-    if (clean.contains('bawang')) {
-      seed = 'Bawang';
-    } else if (clean.contains('stroberi') || clean.contains('strawberry')) {
-      seed = 'Stroberi';
-    } else if (clean.contains('bit') || clean.contains('beet')) {
-      seed = 'Bit';
-    }
-
-    String reply = '';
-    String intent = 'chat'; // plant, harvest, buy, sell, status, chat
-
-    // Pre-validate plot state for planting and harvesting to prevent AI from overwrite planting
-    if (clean.contains('tanam') || clean.contains('plant')) {
-      final plotIdx = plotNum - 1;
-      if (plotIdx >= 0 && plotIdx < farmState.plots.length) {
-        final plot = farmState.plots[plotIdx];
-        if (!plot.owned) {
-          reply = 'Saya tidak bisa menanam di Lahan $plotNum karena lahan tersebut belum dibeli.';
-          intent = 'chat'; // Downgrade to chat to prevent movement and action
-        } else if (plot.status == PlotStatus.growing) {
-          reply = 'Lahan $plotNum sudah ditanami tanaman lain yang sedang tumbuh. Silakan panen atau pilih lahan kosong.';
-          intent = 'chat';
-        }
-      } else {
-        reply = 'Nomor lahan $plotNum tidak valid. Lahan yang tersedia adalah 1 sampai 5.';
-        intent = 'chat';
+      // Parse plot number
+      int plotNum = 1;
+      final plotMatch = RegExp(r'lahan\s*([1-5])|plot\s*([1-5])|\b([1-5])\b').firstMatch(clean);
+      if (plotMatch != null) {
+        plotNum = int.tryParse(plotMatch.group(1) ?? plotMatch.group(2) ?? plotMatch.group(3) ?? '1') ?? 1;
       }
-    } else if (clean.contains('panen') || clean.contains('harvest') || clean.contains('ambil')) {
-      final plotIdx = plotNum - 1;
-      if (plotIdx >= 0 && plotIdx < farmState.plots.length) {
-        final plot = farmState.plots[plotIdx];
-        if (!plot.owned) {
-          reply = 'Lahan $plotNum belum dibeli, tidak ada yang bisa dipanen.';
-          intent = 'chat';
-        } else if (plot.status == PlotStatus.empty) {
-          reply = 'Lahan $plotNum kosong, tidak ada tanaman untuk dipanen.';
-          intent = 'chat';
-        } else if (!plot.isReady(DateTime.now())) {
-          reply = 'Tanaman di Lahan $plotNum masih tumbuh dan belum siap dipanen.';
-          intent = 'chat';
-        }
-      } else {
-        reply = 'Nomor lahan $plotNum tidak valid.';
-        intent = 'chat';
-      }
-    }
 
-    if (intent == 'chat') {
-      // If we intercepted a failed action, set the response
-      if (reply.isEmpty) {
-        if (clean.contains('halo') || clean.contains('hai') || clean.contains('hi') || clean.contains('hello')) {
-          reply = 'Halo! Saya Pak Tani AI. Saya bertani secara mandiri. Contoh: "tanam stroberi di lahan 2".';
-        } else {
-          reply = 'Perintah kurang jelas. Coba katakan: "tanam kentang di lahan 2", "panen lahan 1", atau "jual hasil".';
-        }
+      // Parse crop type
+      String seed = 'Kentang';
+      if (clean.contains('bawang')) {
+        seed = 'Bawang';
+      } else if (clean.contains('stroberi') || clean.contains('strawberry')) {
+        seed = 'Stroberi';
+      } else if (clean.contains('bit') || clean.contains('beet')) {
+        seed = 'Bit';
       }
-    } else {
+
+      String reply = '';
+      String intent = 'chat'; // plant, harvest, buy, sell, status, withdraw, chat
+
+      // Pre-validate plot state for planting and harvesting to prevent AI from overwrite planting
       if (clean.contains('tanam') || clean.contains('plant')) {
-        intent = 'plant';
-        reply = 'Siap! Saya akan ke Lahan $plotNum untuk menanam benih $seed secara lokal.';
+        final plotIdx = plotNum - 1;
+        if (plotIdx >= 0 && plotIdx < farmState.plots.length) {
+          final plot = farmState.plots[plotIdx];
+          if (!plot.owned) {
+            reply = 'Saya tidak bisa menanam di Lahan $plotNum karena lahan tersebut belum dibeli.';
+            intent = 'chat'; // Downgrade to chat to prevent movement and action
+          } else if (plot.status == PlotStatus.growing) {
+            reply = 'Lahan $plotNum sudah ditanami tanaman lain yang sedang tumbuh. Silakan panen atau pilih lahan kosong.';
+            intent = 'chat';
+          }
+        } else {
+          reply = 'Nomor lahan $plotNum tidak valid. Lahan yang tersedia adalah 1 sampai 5.';
+          intent = 'chat';
+        }
       } else if (clean.contains('panen') || clean.contains('harvest') || clean.contains('ambil')) {
-        intent = 'harvest';
-        reply = 'Oke, saya jalan ke Lahan $plotNum untuk memanen tanaman.';
-      } else if (clean.contains('beli') || clean.contains('buy') || clean.contains('shop') || clean.contains('toko')) {
-        intent = 'buy';
-        reply = 'Baik, saya pergi ke Toko Ucup untuk membeli benih $seed.';
-      } else if (clean.contains('jual') || clean.contains('sell')) {
-        intent = 'sell';
-        reply = 'Baik, saya jalan ke rumah pengepul untuk menjual hasil panen.';
-      } else if (clean.contains('status') || clean.contains('koin') || clean.contains('benih')) {
-        intent = 'status';
-        reply = 'Status saya: Koin lokal aktif, benih & panen siap ditanam.';
+        final plotIdx = plotNum - 1;
+        if (plotIdx >= 0 && plotIdx < farmState.plots.length) {
+          final plot = farmState.plots[plotIdx];
+          if (!plot.owned) {
+            reply = 'Lahan $plotNum belum dibeli, tidak ada yang bisa dipanen.';
+            intent = 'chat';
+          } else if (plot.status == PlotStatus.empty) {
+            reply = 'Lahan $plotNum kosong, tidak ada tanaman untuk dipanen.';
+            intent = 'chat';
+          } else if (!plot.isReady(DateTime.now())) {
+            reply = 'Tanaman di Lahan $plotNum masih tumbuh dan belum siap dipanen.';
+            intent = 'chat';
+          }
+        } else {
+          reply = 'Nomor lahan $plotNum tidak valid.';
+          intent = 'chat';
+        }
       }
+
+      if (intent == 'chat') {
+        // If we intercepted a failed action, set the response
+        if (reply.isEmpty) {
+          if (clean.contains('halo') || clean.contains('hai') || clean.contains('hi') || clean.contains('hello')) {
+            reply = 'Halo! Saya Pak Tani AI. Saya bertani secara mandiri. Contoh: "tanam stroberi di lahan 2".';
+          } else if (clean.contains('withdraw') || clean.contains('payout') || clean.contains('swap') || clean.contains('tukar') || clean.contains('tarik')) {
+            intent = 'withdraw';
+            reply = 'Baik, saya jalan ke rumah swap untuk withdraw koin ke ETH Sepolia.';
+          } else {
+            reply = 'Perintah kurang jelas. Coba katakan: "tanam kentang di lahan 2", "panen lahan 1", atau "jual hasil".';
+          }
+        }
+      } else {
+        if (clean.contains('tanam') || clean.contains('plant')) {
+          intent = 'plant';
+          reply = 'Siap! Saya akan ke Lahan $plotNum untuk menanam benih $seed secara lokal.';
+        } else if (clean.contains('panen') || clean.contains('harvest') || clean.contains('ambil')) {
+          intent = 'harvest';
+          reply = 'Oke, saya jalan ke Lahan $plotNum untuk memanen tanaman.';
+        } else if (clean.contains('beli') || clean.contains('buy') || clean.contains('shop') || clean.contains('toko')) {
+          intent = 'buy';
+          reply = 'Baik, saya pergi ke Toko Ucup untuk membeli benih $seed.';
+        } else if (clean.contains('jual') || clean.contains('sell')) {
+          intent = 'sell';
+          reply = 'Baik, saya jalan ke rumah pengepul untuk menjual hasil panen.';
+        } else if (clean.contains('status') || clean.contains('koin') || clean.contains('benih')) {
+          intent = 'status';
+          reply = 'Status saya: Koin lokal aktif, benih & panen siap ditanam.';
+        }
+      }
+
+      _localAiActionQueue.add(LocalAiAction(
+        intent: intent,
+        plotNum: plotNum,
+        seed: seed,
+        reply: reply,
+      ));
     }
+
+    _processNextLocalAiAction(time);
+  }
+
+  void _processNextLocalAiAction(String time) async {
+    if (_isProcessingLocalAi || _localAiActionQueue.isEmpty) return;
+    _isProcessingLocalAi = true;
+
+    final action = _localAiActionQueue.removeAt(0);
 
     // AI agent responds conversationally
     _appendMessage(ChatMessage(
       sender: aiAgent!.name,
       wallet: aiAgent!.wallet,
-      text: reply,
+      text: action.reply,
       time: time,
     ));
 
-    if (intent == 'chat' || intent == 'status') return;
+    if (action.intent == 'chat' || action.intent == 'status') {
+      _isProcessingLocalAi = false;
+      // Schedule next action execution quickly
+      Timer(const Duration(milliseconds: 500), () => _processNextLocalAiAction(time));
+      return;
+    }
 
     // Define target position on map
     // Hotspots derived from TaniinGame tile coordinates:
     // Shop Sign: 18.5, 22.35
     // Sell Sign: 31.0, 13.35
+    // Swap Sign: 10.85, 13.15
     // Plots: 4, 6, 8, 10, 12 at Y=19
     Offset target = Offset(aiAgent!.x, aiAgent!.y);
-    if (intent == 'buy') {
+    if (action.intent == 'buy') {
       target = const Offset(18.5 * 128, 22.35 * 128);
-    } else if (intent == 'sell') {
+    } else if (action.intent == 'sell') {
       target = const Offset(31.0 * 128, 13.35 * 128);
-    } else if (intent == 'plant' || intent == 'harvest') {
-      final plotX = (4 + (plotNum - 1) * 2) * 128.0;
+    } else if (action.intent == 'withdraw') {
+      target = const Offset(10.85 * 128, 13.15 * 128);
+    } else if (action.intent == 'plant' || action.intent == 'harvest') {
+      final plotX = (4 + (action.plotNum - 1) * 2) * 128.0;
       target = Offset(plotX + 128, 19 * 128.0 + 128); // center of plot
     }
 
@@ -454,53 +502,85 @@ class MultiplayerClient extends ChangeNotifier {
       _appendMessage(ChatMessage(
         sender: aiAgent!.name,
         wallet: aiAgent!.wallet,
-        text: 'Tiba di tujuan. Sedang memproses transaksi di Sepolia...',
+        text: 'Tiba di tujuan. Sedang memproses transaksi...',
         time: time,
       ));
 
       // Call API serverless Vercel directly via HTTP POST
       try {
-        final actionType = intent.toUpperCase() == 'BUY' ? 'BUY_SEED' : (intent.toUpperCase() == 'SELL' ? 'SELL_CROP' : intent.toUpperCase());
         final hasApi = farmState.chainConfig.hasGameApi;
+        String actionType = '';
+        int amount = 1;
+
+        if (action.intent == 'buy') {
+          actionType = 'BUY_SEED';
+          amount = 3;
+        } else if (action.intent == 'sell') {
+          actionType = 'SELL_CROP';
+          amount = 3;
+        } else if (action.intent == 'withdraw') {
+          actionType = 'SWAP_COIN_ETH';
+          // Withdraw 50 game coin or current coin balance if lower
+          amount = math.min(50, farmState.coins);
+        } else if (action.intent == 'plant') {
+          actionType = 'PLANT';
+          amount = (['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(action.seed) + 1);
+        } else if (action.intent == 'harvest') {
+          actionType = 'HARVEST';
+          amount = 1;
+        }
+
         final res = hasApi 
           ? await farmState.submitChainActionDirectly(
               aiAgent!.wallet,
               actionType,
-              plotNum,
-              intent == 'buy' ? 3 : (intent == 'plant' ? (['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(seed) + 1) : 1)
+              action.plotNum,
+              amount,
             )
           : null;
         
         final tx = (res != null && res.isNotEmpty) ? res.substring(0, 8) : 'lokal';
 
-        if (intent == 'plant') {
-          onAiPlanted?.call(plotNum - 1, ['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(seed));
+        if (action.intent == 'plant') {
+          onAiPlanted?.call(action.plotNum - 1, ['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(action.seed));
           _appendMessage(ChatMessage(
             sender: aiAgent!.name,
             wallet: aiAgent!.wallet,
-            text: 'Bagus! Benih $seed ditanam di Lahan $plotNum. (Tx: $tx)',
+            text: 'Bagus! Benih ${action.seed} ditanam di Lahan ${action.plotNum}. (Tx: $tx)',
             time: time,
           ));
-        } else if (intent == 'harvest') {
-          onAiHarvested?.call(plotNum - 1);
+        } else if (action.intent == 'harvest') {
+          onAiHarvested?.call(action.plotNum - 1);
           _appendMessage(ChatMessage(
             sender: aiAgent!.name,
             wallet: aiAgent!.wallet,
             text: 'Sukses! Hasil panen berhasil diambil. (Tx: $tx)',
             time: time,
           ));
-        } else if (intent == 'buy') {
+        } else if (action.intent == 'buy') {
           _appendMessage(ChatMessage(
             sender: aiAgent!.name,
             wallet: aiAgent!.wallet,
-            text: 'Selesai! Saya membeli 3 benih $seed. (Tx: $tx)',
+            text: 'Selesai! Saya membeli 3 benih ${action.seed}. (Tx: $tx)',
             time: time,
           ));
-        } else if (intent == 'sell') {
+        } else if (action.intent == 'sell') {
           _appendMessage(ChatMessage(
             sender: aiAgent!.name,
             wallet: aiAgent!.wallet,
             text: 'Hore! Seluruh hasil panen terjual. (Tx: $tx)',
+            time: time,
+          ));
+        } else if (action.intent == 'withdraw') {
+          // Subtract coins locally since it's simulated in Local AI Mode
+          if (farmState.coins >= amount) {
+            farmState.coins -= amount;
+            farmState.notifyExternalChange();
+          }
+          _appendMessage(ChatMessage(
+            sender: aiAgent!.name,
+            wallet: aiAgent!.wallet,
+            text: 'Withdraw $amount Game Coin ke ETH Sepolia berhasil! (Tx: $tx)',
             time: time,
           ));
         }
@@ -512,12 +592,22 @@ class MultiplayerClient extends ChangeNotifier {
           time: time,
         ));
         // Run visual fallback
-        if (intent == 'plant') {
-          onAiPlanted?.call(plotNum - 1, ['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(seed));
-        } else if (intent == 'harvest') {
-          onAiHarvested?.call(plotNum - 1);
+        if (action.intent == 'plant') {
+          onAiPlanted?.call(action.plotNum - 1, ['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(action.seed));
+        } else if (action.intent == 'harvest') {
+          onAiHarvested?.call(action.plotNum - 1);
+        } else if (action.intent == 'withdraw') {
+          final amount = math.min(50, farmState.coins);
+          if (farmState.coins >= amount) {
+            farmState.coins -= amount;
+            farmState.notifyExternalChange();
+          }
         }
       }
+
+      // Finish this action and queue the next one
+      _isProcessingLocalAi = false;
+      Timer(const Duration(milliseconds: 1000), () => _processNextLocalAiAction(time));
     });
   }
 
