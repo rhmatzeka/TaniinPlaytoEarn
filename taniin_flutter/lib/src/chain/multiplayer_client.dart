@@ -722,86 +722,46 @@ class MultiplayerClient extends ChangeNotifier {
   List<Offset> _calculateAiPath(Offset start, Offset target) {
     final path = <Offset>[];
     
-    // Main Road Intersection (horizontal connector road)
-    const mainCrossX = 18.5 * 128.0;
-    const mainCrossY = 19.5 * 128.0;
+    // Check if start and target are inside the fenced farm plot area
+    final startInside = start.dx < 14.0 * 128.0 && start.dy < 23.0 * 128.0;
+    final targetInside = target.dx < 14.0 * 128.0 && target.dy < 23.0 * 128.0;
 
-    // Gate entry to the Farm Plots area
-    const farmGateX = 10.0 * 128.0;
-    const farmGateY = 19.5 * 128.0;
+    const innerY = 19.5 * 128.0;  // Safe path inside fence
+    const outerY = 25.0 * 128.0;  // Safe road outside fence
+    const gateX = 10.0 * 128.0;   // Gate X coordinate
+    const mainRoadX = 18.5 * 128.0; // Vertical main road X
 
-    // Check if target is a farm plot (plots are located in Y range of 19 tiles, X from 4 to 13 tiles)
-    final isPlotTarget = target.dy > 18.0 * 128.0 && target.dy < 24.0 * 128.0 && target.dx < 16.0 * 128.0;
-    
-    // Check if target is the sell crop house (Pengepul)
-    final isSellTarget = (target.dx - 31.0 * 128.0).abs() < 128.0 && target.dy < 17.0 * 128.0;
-
-    // Check if target is the shop (Toko Ucup)
-    final isShopTarget = (target.dx - 18.5 * 128.0).abs() < 128.0 && target.dy > 21.0 * 128.0;
-
-    // Check if target is the swap house (Toko Swap)
-    final isSwapTarget = (target.dx - 10.85 * 128.0).abs() < 128.0 && target.dy < 17.0 * 128.0;
-
-    // Routing Logic using Waypoints to avoid cutting corner fences:
-    if (isPlotTarget) {
-      // If AI is currently in the lower shop area, it must walk UP to the main crossroads first
-      if (start.dy > 20.0 * 128.0) {
-        path.add(const Offset(mainCrossX, mainCrossY));
-      } else {
-        path.add(Offset(mainCrossX, start.dy)); // Go to main road axis
-        path.add(const Offset(mainCrossX, mainCrossY)); // Move to crossroads
-      }
-      path.add(const Offset(farmGateX, farmGateY)); // Walk along road to gate
-      path.add(Offset(target.dx, farmGateY)); // Align with plot X
-      path.add(target); // Enter plot
-    } 
-    else if (isSellTarget) {
-      if (start.dy > 20.0 * 128.0) {
-        path.add(const Offset(mainCrossX, mainCrossY));
-      } else {
-        path.add(Offset(mainCrossX, start.dy));
-        path.add(const Offset(mainCrossX, mainCrossY));
-      }
-      path.add(const Offset(31.0 * 128.0, mainCrossY)); // Move right to sell lane
-      path.add(target); // Walk up to house
-    }
-    else if (isSwapTarget) {
-      if (start.dy > 20.0 * 128.0) {
-        path.add(const Offset(mainCrossX, mainCrossY));
-        path.add(const Offset(10.85 * 128.0, mainCrossY));
-      } else if (start.dx > 25.0 * 128.0) { // Coming from Pengepul
-        path.add(const Offset(31.0 * 128.0, mainCrossY));
-        path.add(const Offset(mainCrossX, mainCrossY));
-        path.add(const Offset(10.85 * 128.0, mainCrossY));
-      } else if (start.dx < 16.0 * 128.0 && start.dy > 18.0 * 128.0 && start.dy < 24.0 * 128.0) {
-        // Coming from farm plots, go through gate first
-        path.add(Offset(start.dx, farmGateY));
-        path.add(const Offset(farmGateX, farmGateY));
-        path.add(const Offset(10.85 * 128.0, farmGateY));
-      } else {
-        path.add(Offset(10.85 * 128.0, start.dy));
-        path.add(const Offset(10.85 * 128.0, mainCrossY));
-      }
-      path.add(target); // Walk up to house
-    }
-    else if (isShopTarget) {
-      // First, get out of farm plot gate to avoid cutting through the fence
-      if (start.dx < 16.0 * 128.0 && start.dy > 18.0 * 128.0 && start.dy < 24.0 * 128.0) {
-        path.add(Offset(start.dx, farmGateY));
-        path.add(const Offset(farmGateX, farmGateY));
-        path.add(const Offset(mainCrossX, mainCrossY));
-      } else if (start.dx > 25.0 * 128.0) { // Coming from Pengepul
-        path.add(const Offset(31.0 * 128.0, mainCrossY));
-        path.add(const Offset(mainCrossX, mainCrossY));
-      } else if (start.dx < 16.0 * 128.0 && start.dy < 18.0 * 128.0) { // Coming from Swap
-        path.add(const Offset(10.85 * 128.0, mainCrossY));
-        path.add(const Offset(mainCrossX, mainCrossY));
-      }
-      path.add(Offset(mainCrossX, target.dy)); // Align with shop X and go down
+    if (startInside && targetInside) {
+      // Both inside the fence: walk along the inner corridor
+      path.add(Offset(start.dx, innerY));
+      path.add(Offset(target.dx, innerY));
       path.add(target);
-    }
+    } 
+    else if (startInside && !targetInside) {
+      // Inside to Outside: walk to gate, exit to road, then to target
+      path.add(Offset(start.dx, innerY));
+      path.add(const Offset(gateX, innerY));
+      path.add(const Offset(gateX, outerY));
+      
+      // If target is in the town center/shop/swap/sell, align with the main vertical road first
+      path.add(const Offset(mainRoadX, outerY));
+      path.add(Offset(mainRoadX, target.dy));
+      path.add(target);
+    } 
+    else if (!startInside && targetInside) {
+      // Outside to Inside: go to main road, road to gate, go inside, then to target
+      path.add(Offset(start.dx, outerY));
+      path.add(const Offset(mainRoadX, outerY));
+      path.add(const Offset(gateX, outerY));
+      path.add(const Offset(gateX, innerY));
+      path.add(Offset(target.dx, innerY));
+      path.add(target);
+    } 
     else {
-      // Direct path fallback for any other targets
+      // Both outside: walk along the main vertical road and horizontal road
+      path.add(Offset(start.dx, outerY));
+      path.add(const Offset(mainRoadX, outerY));
+      path.add(Offset(mainRoadX, target.dy));
       path.add(target);
     }
 
