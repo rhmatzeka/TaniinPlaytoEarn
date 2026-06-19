@@ -208,6 +208,7 @@ class FarmStateController extends ChangeNotifier {
   ChainConfig chainConfig = const ChainConfig();
   final ChainClient Function(ChainConfig) _chainClientFactory;
   late ChainClient _chainClient;
+  ChainClient get chainClient => _chainClient;
   int _nextHistoryId = 1;
   Timer? _saveDebounce;
   bool _persistenceReady = false;
@@ -1759,7 +1760,7 @@ class FarmStateController extends ChangeNotifier {
         return;
       }
       if (hasValidHash) {
-        _updateHistory(
+        updateHistoryStatus(
           entryId,
           status: 'menunggu konfirmasi',
           txHash: result.txHash,
@@ -1769,7 +1770,7 @@ class FarmStateController extends ChangeNotifier {
         _commitState();
         final receipt = await _chainClient.waitForTransaction(result.txHash);
         if (!receipt.confirmed) {
-          _updateHistory(
+          updateHistoryStatus(
             entryId,
             status: 'menunggu konfirmasi',
             txHash: result.txHash,
@@ -1798,27 +1799,27 @@ class FarmStateController extends ChangeNotifier {
           return;
         }
         chainStatus = receipt.message;
-        if (action.type == 'SWAP_COIN_ETH') {
-          final payoutVisible = await _confirmEthPayoutBalance(
-            entryId,
-            action,
-            result.txHash,
-            nativeWeiBeforeAction,
-          );
-          if (!payoutVisible) {
-            _commitState();
-            return;
-          }
+      if (action.type == 'SWAP_COIN_ETH') {
+        final payoutVisible = await _confirmEthPayoutBalance(
+          entryId,
+          action,
+          result.txHash,
+          nativeWeiBeforeAction,
+        );
+        if (!payoutVisible) {
+          _commitState();
+          return;
         }
       }
-      _updateHistory(
-        entryId,
-        status: hasValidHash ? 'on-chain' : 'dikirim',
-        txHash: result.txHash,
-      );
-      if (!hasValidHash) {
-        chainStatus = result.message;
-      }
+    }
+    updateHistoryStatus(
+      entryId,
+      status: hasValidHash ? 'on-chain' : 'dikirim',
+      txHash: result.txHash,
+    );
+    if (!hasValidHash) {
+      chainStatus = result.message;
+    }
       if (action.type == 'SWAP_COIN' && hasValidHash) {
         tani += action.amount;
       }
@@ -1862,7 +1863,7 @@ class FarmStateController extends ChangeNotifier {
           final deltaWei = nativeWeiAfterAction - nativeWeiBeforeAction;
           final deltaEth = _formatEthWei(deltaWei);
           final expectedEth = _formatEthWei(expectedWei);
-          _updateHistory(entryId, status: 'on-chain', txHash: txHash);
+          updateHistoryStatus(entryId, status: 'on-chain', txHash: txHash);
           chainStatus = expectedEth.isEmpty
               ? 'Payout ETH confirmed. Saldo wallet naik ke ${state.nativeEth} ETH.'
               : 'Payout +$deltaEth ETH confirmed. Saldo wallet ${state.nativeEth} ETH.';
@@ -1882,7 +1883,7 @@ class FarmStateController extends ChangeNotifier {
       }
     }
     final expectedEth = _formatEthWei(expectedWei);
-    _updateHistory(entryId, status: 'menunggu saldo ETH', txHash: txHash);
+    updateHistoryStatus(entryId, status: 'menunggu saldo ETH', txHash: txHash);
     chainStatus = expectedEth.isEmpty
         ? 'Receipt Sepolia confirmed, tapi saldo ETH wallet belum naik. Tap Sync Wallet atau cek Etherscan ${shortTransactionHash(txHash)}.'
         : 'Receipt confirmed untuk +$expectedEth ETH, tapi saldo wallet belum naik di RPC. Tap Sync Wallet atau cek Etherscan ${shortTransactionHash(txHash)}.';
@@ -1900,7 +1901,7 @@ class FarmStateController extends ChangeNotifier {
     String reason,
   ) {
     final cleanReason = _conciseChainError(reason);
-    _updateHistory(
+    updateHistoryStatus(
       entryId,
       status: 'gagal on-chain',
       errorMessage: cleanReason,
@@ -1927,7 +1928,7 @@ class FarmStateController extends ChangeNotifier {
         tani = math.min(0x7fffffff, tani + refundTaniOnFailure);
       }
       _clampSwapAmountToSource();
-      _updateHistory(
+      updateHistoryStatus(
         entryId,
         status: 'gagal; saldo kembali',
         errorMessage: cleanReason,
@@ -1945,7 +1946,7 @@ class FarmStateController extends ChangeNotifier {
       _commitState();
       return;
     }
-    _updateHistory(
+    updateHistoryStatus(
       entryId,
       status: 'belum sync',
       errorMessage: cleanReason,
@@ -1955,7 +1956,7 @@ class FarmStateController extends ChangeNotifier {
     _commitState();
   }
 
-  void addExternalHistory(String title, String valueLabel, String status, {String txHash = ''}) {
+  int addExternalHistory(String title, String valueLabel, String status, {String txHash = ''}) {
     final now = DateTime.now();
     final id = _nextHistoryId++;
     history.insert(
@@ -1973,6 +1974,17 @@ class FarmStateController extends ChangeNotifier {
     if (history.length > 8) {
       history.removeRange(8, history.length);
     }
+    _commitState();
+    return id;
+  }
+
+  void deleteHistoryItem(int id) {
+    history.removeWhere((record) => record.id == id);
+    _commitState();
+  }
+
+  void clearAllHistory() {
+    history.clear();
     _commitState();
   }
 
@@ -1996,7 +2008,7 @@ class FarmStateController extends ChangeNotifier {
     return id;
   }
 
-  void _updateHistory(
+  void updateHistoryStatus(
     int entryId, {
     String? status,
     String? txHash,
@@ -2011,6 +2023,7 @@ class FarmStateController extends ChangeNotifier {
       txHash: txHash,
       errorMessage: errorMessage,
     );
+    _commitState();
   }
 
   String _initialChainHistoryStatus() {

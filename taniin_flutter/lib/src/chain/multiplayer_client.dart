@@ -556,12 +556,24 @@ class MultiplayerClient extends ChangeNotifier {
             text: 'Bagus! Benih ${action.seed} ditanam di Lahan ${action.plotNum}. (Tx: $tx)',
             time: time,
           ));
-          farmState.addExternalHistory(
+          final entryId = farmState.addExternalHistory(
             'Tanam ${action.seed}',
             'plot ${action.plotNum}',
-            tx != 'lokal' ? 'on-chain' : 'lokal tersimpan',
+            tx != 'lokal' ? 'menunggu konfirmasi' : 'lokal tersimpan',
             txHash: tx != 'lokal' ? res ?? '' : '',
           );
+          if (tx != 'lokal') {
+            unawaited(() async {
+              try {
+                final receipt = await farmState.chainClient.waitForTransaction(res!);
+                if (receipt.confirmed && receipt.success) {
+                  farmState.updateHistoryStatus(entryId, status: 'on-chain');
+                } else {
+                  farmState.updateHistoryStatus(entryId, status: 'gagal on-chain', errorMessage: receipt.message);
+                }
+              } catch (_) {}
+            }());
+          }
         } else if (action.intent == 'harvest') {
           onAiHarvested?.call(action.plotNum - 1);
           _appendMessage(ChatMessage(
@@ -570,12 +582,24 @@ class MultiplayerClient extends ChangeNotifier {
             text: 'Sukses! Hasil panen berhasil diambil. (Tx: $tx)',
             time: time,
           ));
-          farmState.addExternalHistory(
+          final entryId = farmState.addExternalHistory(
             'Panen ${['Kentang', 'Bawang', 'Stroberi', 'Bit'][['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(action.seed) != -1 ? ['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(action.seed) : 0]}',
             '+3 panen',
-            tx != 'lokal' ? 'on-chain' : 'lokal tersimpan',
+            tx != 'lokal' ? 'menunggu konfirmasi' : 'lokal tersimpan',
             txHash: tx != 'lokal' ? res ?? '' : '',
           );
+          if (tx != 'lokal') {
+            unawaited(() async {
+              try {
+                final receipt = await farmState.chainClient.waitForTransaction(res!);
+                if (receipt.confirmed && receipt.success) {
+                  farmState.updateHistoryStatus(entryId, status: 'on-chain');
+                } else {
+                  farmState.updateHistoryStatus(entryId, status: 'gagal on-chain', errorMessage: receipt.message);
+                }
+              } catch (_) {}
+            }());
+          }
         } else if (action.intent == 'buy') {
           _appendMessage(ChatMessage(
             sender: aiAgent!.name,
@@ -583,12 +607,24 @@ class MultiplayerClient extends ChangeNotifier {
             text: 'Selesai! Saya membeli 3 benih ${action.seed}. (Tx: $tx)',
             time: time,
           ));
-          farmState.addExternalHistory(
+          final entryId = farmState.addExternalHistory(
             'Beli ${action.seed}',
             '-60 coin',
-            tx != 'lokal' ? 'on-chain' : 'lokal tersimpan',
+            tx != 'lokal' ? 'menunggu konfirmasi' : 'lokal tersimpan',
             txHash: tx != 'lokal' ? res ?? '' : '',
           );
+          if (tx != 'lokal') {
+            unawaited(() async {
+              try {
+                final receipt = await farmState.chainClient.waitForTransaction(res!);
+                if (receipt.confirmed && receipt.success) {
+                  farmState.updateHistoryStatus(entryId, status: 'on-chain');
+                } else {
+                  farmState.updateHistoryStatus(entryId, status: 'gagal on-chain', errorMessage: receipt.message);
+                }
+              } catch (_) {}
+            }());
+          }
         } else if (action.intent == 'sell') {
           _appendMessage(ChatMessage(
             sender: aiAgent!.name,
@@ -596,12 +632,24 @@ class MultiplayerClient extends ChangeNotifier {
             text: 'Hore! Seluruh hasil panen terjual. (Tx: $tx)',
             time: time,
           ));
-          farmState.addExternalHistory(
+          final entryId = farmState.addExternalHistory(
             'Jual panen Kentang',
             '+105 coin',
-            tx != 'lokal' ? 'on-chain' : 'lokal tersimpan',
+            tx != 'lokal' ? 'menunggu konfirmasi' : 'lokal tersimpan',
             txHash: tx != 'lokal' ? res ?? '' : '',
           );
+          if (tx != 'lokal') {
+            unawaited(() async {
+              try {
+                final receipt = await farmState.chainClient.waitForTransaction(res!);
+                if (receipt.confirmed && receipt.success) {
+                  farmState.updateHistoryStatus(entryId, status: 'on-chain');
+                } else {
+                  farmState.updateHistoryStatus(entryId, status: 'gagal on-chain', errorMessage: receipt.message);
+                }
+              } catch (_) {}
+            }());
+          }
         } else if (action.intent == 'withdraw') {
           // Subtract coins locally since it's simulated in Local AI Mode
           if (farmState.coins >= amount) {
@@ -614,12 +662,24 @@ class MultiplayerClient extends ChangeNotifier {
             text: 'Withdraw $amount Game Coin ke ETH Sepolia berhasil! (Tx: $tx)',
             time: time,
           ));
-          farmState.addExternalHistory(
+          final entryId = farmState.addExternalHistory(
             'Payout Game Coin ke ETH',
             '-$amount coin',
-            tx != 'lokal' ? 'on-chain' : 'lokal tersimpan',
+            tx != 'lokal' ? 'menunggu konfirmasi' : 'lokal tersimpan',
             txHash: tx != 'lokal' ? res ?? '' : '',
           );
+          if (tx != 'lokal') {
+            unawaited(() async {
+              try {
+                final receipt = await farmState.chainClient.waitForTransaction(res!);
+                if (receipt.confirmed && receipt.success) {
+                  farmState.updateHistoryStatus(entryId, status: 'on-chain');
+                } else {
+                  farmState.updateHistoryStatus(entryId, status: 'gagal on-chain', errorMessage: receipt.message);
+                }
+              } catch (_) {}
+            }());
+          }
         }
       } catch (e) {
         _appendMessage(ChatMessage(

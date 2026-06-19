@@ -30,53 +30,70 @@ class HistoryPanel extends StatelessWidget {
       math.max(420.0, media.height - margin),
       620.0,
     );
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
-      child: PixelPanel(
-        color: const Color(0xFFA34A1C),
-        borderColor: const Color(0xFF633010),
-        padding: EdgeInsets.zero,
-        child: Column(
-          children: [
-            _PanelHeader(
-              icon: Icons.history,
-              title: 'RIWAYAT',
-              onClose: onClose,
-              compact: compact,
-            ),
-            Expanded(
-              child: Padding(
-                padding: compact
-                    ? const EdgeInsets.fromLTRB(14, 14, 14, 16)
-                    : const EdgeInsets.fromLTRB(30, 26, 30, 32),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF7A2D0E),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: const Color(0xFFE07B20),
-                      width: compact ? 4 : 5,
-                    ),
-                  ),
+    return ListenableBuilder(
+      listenable: farmState,
+      builder: (context, _) {
+        return ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
+          child: PixelPanel(
+            color: const Color(0xFFA34A1C),
+            borderColor: const Color(0xFF633010),
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                _PanelHeader(
+                  icon: Icons.history,
+                  title: 'RIWAYAT',
+                  onClose: onClose,
+                  compact: compact,
+                  farmState: farmState,
+                ),
+                Expanded(
                   child: Padding(
-                    padding: compact ? const EdgeInsets.all(10) : const EdgeInsets.all(18),
-                    child: ListView.separated(
-                      padding: EdgeInsets.zero,
-                      itemCount: farmState.history.length,
-                      separatorBuilder: (_, _) => SizedBox(height: compact ? 8 : 14),
-                      itemBuilder: (context, index) => _HistoryRow(
-                        record: farmState.history[index],
-                        farmState: farmState,
-                        compact: compact,
+                    padding: compact
+                        ? const EdgeInsets.fromLTRB(14, 14, 14, 16)
+                        : const EdgeInsets.fromLTRB(30, 26, 30, 32),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF7A2D0E),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: const Color(0xFFE07B20),
+                          width: compact ? 4 : 5,
+                        ),
+                      ),
+                      child: Padding(
+                        padding: compact ? const EdgeInsets.all(10) : const EdgeInsets.all(18),
+                        child: farmState.history.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'Belum ada riwayat transaksi.',
+                                  style: TextStyle(
+                                    color: Color(0xFFE9C692),
+                                    fontSize: 18,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              )
+                            : ListView.separated(
+                                padding: EdgeInsets.zero,
+                                itemCount: farmState.history.length,
+                                separatorBuilder: (_, _) => SizedBox(height: compact ? 8 : 14),
+                                itemBuilder: (context, index) => _HistoryRow(
+                                  record: farmState.history[index],
+                                  farmState: farmState,
+                                  compact: compact,
+                                ),
+                              ),
                       ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -87,12 +104,14 @@ class _PanelHeader extends StatelessWidget {
     required this.title,
     required this.onClose,
     required this.compact,
+    required this.farmState,
   });
 
   final IconData icon;
   final String title;
   final VoidCallback onClose;
   final bool compact;
+  final FarmStateController farmState;
 
   @override
   Widget build(BuildContext context) {
@@ -129,6 +148,32 @@ class _PanelHeader extends StatelessWidget {
               ),
             ),
           ),
+          if (farmState.history.isNotEmpty) ...[
+            GestureDetector(
+              onTap: () {
+                farmState.playClick();
+                farmState.clearAllHistory();
+                farmState.showMessage('Seluruh riwayat berhasil dihapus.');
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFA00500),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFF5C0000), width: 2),
+                ),
+                child: Text(
+                  'Hapus Semua',
+                  style: TextStyle(
+                    color: const Color(0xFFFFEDCD),
+                    fontSize: compact ? 12 : 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
           PanelCloseButton(
             onPressed: onClose,
             dimension: compact ? 46 : 62,
@@ -278,6 +323,27 @@ class _HistoryRow extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+              SizedBox(width: compact ? 12 : 18),
+              GestureDetector(
+                onTap: () {
+                  farmState.playClick();
+                  farmState.deleteHistoryItem(record.id);
+                  farmState.showMessage('Riwayat berhasil dihapus.');
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFA00500),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFF5C0000), width: 2),
+                  ),
+                  child: Icon(
+                    Icons.delete,
+                    size: compact ? 16 : 22,
+                    color: const Color(0xFFFFEDCD),
+                  ),
+                ),
               ),
             ],
           ),
