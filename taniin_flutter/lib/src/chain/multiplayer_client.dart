@@ -722,34 +722,34 @@ class MultiplayerClient extends ChangeNotifier {
   List<Offset> _calculateAiPath(Offset start, Offset target) {
     final path = <Offset>[];
     
-    // Check if start and target are inside the fenced farm plot area
+    // Define areas based on the horizontal fence at Y = 23.0 * 128 and vertical fence at X = 14.0 * 128
     final startInside = start.dx < 14.0 * 128.0 && start.dy < 23.0 * 128.0;
     final targetInside = target.dx < 14.0 * 128.0 && target.dy < 23.0 * 128.0;
 
-    const innerY = 19.5 * 128.0;  // Safe path inside fence
-    const outerY = 25.0 * 128.0;  // Safe road outside fence
-    const gateX = 10.0 * 128.0;   // Gate X coordinate
+    const innerY = 19.5 * 128.0;   // Safe horizontal path inside fence
+    const outerY = 28.5 * 128.0;   // Main horizontal road below the shop and fence
+    const gateX = 5.0 * 128.0;     // Gate X coordinate (below Plot 1, next to lake/lake-path)
     const mainRoadX = 18.5 * 128.0; // Vertical main road X
 
     if (startInside && targetInside) {
-      // Both inside the fence: walk along the inner corridor
+      // Both inside the fence: walk along inner corridor Y = 19.5
       path.add(Offset(start.dx, innerY));
       path.add(Offset(target.dx, innerY));
       path.add(target);
     } 
     else if (startInside && !targetInside) {
-      // Inside to Outside: walk to gate, exit to road, then to target
+      // Inside to Outside: walk to inner corridor, go left to gate, walk down to road, then to target
       path.add(Offset(start.dx, innerY));
       path.add(const Offset(gateX, innerY));
       path.add(const Offset(gateX, outerY));
       
-      // If target is in the town center/shop/swap/sell, align with the main vertical road first
+      // If target is outside, go along the main road
       path.add(const Offset(mainRoadX, outerY));
       path.add(Offset(mainRoadX, target.dy));
       path.add(target);
     } 
     else if (!startInside && targetInside) {
-      // Outside to Inside: go to main road, road to gate, go inside, then to target
+      // Outside to Inside: go to main road, walk left along road to gateX, go up, then to target
       path.add(Offset(start.dx, outerY));
       path.add(const Offset(mainRoadX, outerY));
       path.add(const Offset(gateX, outerY));
@@ -758,7 +758,7 @@ class MultiplayerClient extends ChangeNotifier {
       path.add(target);
     } 
     else {
-      // Both outside: walk along the main vertical road and horizontal road
+      // Both outside: walk along road Y = 28.5
       path.add(Offset(start.dx, outerY));
       path.add(const Offset(mainRoadX, outerY));
       path.add(Offset(mainRoadX, target.dy));
