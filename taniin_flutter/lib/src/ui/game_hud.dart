@@ -2442,56 +2442,60 @@ class _ChatHudState extends State<_ChatHud> {
     final unread =
         (widget.multiplayerClient.chatMessages.length - _lastSeenCount)
             .clamp(0, 99);
+    final compact = widget.compact;
     return GestureDetector(
       onTap: _toggle,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            padding: EdgeInsets.symmetric(
+              horizontal: compact ? 16 : 20,
+              vertical: compact ? 12 : 14,
+            ),
             decoration: BoxDecoration(
               color: _kPanel,
-              border: Border.all(color: _kBorder, width: 2),
-              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: _kBorder, width: 2.5),
+              borderRadius: BorderRadius.circular(12),
               boxShadow: const [
                 BoxShadow(color: Color(0x66000000), blurRadius: 6, offset: Offset(0, 3)),
               ],
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
-              children: const [
-                _AiAvatar(size: 22),
-                SizedBox(width: 8),
+              children: [
+                _AiAvatar(size: compact ? 26 : 30),
+                const SizedBox(width: 10),
                 Text(
                   'Pak Tani AI',
                   style: TextStyle(
                     color: Colors.white,
                     fontFamily: 'monospace',
                     fontWeight: FontWeight.bold,
-                    fontSize: 12.5,
+                    fontSize: compact ? 15 : 18,
                   ),
                 ),
-                SizedBox(width: 6),
-                Icon(Icons.chat_bubble_outline, color: _kAccent, size: 16),
+                const SizedBox(width: 8),
+                Icon(Icons.chat_bubble_outline, color: _kAccent, size: compact ? 18 : 22),
               ],
             ),
           ),
           if (unread > 0)
             Positioned(
-              right: -6,
-              top: -6,
+              right: -8,
+              top: -8,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: const Color(0xFFE3453B),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white, width: 1.5),
+                  border: Border.all(color: Colors.white, width: 2),
                 ),
                 child: Text(
                   '$unread',
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 10,
+                    fontSize: 12,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -2504,16 +2508,17 @@ class _ChatHudState extends State<_ChatHud> {
 
   Widget _buildExpanded(BuildContext context) {
     final messages = widget.multiplayerClient.chatMessages;
-    final width = widget.compact ? 260.0 : 320.0;
-    final listHeight = widget.compact ? 140.0 : 178.0;
+    final compact = widget.compact;
+    final width = compact ? 340.0 : 420.0;
+    final listHeight = compact ? 220.0 : 280.0;
     final connected = widget.multiplayerClient.connected;
 
     return Container(
       width: width,
       decoration: BoxDecoration(
         color: _kPanel,
-        border: Border.all(color: _kBorder, width: 2),
-        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _kBorder, width: 2.5),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: const [
           BoxShadow(color: Color(0x80000000), blurRadius: 10, offset: Offset(0, 4)),
         ],
@@ -2524,33 +2529,33 @@ class _ChatHudState extends State<_ChatHud> {
         children: [
           // Header
           Container(
-            padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
+            padding: EdgeInsets.fromLTRB(14, compact ? 10 : 12, 10, compact ? 10 : 12),
             decoration: const BoxDecoration(
               color: Color(0xFF2C3A24),
               borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(10),
-                topRight: Radius.circular(10),
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
               ),
             ),
             child: Row(
               children: [
-                const _AiAvatar(size: 24),
-                const SizedBox(width: 8),
-                const Expanded(
+                _AiAvatar(size: compact ? 28 : 34),
+                const SizedBox(width: 10),
+                Expanded(
                   child: Text(
                     'Pak Tani AI',
                     style: TextStyle(
                       color: Colors.white,
                       fontFamily: 'monospace',
                       fontWeight: FontWeight.bold,
-                      fontSize: 13.5,
+                      fontSize: compact ? 17 : 20,
                     ),
                   ),
                 ),
                 Container(
-                  width: 8,
-                  height: 8,
-                  margin: const EdgeInsets.only(right: 8),
+                  width: compact ? 10 : 12,
+                  height: compact ? 10 : 12,
+                  margin: const EdgeInsets.only(right: 12),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: connected ? _kAi : const Color(0xFFB55555),
@@ -2558,9 +2563,9 @@ class _ChatHudState extends State<_ChatHud> {
                 ),
                 GestureDetector(
                   onTap: _toggle,
-                  child: const Padding(
-                    padding: EdgeInsets.all(2),
-                    child: Icon(Icons.close, color: Color(0xFFE9C67B), size: 18),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(Icons.close, color: const Color(0xFFE9C67B), size: compact ? 22 : 26),
                   ),
                 ),
               ],
@@ -2570,16 +2575,16 @@ class _ChatHudState extends State<_ChatHud> {
           SizedBox(
             height: listHeight,
             child: messages.isEmpty
-                ? const Center(
+                ? Center(
                     child: Padding(
-                      padding: EdgeInsets.all(14),
+                      padding: const EdgeInsets.all(18),
                       child: Text(
                         'Suruh AI bertani!\nContoh: "tanam stroberi di lahan 2"',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: Color(0xFF9DAE8B),
+                          color: const Color(0xFF9DAE8B),
                           fontFamily: 'monospace',
-                          fontSize: 12,
+                          fontSize: compact ? 14 : 16,
                           height: 1.4,
                         ),
                       ),
@@ -2587,7 +2592,7 @@ class _ChatHudState extends State<_ChatHud> {
                   )
                 : ListView.builder(
                     controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     itemCount: messages.length,
                     itemBuilder: (context, index) {
                       final msg = messages[index];
@@ -2595,15 +2600,15 @@ class _ChatHudState extends State<_ChatHud> {
                       final isSystem = msg.sender == 'Sistem';
                       if (isSystem) {
                         return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          padding: const EdgeInsets.symmetric(vertical: 6),
                           child: Center(
                             child: Text(
                               msg.text,
                               textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Color(0xFFE0A24B),
+                              style: TextStyle(
+                                color: const Color(0xFFE0A24B),
                                 fontFamily: 'monospace',
-                                fontSize: 11,
+                                fontSize: compact ? 13 : 15,
                                 fontStyle: FontStyle.italic,
                               ),
                             ),
@@ -2615,18 +2620,18 @@ class _ChatHudState extends State<_ChatHud> {
                         alignment:
                             isAi ? Alignment.centerLeft : Alignment.centerRight,
                         child: Container(
-                          margin: const EdgeInsets.symmetric(vertical: 3),
+                          margin: const EdgeInsets.symmetric(vertical: 4),
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 9, vertical: 6),
+                              horizontal: 12, vertical: 9),
                           constraints: BoxConstraints(maxWidth: width * 0.82),
                           decoration: BoxDecoration(
                             color: isAi
                                 ? const Color(0xFF24351F)
                                 : const Color(0xFF1E2C3A),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(10),
                             border: Border.all(
                               color: accent.withValues(alpha: 0.45),
-                              width: 1,
+                              width: 1.5,
                             ),
                           ),
                           child: Column(
@@ -2638,16 +2643,16 @@ class _ChatHudState extends State<_ChatHud> {
                                   color: accent,
                                   fontFamily: 'monospace',
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 10.5,
+                                  fontSize: compact ? 12 : 14,
                                 ),
                               ),
-                              const SizedBox(height: 2),
+                              const SizedBox(height: 4),
                               Text(
                                 msg.text,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: Colors.white,
                                   fontFamily: 'monospace',
-                                  fontSize: 12.5,
+                                  fontSize: compact ? 14 : 16,
                                   height: 1.25,
                                 ),
                               ),
@@ -2660,31 +2665,31 @@ class _ChatHudState extends State<_ChatHud> {
           ),
           // Input row
           Padding(
-            padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+            padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
             child: Row(
               children: [
                 Expanded(
                   child: Container(
-                    height: 38,
+                    height: compact ? 44 : 50,
                     decoration: BoxDecoration(
                       color: const Color(0xFF12160F),
-                      border: Border.all(color: _kBorder, width: 1.5),
-                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: _kBorder, width: 1.8),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     alignment: Alignment.center,
                     child: TextField(
                       controller: _textController,
                       focusNode: _inputFocus,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.white,
-                        fontSize: 12.5,
+                        fontSize: compact ? 14 : 16,
                         fontFamily: 'monospace',
                       ),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         isCollapsed: true,
                         hintText: 'Ketik perintah ke AI...',
-                        hintStyle: TextStyle(color: Color(0xFF6F7B62), fontSize: 12),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 10),
+                        hintStyle: TextStyle(color: const Color(0xFF6F7B62), fontSize: compact ? 13 : 15),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                         border: InputBorder.none,
                       ),
                       textInputAction: TextInputAction.send,
@@ -2692,22 +2697,22 @@ class _ChatHudState extends State<_ChatHud> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 8),
                 GestureDetector(
                   onTap: _submitMessage,
                   child: Container(
-                    height: 38,
-                    width: 42,
+                    height: compact ? 44 : 50,
+                    width: compact ? 48 : 54,
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
                         colors: [Color(0xFF8A5E32), Color(0xFF6B4527)],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                       ),
-                      border: Border.all(color: _kAccent, width: 1.5),
-                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: _kAccent, width: 1.8),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.send, color: Colors.white, size: 17),
+                    child: Icon(Icons.send, color: Colors.white, size: compact ? 19 : 22),
                   ),
                 ),
               ],
