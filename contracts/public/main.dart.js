@@ -95103,32 +95103,32 @@ k=A.b([A.eR(i,A.ce(A.b([new A.Fj(m,i),B.Bz,l,B.fA,A.dT(B.Lm,B.h7,i,q?18:22)],k),
 if(r>0){s=A.b2(10)
 p=A.by(B.k,2)
 k.push(A.iF(i,A.eR(i,A.aF(""+r,i,i,i,B.Yn,i,i),B.x,i,new A.aE(B.HV,i,p,s,i,i,B.p),i,i,B.KX,i),i,i,i,-8,-8,i))}s=A.cY(i,A.fN(B.bb,k,B.x,B.bp,i),B.I,!1,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,j.gW_(),i,i,i)}return A.lM(B.ac,!0,i,A.aBg(B.cb,s,B.ch,B.p5),B.x,B.R,0,i,i,i,i,i,B.dh)},
-aam(a){var s,r,q,p,o,n,m,l,k=this,j=null,i="monospace",h=k.a,g=h.c,f=g.x,e=h.d,d=e?340:420,c=e?220:280,b=g.c
+aam(a){var s,r,q,p,o,n,m,l,k=this,j=null,i="monospace",h=k.a,g=h.c,f=g.x,e=h.d,d=e?400:460,c=e?260:300,b=g.c
 h=A.by(B.k1,2.5)
 g=A.b2(14)
-s=e?10:12
-r=e?10:12
-q=e?28:34
-p=A.c5(A.aF("Pak Tani AI",j,j,j,A.dH(j,j,B.k,j,j,j,j,j,i,j,j,e?17:20,j,j,B.bm,j,j,!0,j,j,j,j,j,j,j,j),j,j),1)
-o=e?10:12
-n=e?10:12
+s=e?12:14
+r=e?12:14
+q=e?32:36
+p=A.c5(A.aF("Pak Tani AI",j,j,j,A.dH(j,j,B.k,j,j,j,j,j,i,j,j,e?19:21,j,j,B.bm,j,j,!0,j,j,j,j,j,j,j,j),j,j),1)
+o=e?11:13
+n=e?11:13
 o=A.eR(j,j,B.x,j,new A.aE(b?B.he:B.HR,j,j,j,j,j,B.ex),n,B.pb,j,o)
 n=t.p
-r=A.eR(j,A.ce(A.b([new A.Fj(q,j),B.Bz,p,o,A.cY(j,new A.b0(B.KU,A.dT(B.pY,B.h7,j,e?22:26),j),B.I,!1,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,k.gW_(),j,j,j)],n),B.B,B.o,B.y),B.x,j,B.DE,j,j,new A.af(14,s,10,r),j)
+r=A.eR(j,A.ce(A.b([new A.Fj(q,j),B.Bz,p,o,A.cY(j,new A.b0(B.KU,A.dT(B.pY,B.h7,j,e?24:28),j),B.I,!1,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,k.gW_(),j,j,j)],n),B.B,B.o,B.y),B.x,j,B.DE,j,j,new A.af(14,s,10,r),j)
 s=f.length
-if(s===0)s=A.fB(new A.b0(B.kz,A.aF('Suruh AI bertani!\nContoh: "tanam stroberi di lahan 2"',j,j,j,A.dH(j,j,B.J3,j,j,j,j,j,i,j,j,e?14:16,j,j,j,j,1.4,!0,j,j,j,j,j,j,j,j),B.bD,j),j),j,j)
+if(s===0)s=A.fB(new A.b0(B.kz,A.aF('Suruh AI bertani!\nContoh: "tanam stroberi di lahan 2"',j,j,j,A.dH(j,j,B.J3,j,j,j,j,j,i,j,j,e?15:17,j,j,j,j,1.4,!0,j,j,j,j,j,j,j,j),B.bD,j),j),j,j)
 else s=new A.vc(new A.DO(new A.apQ(f,e,d),s,!0,!0,!0,A.aN6(),j),B.Kw,B.aH,!1,k.e,j,j,!1,j,j,s,B.I,j,j,B.V,B.a6,j)
 s=A.bN(s,c,j)
-q=e?44:50
+q=e?48:54
 p=A.by(B.k1,1.8)
 o=A.b2(10)
-m=A.dH(j,j,B.k,j,j,j,j,j,i,j,j,e?14:16,j,j,j,j,j,!0,j,j,j,j,j,j,j,j)
-q=A.c5(A.eR(B.aa,A.aJd(k.d,A.aCb(j,B.mU,j,B.pe,j,j,j,j,!0,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,A.dH(j,j,B.FU,j,j,j,j,j,j,j,j,e?13:15,j,j,j,j,j,!0,j,j,j,j,j,j,j,j),"Ketik perintah ke AI...",j,j,j,j,!0,j,j,j,j,!0,!0,!1,j,j,j,j,j,j,j,j,j,j,j,j,j,j),k.f,j,1,new A.apR(k),m,B.C2),B.x,j,new A.aE(B.Gc,j,p,o,j,j,B.p),q,j,j,j),1)
-p=e?44:50
-o=e?48:54
+m=A.dH(j,j,B.k,j,j,j,j,j,i,j,j,e?15:17,j,j,j,j,j,!0,j,j,j,j,j,j,j,j)
+q=A.c5(A.eR(B.aa,A.aJd(k.d,A.aCb(j,B.mU,j,B.pe,j,j,j,j,!0,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,A.dH(j,j,B.FU,j,j,j,j,j,j,j,j,e?14:16,j,j,j,j,j,!0,j,j,j,j,j,j,j,j),"Ketik perintah ke AI...",j,j,j,j,!0,j,j,j,j,!0,!0,!1,j,j,j,j,j,j,j,j,j,j,j,j,j,j),k.f,j,1,new A.apR(k),m,B.C2),B.x,j,new A.aE(B.Gc,j,p,o,j,j,B.p),q,j,j,j),1)
+p=e?48:54
+o=e?52:58
 m=A.by(B.h7,1.8)
 l=A.b2(10)
-return A.eR(j,A.ca(A.b([r,s,new A.b0(B.Kv,A.ce(A.b([q,B.fA,A.cY(j,A.eR(j,A.dT(B.Lx,B.k,j,e?19:22),B.x,j,new A.aE(j,j,m,l,j,B.Mv,B.p),p,j,j,o),B.I,!1,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,k.ganD(),j,j,j)],n),B.B,B.o,B.y),j)],n),B.bd,B.o,B.as),B.x,j,new A.aE(B.ox,j,h,g,B.OH,j,B.p),j,j,j,d)}}
+return A.eR(j,A.ca(A.b([r,s,new A.b0(B.Kv,A.ce(A.b([q,B.fA,A.cY(j,A.eR(j,A.dT(B.Lx,B.k,j,e?20:23),B.x,j,new A.aE(j,j,m,l,j,B.Mv,B.p),p,j,j,o),B.I,!1,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,j,k.ganD(),j,j,j)],n),B.B,B.o,B.y),j)],n),B.bd,B.o,B.as),B.x,j,new A.aE(B.ox,j,h,g,B.OH,j,B.p),j,j,j,d)}}
 A.apS.prototype={
 $0(){},
 $S:0}
@@ -95152,15 +95152,15 @@ s.ja(r,B.ch,B.K7)}},
 $S:15}
 A.apQ.prototype={
 $2(a,b){var s,r,q,p,o,n,m=this,l="monospace",k=null,j=m.a[b],i=j.a,h=i==="Pak Tani AI"
-if(i==="Sistem")return new A.b0(B.Ks,A.fB(A.aF(j.c,k,k,k,A.dH(k,k,B.I6,k,k,k,k,k,l,k,k,m.b?13:15,B.L8,k,k,k,k,!0,k,k,k,k,k,k,k,k),B.bD,k),k,k),k)
+if(i==="Sistem")return new A.b0(B.Ks,A.fB(A.aF(j.c,k,k,k,A.dH(k,k,B.I6,k,k,k,k,k,l,k,k,m.b?14:16,B.L8,k,k,k,k,!0,k,k,k,k,k,k,k,k),B.bD,k),k,k),k)
 s=h?B.he:B.nR
 r=h?B.cS:B.jv
 q=h?B.G1:B.Hb
 p=A.b2(10)
 o=A.by(s.N6(0.45),1.5)
 n=m.b
-i=A.aF(i,k,k,k,A.dH(k,k,s,k,k,k,k,k,l,k,k,n?12:14,k,k,B.bm,k,k,!0,k,k,k,k,k,k,k,k),k,k)
-return new A.il(r,k,k,A.eR(k,A.ca(A.b([i,B.BE,A.aF(j.c,k,k,k,A.dH(k,k,B.k,k,k,k,k,k,l,k,k,n?14:16,k,k,k,k,1.25,!0,k,k,k,k,k,k,k,k),k,k)],t.p),B.aj,B.o,B.y),B.x,new A.aa(0,m.c*0.82,0,1/0),new A.aE(q,k,o,p,k,k,B.p),k,B.Kr,B.kx,k),k)},
+i=A.aF(i,k,k,k,A.dH(k,k,s,k,k,k,k,k,l,k,k,n?13:15,k,k,B.bm,k,k,!0,k,k,k,k,k,k,k,k),k,k)
+return new A.il(r,k,k,A.eR(k,A.ca(A.b([i,B.BE,A.aF(j.c,k,k,k,A.dH(k,k,B.k,k,k,k,k,k,l,k,k,n?15:17,k,k,k,k,1.25,!0,k,k,k,k,k,k,k,k),k,k)],t.p),B.aj,B.o,B.y),B.x,new A.aa(0,m.c*0.82,0,1/0),new A.aE(q,k,o,p,k,k,B.p),k,B.Kr,B.kx,k),k)},
 $S:582}
 A.apR.prototype={
 $1(a){return this.a.Vy()},

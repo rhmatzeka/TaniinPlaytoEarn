@@ -2509,8 +2509,9 @@ class _ChatHudState extends State<_ChatHud> {
   Widget _buildExpanded(BuildContext context) {
     final messages = widget.multiplayerClient.chatMessages;
     final compact = widget.compact;
-    final width = compact ? 340.0 : 420.0;
-    final listHeight = compact ? 220.0 : 280.0;
+    // Further enlarged for mobile readability (compact: 400, desktop: 460)
+    final width = compact ? 400.0 : 460.0;
+    final listHeight = compact ? 260.0 : 300.0;
     final connected = widget.multiplayerClient.connected;
 
     return Container(
@@ -2529,7 +2530,7 @@ class _ChatHudState extends State<_ChatHud> {
         children: [
           // Header
           Container(
-            padding: EdgeInsets.fromLTRB(14, compact ? 10 : 12, 10, compact ? 10 : 12),
+            padding: EdgeInsets.fromLTRB(14, compact ? 12 : 14, 10, compact ? 12 : 14),
             decoration: const BoxDecoration(
               color: Color(0xFF2C3A24),
               borderRadius: BorderRadius.only(
@@ -2539,7 +2540,7 @@ class _ChatHudState extends State<_ChatHud> {
             ),
             child: Row(
               children: [
-                _AiAvatar(size: compact ? 28 : 34),
+                _AiAvatar(size: compact ? 32 : 36),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -2548,13 +2549,13 @@ class _ChatHudState extends State<_ChatHud> {
                       color: Colors.white,
                       fontFamily: 'monospace',
                       fontWeight: FontWeight.bold,
-                      fontSize: compact ? 17 : 20,
+                      fontSize: compact ? 19 : 21,
                     ),
                   ),
                 ),
                 Container(
-                  width: compact ? 10 : 12,
-                  height: compact ? 10 : 12,
+                  width: compact ? 11 : 13,
+                  height: compact ? 11 : 13,
                   margin: const EdgeInsets.only(right: 12),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
@@ -2565,7 +2566,7 @@ class _ChatHudState extends State<_ChatHud> {
                   onTap: _toggle,
                   child: Padding(
                     padding: const EdgeInsets.all(4),
-                    child: Icon(Icons.close, color: const Color(0xFFE9C67B), size: compact ? 22 : 26),
+                    child: Icon(Icons.close, color: const Color(0xFFE9C67B), size: compact ? 24 : 28),
                   ),
                 ),
               ],
@@ -2584,7 +2585,7 @@ class _ChatHudState extends State<_ChatHud> {
                         style: TextStyle(
                           color: const Color(0xFF9DAE8B),
                           fontFamily: 'monospace',
-                          fontSize: compact ? 14 : 16,
+                          fontSize: compact ? 15 : 17,
                           height: 1.4,
                         ),
                       ),
@@ -2608,7 +2609,7 @@ class _ChatHudState extends State<_ChatHud> {
                               style: TextStyle(
                                 color: const Color(0xFFE0A24B),
                                 fontFamily: 'monospace',
-                                fontSize: compact ? 13 : 15,
+                                fontSize: compact ? 14 : 16,
                                 fontStyle: FontStyle.italic,
                               ),
                             ),
@@ -2643,7 +2644,7 @@ class _ChatHudState extends State<_ChatHud> {
                                   color: accent,
                                   fontFamily: 'monospace',
                                   fontWeight: FontWeight.bold,
-                                  fontSize: compact ? 12 : 14,
+                                  fontSize: compact ? 13 : 15,
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -2652,7 +2653,7 @@ class _ChatHudState extends State<_ChatHud> {
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontFamily: 'monospace',
-                                  fontSize: compact ? 14 : 16,
+                                  fontSize: compact ? 15 : 17,
                                   height: 1.25,
                                 ),
                               ),
@@ -2670,7 +2671,7 @@ class _ChatHudState extends State<_ChatHud> {
               children: [
                 Expanded(
                   child: Container(
-                    height: compact ? 44 : 50,
+                    height: compact ? 48 : 54,
                     decoration: BoxDecoration(
                       color: const Color(0xFF12160F),
                       border: Border.all(color: _kBorder, width: 1.8),
@@ -2682,13 +2683,13 @@ class _ChatHudState extends State<_ChatHud> {
                       focusNode: _inputFocus,
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: compact ? 14 : 16,
+                        fontSize: compact ? 15 : 17,
                         fontFamily: 'monospace',
                       ),
                       decoration: InputDecoration(
                         isCollapsed: true,
                         hintText: 'Ketik perintah ke AI...',
-                        hintStyle: TextStyle(color: const Color(0xFF6F7B62), fontSize: compact ? 13 : 15),
+                        hintStyle: TextStyle(color: const Color(0xFF6F7B62), fontSize: compact ? 14 : 16),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                         border: InputBorder.none,
                       ),
@@ -2701,8 +2702,8 @@ class _ChatHudState extends State<_ChatHud> {
                 GestureDetector(
                   onTap: _submitMessage,
                   child: Container(
-                    height: compact ? 44 : 50,
-                    width: compact ? 48 : 54,
+                    height: compact ? 48 : 54,
+                    width: compact ? 52 : 58,
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
                         colors: [Color(0xFF8A5E32), Color(0xFF6B4527)],
@@ -2712,7 +2713,7 @@ class _ChatHudState extends State<_ChatHud> {
                       border: Border.all(color: _kAccent, width: 1.8),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(Icons.send, color: Colors.white, size: compact ? 19 : 22),
+                    child: Icon(Icons.send, color: Colors.white, size: compact ? 20 : 23),
                   ),
                 ),
               ],
