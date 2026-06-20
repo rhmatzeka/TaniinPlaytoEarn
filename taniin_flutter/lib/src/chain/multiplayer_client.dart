@@ -81,6 +81,26 @@ const double _shopBottom = 23.95 * _tileSize;
 const double _shopSafeX = 5.95 * _tileSize;
 const double _shopFrontY = 26.85 * _tileSize;
 const double _shopDoorX = 3.35 * _tileSize;
+final List<Rect> _aiDecorObstacles = <Rect>[
+  Rect.fromLTRB(
+    4.05 * _tileSize,
+    20.1 * _tileSize,
+    5.45 * _tileSize,
+    22.25 * _tileSize,
+  ),
+  Rect.fromLTRB(
+    5.05 * _tileSize,
+    20.55 * _tileSize,
+    6.15 * _tileSize,
+    26.05 * _tileSize,
+  ),
+  Rect.fromLTRB(
+    6.95 * _tileSize,
+    23.0 * _tileSize,
+    8.15 * _tileSize,
+    24.25 * _tileSize,
+  ),
+];
 
 class MultiplayerClient extends ChangeNotifier {
   MultiplayerClient(this.farmState) {
@@ -995,20 +1015,71 @@ class MultiplayerClient extends ChangeNotifier {
       path.add(target);
     }
 
-    return path;
+    return _avoidDecorObstacles(safeStart, path);
   }
 
   List<Offset> _calculateShopPathFromInside(Offset start, Offset target) {
-    const rightOpenX = 8.8 * _tileSize;
     const lowerOpenY = 25.6 * _tileSize;
 
-    return <Offset>[
-      Offset(rightOpenX, start.dy),
-      const Offset(rightOpenX, lowerOpenY),
-      const Offset(_shopSafeX, lowerOpenY),
+    return _avoidDecorObstacles(start, <Offset>[
+      Offset(start.dx, lowerOpenY),
       Offset(target.dx, _shopFrontY),
       target,
-    ];
+    ]);
+  }
+
+  List<Offset> _avoidDecorObstacles(Offset start, List<Offset> rawPath) {
+    final result = <Offset>[];
+    var from = start;
+    for (final point in rawPath) {
+      final detour = _detourAroundFirstObstacle(from, point);
+      result.addAll(detour);
+      result.add(point);
+      from = point;
+    }
+    return result;
+  }
+
+  List<Offset> _detourAroundFirstObstacle(Offset from, Offset to) {
+    for (final obstacle in _aiDecorObstacles) {
+      if (!_segmentIntersectsRect(from, to, obstacle)) {
+        continue;
+      }
+      const padding = 34.0;
+      final goRight =
+          from.dx <= obstacle.center.dx || to.dx <= obstacle.center.dx;
+      final detourX = goRight
+          ? obstacle.right + padding
+          : obstacle.left - padding;
+      final detourY = to.dy > obstacle.center.dy
+          ? obstacle.bottom + padding
+          : obstacle.top - padding;
+      return <Offset>[Offset(detourX, from.dy), Offset(detourX, detourY)];
+    }
+    return const <Offset>[];
+  }
+
+  bool _segmentIntersectsRect(Offset from, Offset to, Rect rect) {
+    final expanded = rect.inflate(18.0);
+    if (expanded.contains(from) || expanded.contains(to)) {
+      return true;
+    }
+    final segmentBounds = Rect.fromLTRB(
+      math.min(from.dx, to.dx),
+      math.min(from.dy, to.dy),
+      math.max(from.dx, to.dx),
+      math.max(from.dy, to.dy),
+    ).inflate(1.0);
+    if (!segmentBounds.overlaps(expanded)) {
+      return false;
+    }
+    if ((from.dx - to.dx).abs() < 0.1) {
+      return from.dx >= expanded.left && from.dx <= expanded.right;
+    }
+    if ((from.dy - to.dy).abs() < 0.1) {
+      return from.dy >= expanded.top && from.dy <= expanded.bottom;
+    }
+    return true;
   }
 
   bool _isShopFrontTarget(Offset target) {
@@ -1061,6 +1132,36 @@ class MultiplayerClient extends ChangeNotifier {
     return Offset(point.dx, _shopTop - padding);
   }
 
+  Offset _pushOutOfDecorObstacle(Offset point) {
+    for (final obstacle in _aiDecorObstacles) {
+      final expanded = obstacle.inflate(14.0);
+      if (!expanded.contains(point)) {
+        continue;
+      }
+      const padding = 18.0;
+      final leftDistance = (point.dx - expanded.left).abs();
+      final rightDistance = (expanded.right - point.dx).abs();
+      final topDistance = (point.dy - expanded.top).abs();
+      final bottomDistance = (expanded.bottom - point.dy).abs();
+      final nearest = math.min(
+        math.min(leftDistance, rightDistance),
+        math.min(topDistance, bottomDistance),
+      );
+
+      if (nearest == rightDistance) {
+        return Offset(expanded.right + padding, point.dy);
+      }
+      if (nearest == bottomDistance) {
+        return Offset(point.dx, expanded.bottom + padding);
+      }
+      if (nearest == topDistance) {
+        return Offset(point.dx, expanded.top - padding);
+      }
+      return Offset(expanded.left - padding, point.dy);
+    }
+    return point;
+  }
+
   void _followWaypoints(List<Offset> path, int index, VoidCallback onArrival) {
     if (aiAgent == null) {
       aiTarget = null;
@@ -1109,15 +1210,17 @@ class MultiplayerClient extends ChangeNotifier {
             aiAgent!.y + (dy / distance) * speed,
           ),
         );
+        final decorSafePosition = _pushOutOfDecorObstacle(nextPosition);
         aiAgent!
-          ..x = nextPosition.dx
-          ..y = nextPosition.dy;
+          ..x = decorSafePosition.dx
+          ..y = decorSafePosition.dy;
         notifyListeners();
       } else {
         final safeTarget = _pushOutOfShopBounds(target);
+        final decorSafeTarget = _pushOutOfDecorObstacle(safeTarget);
         aiAgent!
-          ..x = safeTarget.dx
-          ..y = safeTarget.dy;
+          ..x = decorSafeTarget.dx
+          ..y = decorSafeTarget.dy;
         notifyListeners();
         timer.cancel();
 
