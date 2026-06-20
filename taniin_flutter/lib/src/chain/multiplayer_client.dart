@@ -79,7 +79,7 @@ const double _shopRight = 5.25 * _tileSize;
 const double _shopTop = 16.2 * _tileSize;
 const double _shopBottom = 23.95 * _tileSize;
 const double _shopSafeX = 5.95 * _tileSize;
-const double _shopFrontY = 27.5 * _tileSize;
+const double _shopFrontY = 26.85 * _tileSize;
 const double _shopDoorX = 3.35 * _tileSize;
 
 class MultiplayerClient extends ChangeNotifier {
@@ -944,8 +944,8 @@ class MultiplayerClient extends ChangeNotifier {
   List<Offset> _calculateAiPath(Offset start, Offset target) {
     final path = <Offset>[];
 
-    const innerY = 19.5 * 128.0; // Safe horizontal path inside fence
-    const outerY = 27.5 * 128.0; // Front road below the shop and fence
+    const innerY = 21.65 * 128.0; // Inner corridor below field decorations.
+    const outerY = _shopFrontY; // Front road below the shop and fence
     const gateX =
         5.0 * 128.0; // Gate X coordinate (below Plot 1, next to lake/lake-path)
     const mainRoadX = 18.5 * 128.0; // Vertical main road X
@@ -959,19 +959,21 @@ class MultiplayerClient extends ChangeNotifier {
     final targetInside = target.dx < 14.0 * 128.0 && target.dy < 23.0 * 128.0;
 
     if (startInside && targetInside) {
-      // Both inside the fence: walk along inner corridor Y = 19.5
+      // Both inside the fence: walk along the lower inner corridor.
       path.add(Offset(safeStart.dx, innerY));
       path.add(Offset(target.dx, innerY));
       path.add(target);
     } else if (startInside && !targetInside) {
-      // Inside to Outside: walk to inner corridor, go left to gate, walk down to road, then to target
+      // Inside to outside: use the gate, then the nearest outside road.
       path.add(Offset(safeStart.dx, innerY));
       path.add(const Offset(gateX, innerY));
       path.add(const Offset(gateX, outerY));
-
-      // If target is outside, go along the main road
-      path.add(const Offset(mainRoadX, outerY));
-      path.add(Offset(mainRoadX, target.dy));
+      if (_isShopFrontTarget(target)) {
+        path.add(Offset(target.dx, outerY));
+      } else {
+        path.add(const Offset(mainRoadX, outerY));
+        path.add(Offset(mainRoadX, target.dy));
+      }
       path.add(target);
     } else if (!startInside && targetInside) {
       // Outside to Inside: go to main road, walk left along road to gateX, go up, then to target
@@ -994,6 +996,12 @@ class MultiplayerClient extends ChangeNotifier {
     }
 
     return path;
+  }
+
+  bool _isShopFrontTarget(Offset target) {
+    return target.dx >= _shopLeft &&
+        target.dx <= _shopRight &&
+        (target.dy - _shopFrontY).abs() < 2.0;
   }
 
   Offset _moveOutOfShopBounds(Offset start, List<Offset> path) {
@@ -1062,8 +1070,6 @@ class MultiplayerClient extends ChangeNotifier {
     notifyListeners();
 
     const speed = 12.0; // speed per step
-    var stuckTicks = 0;
-    var lastDistance = double.infinity;
     Timer.periodic(const Duration(milliseconds: 50), (timer) {
       if (aiAgent == null) {
         timer.cancel();
@@ -1075,19 +1081,6 @@ class MultiplayerClient extends ChangeNotifier {
       final distance = math.sqrt(dx * dx + dy * dy);
 
       if (distance > speed) {
-        if ((lastDistance - distance).abs() < 0.5) {
-          stuckTicks++;
-        } else {
-          stuckTicks = 0;
-        }
-        lastDistance = distance;
-
-        if (stuckTicks > 12) {
-          timer.cancel();
-          _followWaypoints(path, index + 1, onArrival);
-          return;
-        }
-
         // Calculate facing direction before moving
         if (dy.abs() > dx.abs()) {
           aiAgent!.facingDirection = dy < 0 ? 1 : 0; // 1: up, 0: down
