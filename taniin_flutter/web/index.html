@@ -3,26 +3,23 @@
 <head>
   <script>
     (function() {
-      const version = 'v29';
+      const version = 'v30';
       if (localStorage.getItem('taniin_cache_version') !== version) {
         localStorage.setItem('taniin_cache_version', version);
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistrations().then(function(registrations) {
-            for (let r of registrations) {
-              r.unregister();
-            }
-          });
-        }
-        if ('caches' in window) {
-          caches.keys().then(function(names) {
-            for (let name of names) {
-              caches.delete(name);
-            }
-          });
-        }
-        setTimeout(function() {
-          window.location.reload(true);
-        }, 250);
+        const unregisterWorkers = 'serviceWorker' in navigator
+          ? navigator.serviceWorker.getRegistrations().then(function(registrations) {
+              return Promise.all(registrations.map(function(r) { return r.unregister(); }));
+            })
+          : Promise.resolve();
+        const clearCaches = 'caches' in window
+          ? caches.keys().then(function(names) {
+              return Promise.all(names.map(function(name) { return caches.delete(name); }));
+            })
+          : Promise.resolve();
+
+        Promise.all([unregisterWorkers, clearCaches]).finally(function() {
+          window.location.replace(window.location.pathname + '?v=' + version + window.location.hash);
+        });
       }
     })();
   </script>
@@ -146,6 +143,6 @@
       }
     };
   </script>
-  <script src="flutter_bootstrap.js?v=9" async></script>
+  <script src="flutter_bootstrap.js?v=30" async></script>
 </body>
 </html>

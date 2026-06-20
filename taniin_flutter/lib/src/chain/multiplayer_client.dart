@@ -964,16 +964,16 @@ class MultiplayerClient extends ChangeNotifier {
       path.add(Offset(target.dx, innerY));
       path.add(target);
     } else if (startInside && !targetInside) {
+      if (_isShopFrontTarget(target)) {
+        return _calculateShopPathFromInside(safeStart, target);
+      }
+
       // Inside to outside: use the gate, then the nearest outside road.
       path.add(Offset(safeStart.dx, innerY));
       path.add(const Offset(gateX, innerY));
       path.add(const Offset(gateX, outerY));
-      if (_isShopFrontTarget(target)) {
-        path.add(Offset(target.dx, outerY));
-      } else {
-        path.add(const Offset(mainRoadX, outerY));
-        path.add(Offset(mainRoadX, target.dy));
-      }
+      path.add(const Offset(mainRoadX, outerY));
+      path.add(Offset(mainRoadX, target.dy));
       path.add(target);
     } else if (!startInside && targetInside) {
       // Outside to Inside: go to main road, walk left along road to gateX, go up, then to target
@@ -996,6 +996,19 @@ class MultiplayerClient extends ChangeNotifier {
     }
 
     return path;
+  }
+
+  List<Offset> _calculateShopPathFromInside(Offset start, Offset target) {
+    const upperSafeY = 18.35 * _tileSize;
+    const shopBypassX = 6.25 * _tileSize;
+
+    return <Offset>[
+      Offset(start.dx, upperSafeY),
+      const Offset(shopBypassX, upperSafeY),
+      const Offset(shopBypassX, _shopFrontY),
+      Offset(target.dx, _shopFrontY),
+      target,
+    ];
   }
 
   bool _isShopFrontTarget(Offset target) {
