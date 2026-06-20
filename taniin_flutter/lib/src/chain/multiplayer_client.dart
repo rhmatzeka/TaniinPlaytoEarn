@@ -76,8 +76,8 @@ class LocalAiAction {
 const double _tileSize = 128.0;
 const double _shopLeft = 1.1 * _tileSize;
 const double _shopRight = 5.8 * _tileSize;
-const double _shopTop = 17.0 * _tileSize;
-const double _shopBottom = 28.0 * _tileSize;
+const double _shopTop = 16.2 * _tileSize;
+const double _shopBottom = 25.85 * _tileSize;
 const double _shopSafeX = 5.95 * _tileSize;
 const double _shopFrontY = 27.5 * _tileSize;
 const double _shopDoorX = 3.35 * _tileSize;
@@ -924,6 +924,15 @@ class MultiplayerClient extends ChangeNotifier {
   void _moveLocalAiTo(Offset finalTarget, VoidCallback onArrival) {
     if (aiAgent == null) return;
 
+    final current = Offset(aiAgent!.x, aiAgent!.y);
+    final safeCurrent = _pushOutOfShopBounds(current);
+    if (safeCurrent != current) {
+      aiAgent!
+        ..x = safeCurrent.dx
+        ..y = safeCurrent.dy;
+      notifyListeners();
+    }
+
     // Generate waypoints path to follow the roads and avoid fences/obstacles
     final waypoints = _calculateAiPath(
       Offset(aiAgent!.x, aiAgent!.y),
@@ -992,11 +1001,9 @@ class MultiplayerClient extends ChangeNotifier {
       return start;
     }
 
-    // If Pak Tani AI is already clipped into the shop sprite from an older
-    // route, force him out through the right-side/front walkway first.
-    path.add(Offset(_shopSafeX, start.dy.clamp(_shopTop, _shopFrontY)));
-    path.add(const Offset(_shopSafeX, _shopFrontY));
-    return const Offset(_shopSafeX, _shopFrontY);
+    final safe = _pushOutOfShopBounds(start);
+    path.add(safe);
+    return safe;
   }
 
   bool _isInsideShopBounds(Offset point) {
@@ -1004,6 +1011,33 @@ class MultiplayerClient extends ChangeNotifier {
         point.dx <= _shopRight &&
         point.dy >= _shopTop &&
         point.dy <= _shopBottom;
+  }
+
+  Offset _pushOutOfShopBounds(Offset point) {
+    if (!_isInsideShopBounds(point)) {
+      return point;
+    }
+
+    const padding = 10.0;
+    final leftDistance = (point.dx - _shopLeft).abs();
+    final rightDistance = (_shopRight - point.dx).abs();
+    final topDistance = (point.dy - _shopTop).abs();
+    final bottomDistance = (_shopBottom - point.dy).abs();
+    final nearest = math.min(
+      math.min(leftDistance, rightDistance),
+      math.min(topDistance, bottomDistance),
+    );
+
+    if (nearest == bottomDistance) {
+      return Offset(point.dx, _shopBottom + padding);
+    }
+    if (nearest == rightDistance) {
+      return Offset(_shopRight + padding, point.dy);
+    }
+    if (nearest == leftDistance) {
+      return Offset(_shopLeft - padding, point.dy);
+    }
+    return Offset(point.dx, _shopTop - padding);
   }
 
   void _followWaypoints(List<Offset> path, int index, VoidCallback onArrival) {
@@ -1048,12 +1082,21 @@ class MultiplayerClient extends ChangeNotifier {
           aiAgent!.flipLeft = dx < 0;
         }
 
-        aiAgent!.x += (dx / distance) * speed;
-        aiAgent!.y += (dy / distance) * speed;
+        final nextPosition = _pushOutOfShopBounds(
+          Offset(
+            aiAgent!.x + (dx / distance) * speed,
+            aiAgent!.y + (dy / distance) * speed,
+          ),
+        );
+        aiAgent!
+          ..x = nextPosition.dx
+          ..y = nextPosition.dy;
         notifyListeners();
       } else {
-        aiAgent!.x = target.dx;
-        aiAgent!.y = target.dy;
+        final safeTarget = _pushOutOfShopBounds(target);
+        aiAgent!
+          ..x = safeTarget.dx
+          ..y = safeTarget.dy;
         notifyListeners();
         timer.cancel();
 

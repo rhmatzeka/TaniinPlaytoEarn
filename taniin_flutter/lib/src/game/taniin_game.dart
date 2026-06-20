@@ -231,12 +231,36 @@ class TaniinGame extends FlameGame {
     canvas.drawCircle(markerCenter, markerOuterRadius, _miniMapMarkerPaint);
     _miniMapMarkerPaint.color = const Color(0xFFE12622);
     canvas.drawCircle(markerCenter, markerInnerRadius, _miniMapMarkerPaint);
+
+    final ai = multiplayerClient.aiAgent;
+    if (ai != null) {
+      final aiX =
+          bounds.left + (ai.x / math.max(1, _worldWidth)) * bounds.width;
+      final aiY =
+          bounds.top + (ai.y / math.max(1, _worldHeight)) * bounds.height;
+      final aiCenter = Offset(aiX, aiY);
+      final aiOuterRadius = markerOuterRadius * 0.92;
+      final aiInnerRadius = aiOuterRadius * 0.62;
+
+      _miniMapMarkerPaint
+        ..style = PaintingStyle.fill
+        ..color = const Color(0x66000000);
+      canvas.drawCircle(
+        aiCenter + Offset(0, aiOuterRadius * 0.26),
+        aiOuterRadius * 1.04,
+        _miniMapMarkerPaint,
+      );
+      _miniMapMarkerPaint.color = const Color(0xFFE8FFF0);
+      canvas.drawCircle(aiCenter, aiOuterRadius, _miniMapMarkerPaint);
+      _miniMapMarkerPaint.color = const Color(0xFF22D36B);
+      canvas.drawCircle(aiCenter, aiInnerRadius, _miniMapMarkerPaint);
+    }
   }
 
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    
+
     // Bind AI Farmer Agent callbacks to local game actions
     multiplayerClient.onAiPlanted = (plotIndex, seedIndex) {
       if (plotIndex >= 0 && plotIndex < farmState.plots.length) {
@@ -247,7 +271,7 @@ class TaniinGame extends FlameGame {
         farmState.notifyExternalChange();
       }
     };
-    
+
     multiplayerClient.onAiHarvested = (plotIndex) {
       if (plotIndex >= 0 && plotIndex < farmState.plots.length) {
         final plot = farmState.plots[plotIndex];
@@ -282,7 +306,7 @@ class TaniinGame extends FlameGame {
   void update(double dt) {
     super.update(dt);
     _clock += dt;
-    
+
     // Update the walk animation frame independently so that remote players
     // and AI agents animate their walking correctly even when the local player is still.
     _walkTick += dt;
@@ -290,15 +314,11 @@ class TaniinGame extends FlameGame {
       _walkFrame = (_walkFrame + 1) % 6;
       _walkTick = 0;
     }
-    
+
     _updatePlayer(dt);
-    
+
     // Broadcast player coordinates to WebSocket server
-    multiplayerClient.sendMove(
-      _playerX,
-      _playerY,
-      _moving ? 'walk' : 'idle',
-    );
+    multiplayerClient.sendMove(_playerX, _playerY, _moving ? 'walk' : 'idle');
 
     _hudTick += dt;
     if (_hudTick >= 0.12) {
@@ -1744,7 +1764,7 @@ class TaniinGame extends FlameGame {
       final columns = math.max(1, sheet.width ~/ frameW);
       final frame = isWalking ? _walkFrame : ((_clock * 1000) ~/ 240) % 6;
       final frameIndex = frame % columns;
-      
+
       // Determine facing direction row for remote player (down=0, up=1, side=2)
       int row = 0;
       if (isWalking) {
@@ -1761,7 +1781,13 @@ class TaniinGame extends FlameGame {
       canvas.drawImageRect(sheet, source, target, remotePaint);
 
       // Draw Name tag
-      _drawNameTag(canvas, player.name, player.x, player.y - playerSize * 0.8, const Color(0xFF6FB7FF));
+      _drawNameTag(
+        canvas,
+        player.name,
+        player.x,
+        player.y - playerSize * 0.8,
+        const Color(0xFF6FB7FF),
+      );
     });
   }
 
@@ -1806,7 +1832,7 @@ class TaniinGame extends FlameGame {
     // Use walk frame index for walking, idle frame index for idle
     final frame = isWalking ? _walkFrame : ((_clock * 1000) ~/ 240) % 6;
     final frameIndex = frame % columns;
-    
+
     // Determine dynamically facing direction row for AI agent (down=0, up=1, side=2)
     int row = ai.facingDirection;
     bool flipLeft = ai.flipLeft;
@@ -1838,10 +1864,22 @@ class TaniinGame extends FlameGame {
     canvas.restore();
 
     // Draw Name tag
-    _drawNameTag(canvas, ai.name, ai.x, ai.y - playerSize * 0.8, const Color(0xFF52E07A));
+    _drawNameTag(
+      canvas,
+      ai.name,
+      ai.x,
+      ai.y - playerSize * 0.8,
+      const Color(0xFF52E07A),
+    );
   }
 
-  void _drawNameTag(Canvas canvas, String name, double worldX, double worldY, Color tagColor) {
+  void _drawNameTag(
+    Canvas canvas,
+    String name,
+    double worldX,
+    double worldY,
+    Color tagColor,
+  ) {
     final painter = TextPainter(
       text: TextSpan(
         text: ' $name ',
@@ -1858,7 +1896,7 @@ class TaniinGame extends FlameGame {
 
     final x = worldX - _cameraX - painter.width * 0.5;
     final y = worldY - _cameraY - painter.height * 0.5;
-    
+
     // Draw small green/blue accent bar under name tag
     final borderPaint = Paint()
       ..style = PaintingStyle.fill
