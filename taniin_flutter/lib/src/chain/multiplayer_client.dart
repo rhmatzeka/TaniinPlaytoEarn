@@ -75,9 +75,9 @@ class LocalAiAction {
 
 const double _tileSize = 128.0;
 const double _shopLeft = 1.1 * _tileSize;
-const double _shopRight = 5.8 * _tileSize;
+const double _shopRight = 5.25 * _tileSize;
 const double _shopTop = 16.2 * _tileSize;
-const double _shopBottom = 25.85 * _tileSize;
+const double _shopBottom = 23.95 * _tileSize;
 const double _shopSafeX = 5.95 * _tileSize;
 const double _shopFrontY = 27.5 * _tileSize;
 const double _shopDoorX = 3.35 * _tileSize;
@@ -1062,6 +1062,8 @@ class MultiplayerClient extends ChangeNotifier {
     notifyListeners();
 
     const speed = 12.0; // speed per step
+    var stuckTicks = 0;
+    var lastDistance = double.infinity;
     Timer.periodic(const Duration(milliseconds: 50), (timer) {
       if (aiAgent == null) {
         timer.cancel();
@@ -1073,6 +1075,19 @@ class MultiplayerClient extends ChangeNotifier {
       final distance = math.sqrt(dx * dx + dy * dy);
 
       if (distance > speed) {
+        if ((lastDistance - distance).abs() < 0.5) {
+          stuckTicks++;
+        } else {
+          stuckTicks = 0;
+        }
+        lastDistance = distance;
+
+        if (stuckTicks > 12) {
+          timer.cancel();
+          _followWaypoints(path, index + 1, onArrival);
+          return;
+        }
+
         // Calculate facing direction before moving
         if (dy.abs() > dx.abs()) {
           aiAgent!.facingDirection = dy < 0 ? 1 : 0; // 1: up, 0: down
