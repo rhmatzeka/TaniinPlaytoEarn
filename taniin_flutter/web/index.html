@@ -4,9 +4,6 @@
   <script>
     (function() {
       const version = 'v30';
-      if (window.location.search === '?v=' + version && window.history && window.history.replaceState) {
-        window.history.replaceState(null, '', window.location.pathname + window.location.hash);
-      }
       if (localStorage.getItem('taniin_cache_version') !== version) {
         localStorage.setItem('taniin_cache_version', version);
         const unregisterWorkers = 'serviceWorker' in navigator
