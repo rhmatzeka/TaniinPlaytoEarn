@@ -16,6 +16,7 @@ const coinAbi = [
 
 const landAbi = [
   "function playerPlotLandId(address player, uint256 plotId) view returns (uint256)",
+  "function planted(uint256 landId) view returns (bool)",
   "function mintLandFor(address player, uint256 plotId, string tokenUri) external returns (uint256)",
   "function sellLandFor(address player, uint256 plotId, string tokenUri) external returns (uint256)",
   "function plantFor(address player, uint256 plotId, string tokenUri) external returns (uint256)",
@@ -102,43 +103,47 @@ async function submitGameAction(body) {
       if (existingLandId !== 0n) {
         throw httpError(409, `Lahan #${plotId} sudah minted on-chain untuk wallet ini.`);
       }
-      txHashes.push(await sendTransaction("mint land", land.mintLandFor(walletAddress, plotId, tokenUri)));
+      txHashes.push(await sendTransaction("mint land", () => land.mintLandFor(walletAddress, plotId, tokenUri)));
       break;
     }
     case "SELL_LAND": {
-      txHashes.push(await sendTransaction("sell land", land.sellLandFor(walletAddress, plotId, tokenUri)));
-      txHashes.push(await sendTransaction("land sell reward", coin.mint(walletAddress, toTani(LAND_SELL_REWARD))));
+      txHashes.push(await sendTransaction("sell land", () => land.sellLandFor(walletAddress, plotId, tokenUri)));
+      txHashes.push(await sendTransaction("land sell reward", () => coin.mint(walletAddress, toTani(LAND_SELL_REWARD))));
       break;
     }
     case "PLANT": {
-      txHashes.push(await sendTransaction("plant", land.plantFor(walletAddress, plotId, tokenUri)));
+      const existingLandId = await land.playerPlotLandId(walletAddress, plotId);
+      if (existingLandId !== 0n && await land.planted(existingLandId)) {
+        throw httpError(409, `Lahan #${plotId} sudah ditanami on-chain. Panen dulu atau pilih lahan kosong.`);
+      }
+      txHashes.push(await sendTransaction("plant", () => land.plantFor(walletAddress, plotId, tokenUri)));
       break;
     }
     case "HARVEST": {
-      txHashes.push(await sendTransaction("harvest", land.harvestFor(walletAddress, plotId, tokenUri)));
-      txHashes.push(await sendTransaction("mint crop", items.mint(walletAddress, CROP_ITEM_ID, BigInt(amount))));
+      txHashes.push(await sendTransaction("harvest", () => land.harvestFor(walletAddress, plotId, tokenUri)));
+      txHashes.push(await sendTransaction("mint crop", () => items.mint(walletAddress, CROP_ITEM_ID, BigInt(amount))));
       break;
     }
     case "BUY_SEED": {
-      txHashes.push(await sendTransaction("mint seed", items.mint(walletAddress, SEED_ITEM_ID, BigInt(amount))));
+      txHashes.push(await sendTransaction("mint seed", () => items.mint(walletAddress, SEED_ITEM_ID, BigInt(amount))));
       break;
     }
     case "SELL_CROP":
     case "SWAP_CROP": {
-      txHashes.push(await sendTransaction("crop reward", coin.mint(walletAddress, toTani(BigInt(amount) * BigInt(CROP_REWARD)))));
+      txHashes.push(await sendTransaction("crop reward", () => coin.mint(walletAddress, toTani(BigInt(amount) * BigInt(CROP_REWARD)))));
       break;
     }
     case "SWAP_COIN": {
-      txHashes.push(await sendTransaction("coin swap", coin.mint(walletAddress, toTani(BigInt(amount) * BigInt(COIN_SWAP_RATE)))));
+      txHashes.push(await sendTransaction("coin swap", () => coin.mint(walletAddress, toTani(BigInt(amount) * BigInt(COIN_SWAP_RATE)))));
       break;
     }
     case "SWAP_TANI_COIN": {
-      txHashes.push(await sendTransaction("TANI deposit burn", coin.gameSpend(walletAddress, toTani(BigInt(amount) * BigInt(COIN_SWAP_RATE)))));
+      txHashes.push(await sendTransaction("TANI deposit burn", () => coin.gameSpend(walletAddress, toTani(BigInt(amount) * BigInt(COIN_SWAP_RATE)))));
       break;
     }
     case "SWAP_ETH_COIN": {
       await ensureWalletHasEthForFunding(service, walletAddress, amount);
-      txHashes.push(await sendTransaction("ETH funding receipt", coin.mint(walletAddress, toTani(BigInt(amount) * BigInt(COIN_SWAP_RATE)))));
+      txHashes.push(await sendTransaction("ETH funding receipt", () => coin.mint(walletAddress, toTani(BigInt(amount) * BigInt(COIN_SWAP_RATE)))));
       break;
     }
     case "SWAP_COIN_ETH": {
@@ -146,8 +151,8 @@ async function submitGameAction(body) {
       ethPayoutAmountWei = payoutWei;
       ensureRecipientIsNotSigner(service, walletAddress);
       await ensureSignerCanPayEth(service, payoutWei);
-      txHashes.push(await sendTransaction("TANI swap burn", coin.gameSpend(walletAddress, toTani(amount))));
-      txHashes.push(await sendTransaction("ETH swap payout", service.signer.sendTransaction({
+      txHashes.push(await sendTransaction("TANI swap burn", () => coin.gameSpend(walletAddress, toTani(amount))));
+      txHashes.push(await sendTransaction("ETH swap payout", () => service.signer.sendTransaction({
         to: walletAddress,
         value: payoutWei
       })));
@@ -188,10 +193,29 @@ async function health() {
   };
 }
 
-async function sendTransaction(label, txPromise) {
-  const tx = await txPromise;
+async function sendTransaction(label, createTx) {
+  let tx;
+  try {
+    tx = await createTx();
+  } catch (error) {
+    if (!isReplacementFeeTooLow(error)) {
+      throw error;
+    }
+    const service = await getGameService();
+    service.signer.reset();
+    await delay(1500);
+    tx = await createTx();
+  }
   console.log(`[game-api] ${label}: ${tx.hash}`);
   return tx.hash;
+}
+
+function isReplacementFeeTooLow(error) {
+  return normalizeError(error).toLowerCase().includes("replacement fee too low");
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function landTokenUri(walletAddress, plotId) {

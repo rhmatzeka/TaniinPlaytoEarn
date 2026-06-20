@@ -486,15 +486,14 @@ class MultiplayerClient extends ChangeNotifier {
       return;
     }
 
-    // Define target position on map
-    // Hotspots derived from TaniinGame tile coordinates:
-    // Shop Sign: 18.5, 22.35
+    // Define target position on map. Shop uses the front walkway, not the
+    // sign/roof coordinate, so Pak Tani AI never cuts across the house sprite.
     // Sell Sign: 31.0, 13.35
     // Swap Sign: 10.85, 13.15
     // Plots: 4, 6, 8, 10, 12 at Y=19
     Offset target = Offset(aiAgent!.x, aiAgent!.y);
     if (action.intent == 'buy') {
-      target = const Offset(18.5 * 128, 22.35 * 128);
+      target = const Offset(18.5 * 128, 27.5 * 128);
     } else if (action.intent == 'sell') {
       target = const Offset(31.0 * 128, 13.35 * 128);
     } else if (action.intent == 'withdraw') {
@@ -537,8 +536,20 @@ class MultiplayerClient extends ChangeNotifier {
           amount = 1;
         }
 
-        final res = hasApi 
-          ? await farmState.submitChainActionDirectly(
+        if (!_isLocalAiActionStillValid(action)) {
+          _appendMessage(ChatMessage(
+            sender: aiAgent!.name,
+            wallet: aiAgent!.wallet,
+            text: _invalidLocalAiActionMessage(action),
+            time: time,
+          ));
+          _isProcessingLocalAi = false;
+          Timer(const Duration(milliseconds: 1000), () => _processNextLocalAiAction(time));
+          return;
+        }
+
+        final res = hasApi
+          ? await _submitChainActionWithRetry(
               aiAgent!.wallet,
               actionType,
               action.plotNum,
@@ -688,13 +699,17 @@ class MultiplayerClient extends ChangeNotifier {
           text: 'Transaksi selesai secara lokal. (Gagal Sepolia: ${e.toString().split('\n').first})',
           time: time,
         ));
-        // Run visual fallback
+        // Run visual fallback only if the current local state still permits it.
         if (action.intent == 'plant') {
-          onAiPlanted?.call(action.plotNum - 1, ['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(action.seed));
-          farmState.addExternalHistory('Tanam ${action.seed}', 'plot ${action.plotNum}', 'lokal tersimpan');
+          if (_isLocalAiActionStillValid(action)) {
+            onAiPlanted?.call(action.plotNum - 1, ['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(action.seed));
+            farmState.addExternalHistory('Tanam ${action.seed}', 'plot ${action.plotNum}', 'lokal tersimpan');
+          }
         } else if (action.intent == 'harvest') {
-          onAiHarvested?.call(action.plotNum - 1);
-          farmState.addExternalHistory('Panen Kentang', '+3 panen', 'lokal tersimpan');
+          if (_isLocalAiActionStillValid(action)) {
+            onAiHarvested?.call(action.plotNum - 1);
+            farmState.addExternalHistory('Panen Kentang', '+3 panen', 'lokal tersimpan');
+          }
         } else if (action.intent == 'withdraw') {
           final amount = math.min(50, farmState.coins);
           if (farmState.coins >= amount) {
@@ -709,6 +724,62 @@ class MultiplayerClient extends ChangeNotifier {
       _isProcessingLocalAi = false;
       Timer(const Duration(milliseconds: 1000), () => _processNextLocalAiAction(time));
     });
+  }
+
+  Future<String> _submitChainActionWithRetry(
+    String wallet,
+    String actionType,
+    int plotNum,
+    int amount,
+  ) async {
+    try {
+      return await farmState.submitChainActionDirectly(
+        wallet,
+        actionType,
+        plotNum,
+        amount,
+      );
+    } catch (e) {
+      if (!e.toString().toLowerCase().contains('replacement fee too low')) {
+        rethrow;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 1800));
+      return farmState.submitChainActionDirectly(
+        wallet,
+        actionType,
+        plotNum,
+        amount,
+      );
+    }
+  }
+
+  bool _isLocalAiActionStillValid(LocalAiAction action) {
+    if (action.intent != 'plant' && action.intent != 'harvest') {
+      return true;
+    }
+    final plotIdx = action.plotNum - 1;
+    if (plotIdx < 0 || plotIdx >= farmState.plots.length) {
+      return false;
+    }
+    final plot = farmState.plots[plotIdx];
+    if (!plot.owned) {
+      return false;
+    }
+    if (action.intent == 'plant') {
+      return plot.status == PlotStatus.empty;
+    }
+    return plot.status == PlotStatus.growing && plot.isReady(DateTime.now());
+  }
+
+  String _invalidLocalAiActionMessage(LocalAiAction action) {
+    final plotNum = action.plotNum;
+    if (action.intent == 'plant') {
+      return 'Lahan $plotNum sudah terisi atau belum bisa ditanami. Saya batalkan supaya tidak menembus error Sepolia.';
+    }
+    if (action.intent == 'harvest') {
+      return 'Lahan $plotNum belum siap dipanen. Saya batalkan supaya transaksi tidak gagal.';
+    }
+    return 'Aksi dibatalkan karena kondisi lahan berubah.';
   }
 
   void _moveLocalAiTo(Offset finalTarget, VoidCallback onArrival) {
@@ -727,7 +798,7 @@ class MultiplayerClient extends ChangeNotifier {
     final targetInside = target.dx < 14.0 * 128.0 && target.dy < 23.0 * 128.0;
 
     const innerY = 19.5 * 128.0;   // Safe horizontal path inside fence
-    const outerY = 28.5 * 128.0;   // Main horizontal road below the shop and fence
+    const outerY = 27.5 * 128.0;   // Front road below the shop and fence
     const gateX = 5.0 * 128.0;     // Gate X coordinate (below Plot 1, next to lake/lake-path)
     const mainRoadX = 18.5 * 128.0; // Vertical main road X
 
@@ -758,7 +829,7 @@ class MultiplayerClient extends ChangeNotifier {
       path.add(target);
     } 
     else {
-      // Both outside: walk along road Y = 28.5
+      // Both outside: walk along the front road and avoid crossing the shop.
       path.add(Offset(start.dx, outerY));
       path.add(const Offset(mainRoadX, outerY));
       path.add(Offset(mainRoadX, target.dy));
