@@ -999,13 +999,11 @@ class MultiplayerClient extends ChangeNotifier {
   }
 
   List<Offset> _calculateShopPathFromInside(Offset start, Offset target) {
-    const upperSafeY = 17.2 * _tileSize;
     const rightOpenX = 8.8 * _tileSize;
     const lowerOpenY = 25.6 * _tileSize;
 
     return <Offset>[
-      Offset(start.dx, upperSafeY),
-      const Offset(rightOpenX, upperSafeY),
+      Offset(rightOpenX, start.dy),
       const Offset(rightOpenX, lowerOpenY),
       const Offset(_shopSafeX, lowerOpenY),
       Offset(target.dx, _shopFrontY),
