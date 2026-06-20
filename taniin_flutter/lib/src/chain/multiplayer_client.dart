@@ -73,6 +73,15 @@ class LocalAiAction {
   final String reply;
 }
 
+const double _tileSize = 128.0;
+const double _shopLeft = 1.1 * _tileSize;
+const double _shopRight = 5.8 * _tileSize;
+const double _shopTop = 17.0 * _tileSize;
+const double _shopBottom = 28.0 * _tileSize;
+const double _shopSafeX = 5.95 * _tileSize;
+const double _shopFrontY = 27.5 * _tileSize;
+const double _shopDoorX = 3.35 * _tileSize;
+
 class MultiplayerClient extends ChangeNotifier {
   MultiplayerClient(this.farmState) {
     _lastWalletAddress = farmState.walletAddress;
@@ -98,7 +107,9 @@ class MultiplayerClient extends ChangeNotifier {
   void _onWalletAddressChanged() {
     if (farmState.walletAddress != _lastWalletAddress) {
       _lastWalletAddress = farmState.walletAddress;
-      debugPrint('[multiplayer] Player wallet address changed, reconnecting...');
+      debugPrint(
+        '[multiplayer] Player wallet address changed, reconnecting...',
+      );
       reconnect();
     }
   }
@@ -306,11 +317,7 @@ class MultiplayerClient extends ChangeNotifier {
 
   void sendMove(double x, double y, String anim) {
     if (connected) {
-      _socket?.emit('move', <String, dynamic>{
-        'x': x,
-        'y': y,
-        'anim': anim,
-      });
+      _socket?.emit('move', <String, dynamic>{'x': x, 'y': y, 'anim': anim});
     }
   }
 
@@ -325,12 +332,14 @@ class MultiplayerClient extends ChangeNotifier {
 
     // Optimistic local echo so the player always sees their own message,
     // even before the server round-trip (or if offline).
-    _appendMessage(ChatMessage(
-      sender: 'Kamu',
-      wallet: farmState.walletAddress,
-      text: trimmed,
-      time: time,
-    ));
+    _appendMessage(
+      ChatMessage(
+        sender: 'Kamu',
+        wallet: farmState.walletAddress,
+        text: trimmed,
+        time: time,
+      ),
+    );
 
     if (connected) {
       _socket?.emit('chat', <String, dynamic>{'text': trimmed});
@@ -357,21 +366,41 @@ class MultiplayerClient extends ChangeNotifier {
 
     // Determine a shared/default plot number from the entire instruction text first
     int defaultPlotNum = 1;
-    final mainPlotMatch = RegExp(r'lahan\s*([1-5])|plot\s*([1-5])|\b([1-5])\b').firstMatch(text.toLowerCase());
+    final mainPlotMatch = RegExp(
+      r'lahan\s*([1-5])|plot\s*([1-5])|\b([1-5])\b',
+    ).firstMatch(text.toLowerCase());
     if (mainPlotMatch != null) {
-      defaultPlotNum = int.tryParse(mainPlotMatch.group(1) ?? mainPlotMatch.group(2) ?? mainPlotMatch.group(3) ?? '1') ?? 1;
+      defaultPlotNum =
+          int.tryParse(
+            mainPlotMatch.group(1) ??
+                mainPlotMatch.group(2) ??
+                mainPlotMatch.group(3) ??
+                '1',
+          ) ??
+          1;
     }
 
-    final commands = text.split(RegExp(r'\bkemudian\b|\blalu\b|\bdan\b|\bterus\b|;|\||,'));
+    final commands = text.split(
+      RegExp(r'\bkemudian\b|\blalu\b|\bdan\b|\bterus\b|;|\||,'),
+    );
     for (final cmd in commands) {
       final clean = cmd.trim().toLowerCase();
       if (clean.isEmpty) continue;
 
       // Parse plot number for this specific command, defaulting to defaultPlotNum if not specified
       int plotNum = defaultPlotNum;
-      final plotMatch = RegExp(r'lahan\s*([1-5])|plot\s*([1-5])|\b([1-5])\b').firstMatch(clean);
+      final plotMatch = RegExp(
+        r'lahan\s*([1-5])|plot\s*([1-5])|\b([1-5])\b',
+      ).firstMatch(clean);
       if (plotMatch != null) {
-        plotNum = int.tryParse(plotMatch.group(1) ?? plotMatch.group(2) ?? plotMatch.group(3) ?? '1') ?? 1;
+        plotNum =
+            int.tryParse(
+              plotMatch.group(1) ??
+                  plotMatch.group(2) ??
+                  plotMatch.group(3) ??
+                  '1',
+            ) ??
+            1;
       }
 
       // Parse crop type
@@ -385,19 +414,30 @@ class MultiplayerClient extends ChangeNotifier {
       }
 
       String reply = '';
-      String intent = 'chat'; // plant, harvest, buy, sell, status, withdraw, chat
+      String intent =
+          'chat'; // plant, harvest, buy, sell, status, withdraw, chat
 
       // Check intents in prioritized order to avoid noun matching conflicts (e.g. "jual hasil panen" matching panen)
       if (clean.contains('jual') || clean.contains('sell')) {
         intent = 'sell';
         reply = 'Baik, saya jalan ke rumah pengepul untuk menjual hasil panen.';
-      } else if (clean.contains('beli') || clean.contains('buy') || clean.contains('shop') || clean.contains('toko')) {
+      } else if (clean.contains('beli') ||
+          clean.contains('buy') ||
+          clean.contains('shop') ||
+          clean.contains('toko')) {
         intent = 'buy';
         reply = 'Baik, saya pergi ke Toko Ucup untuk membeli benih $seed.';
-      } else if (clean.contains('withdraw') || clean.contains('payout') || clean.contains('swap') || clean.contains('tukar') || clean.contains('tarik')) {
+      } else if (clean.contains('withdraw') ||
+          clean.contains('payout') ||
+          clean.contains('swap') ||
+          clean.contains('tukar') ||
+          clean.contains('tarik')) {
         intent = 'withdraw';
-        reply = 'Baik, saya jalan ke rumah swap untuk withdraw koin ke ETH Sepolia.';
-      } else if (clean.contains('panen') || clean.contains('harvest') || clean.contains('ambil')) {
+        reply =
+            'Baik, saya jalan ke rumah swap untuk withdraw koin ke ETH Sepolia.';
+      } else if (clean.contains('panen') ||
+          clean.contains('harvest') ||
+          clean.contains('ambil')) {
         final plotIdx = plotNum - 1;
         if (plotIdx >= 0 && plotIdx < farmState.plots.length) {
           final plot = farmState.plots[plotIdx];
@@ -408,7 +448,8 @@ class MultiplayerClient extends ChangeNotifier {
             reply = 'Lahan $plotNum kosong, tidak ada tanaman untuk dipanen.';
             intent = 'chat';
           } else if (!plot.isReady(DateTime.now())) {
-            reply = 'Tanaman di Lahan $plotNum masih tumbuh dan belum siap dipanen.';
+            reply =
+                'Tanaman di Lahan $plotNum masih tumbuh dan belum siap dipanen.';
             intent = 'chat';
           } else {
             intent = 'harvest';
@@ -421,45 +462,61 @@ class MultiplayerClient extends ChangeNotifier {
       } else if (clean.contains('tanam') || clean.contains('plant')) {
         // Double check it's not matching the noun "tanaman" as a verb instruction "tanam"
         // If the clean string has "tanam" but it was part of "tanaman" and there's no other tanam/plant verb, we check:
-        final hasTanamVerb = RegExp(r'\btanam\b|\btanamkan\b|\bplant\b').hasMatch(clean);
+        final hasTanamVerb = RegExp(
+          r'\btanam\b|\btanamkan\b|\bplant\b',
+        ).hasMatch(clean);
         if (hasTanamVerb) {
           final plotIdx = plotNum - 1;
           if (plotIdx >= 0 && plotIdx < farmState.plots.length) {
             final plot = farmState.plots[plotIdx];
             if (!plot.owned) {
-              reply = 'Saya tidak bisa menanam di Lahan $plotNum karena lahan tersebut belum dibeli.';
-              intent = 'chat'; // Downgrade to chat to prevent movement and action
+              reply =
+                  'Saya tidak bisa menanam di Lahan $plotNum karena lahan tersebut belum dibeli.';
+              intent =
+                  'chat'; // Downgrade to chat to prevent movement and action
             } else if (plot.status == PlotStatus.growing) {
-              reply = 'Lahan $plotNum sudah ditanami tanaman lain yang sedang tumbuh. Silakan panen atau pilih lahan kosong.';
+              reply =
+                  'Lahan $plotNum sudah ditanami tanaman lain yang sedang tumbuh. Silakan panen atau pilih lahan kosong.';
               intent = 'chat';
             } else {
               intent = 'plant';
-              reply = 'Siap! Saya akan ke Lahan $plotNum untuk menanam benih $seed secara lokal.';
+              reply =
+                  'Siap! Saya akan ke Lahan $plotNum untuk menanam benih $seed secara lokal.';
             }
           } else {
-            reply = 'Nomor lahan $plotNum tidak valid. Lahan yang tersedia adalah 1 sampai 5.';
+            reply =
+                'Nomor lahan $plotNum tidak valid. Lahan yang tersedia adalah 1 sampai 5.';
             intent = 'chat';
           }
         }
-      } else if (clean.contains('status') || clean.contains('koin') || clean.contains('benih')) {
+      } else if (clean.contains('status') ||
+          clean.contains('koin') ||
+          clean.contains('benih')) {
         intent = 'status';
         reply = 'Status saya: Koin lokal aktif, benih & panen siap ditanam.';
       }
 
       if (intent == 'chat' && reply.isEmpty) {
-        if (clean.contains('halo') || clean.contains('hai') || clean.contains('hi') || clean.contains('hello')) {
-          reply = 'Halo! Saya Pak Tani AI. Saya bertani secara mandiri. Contoh: "tanam stroberi di lahan 2".';
+        if (clean.contains('halo') ||
+            clean.contains('hai') ||
+            clean.contains('hi') ||
+            clean.contains('hello')) {
+          reply =
+              'Halo! Saya Pak Tani AI. Saya bertani secara mandiri. Contoh: "tanam stroberi di lahan 2".';
         } else {
-          reply = 'Perintah kurang jelas. Coba katakan: "tanam kentang di lahan 2", "panen lahan 1", atau "jual hasil".';
+          reply =
+              'Perintah kurang jelas. Coba katakan: "tanam kentang di lahan 2", "panen lahan 1", atau "jual hasil".';
         }
       }
 
-      _localAiActionQueue.add(LocalAiAction(
-        intent: intent,
-        plotNum: plotNum,
-        seed: seed,
-        reply: reply,
-      ));
+      _localAiActionQueue.add(
+        LocalAiAction(
+          intent: intent,
+          plotNum: plotNum,
+          seed: seed,
+          reply: reply,
+        ),
+      );
     }
 
     _processNextLocalAiAction(time);
@@ -472,17 +529,22 @@ class MultiplayerClient extends ChangeNotifier {
     final action = _localAiActionQueue.removeAt(0);
 
     // AI agent responds conversationally
-    _appendMessage(ChatMessage(
-      sender: aiAgent!.name,
-      wallet: aiAgent!.wallet,
-      text: action.reply,
-      time: time,
-    ));
+    _appendMessage(
+      ChatMessage(
+        sender: aiAgent!.name,
+        wallet: aiAgent!.wallet,
+        text: action.reply,
+        time: time,
+      ),
+    );
 
     if (action.intent == 'chat' || action.intent == 'status') {
       _isProcessingLocalAi = false;
       // Schedule next action execution quickly
-      Timer(const Duration(milliseconds: 500), () => _processNextLocalAiAction(time));
+      Timer(
+        const Duration(milliseconds: 500),
+        () => _processNextLocalAiAction(time),
+      );
       return;
     }
 
@@ -493,7 +555,7 @@ class MultiplayerClient extends ChangeNotifier {
     // Plots: 4, 6, 8, 10, 12 at Y=19
     Offset target = Offset(aiAgent!.x, aiAgent!.y);
     if (action.intent == 'buy') {
-      target = const Offset(18.5 * 128, 27.5 * 128);
+      target = const Offset(_shopDoorX, _shopFrontY);
     } else if (action.intent == 'sell') {
       target = const Offset(31.0 * 128, 13.35 * 128);
     } else if (action.intent == 'withdraw') {
@@ -505,12 +567,14 @@ class MultiplayerClient extends ChangeNotifier {
 
     // Move AI to target visually in client frame-rate
     _moveLocalAiTo(target, () async {
-      _appendMessage(ChatMessage(
-        sender: aiAgent!.name,
-        wallet: aiAgent!.wallet,
-        text: 'Tiba di tujuan. Sedang memproses transaksi...',
-        time: time,
-      ));
+      _appendMessage(
+        ChatMessage(
+          sender: aiAgent!.name,
+          wallet: aiAgent!.wallet,
+          text: 'Tiba di tujuan. Sedang memproses transaksi...',
+          time: time,
+        ),
+      );
 
       // Call API serverless Vercel directly via HTTP POST
       try {
@@ -530,43 +594,58 @@ class MultiplayerClient extends ChangeNotifier {
           amount = math.min(50, farmState.coins);
         } else if (action.intent == 'plant') {
           actionType = 'PLANT';
-          amount = (['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(action.seed) + 1);
+          amount =
+              (['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(action.seed) +
+              1);
         } else if (action.intent == 'harvest') {
           actionType = 'HARVEST';
           amount = 1;
         }
 
         if (!_isLocalAiActionStillValid(action)) {
-          _appendMessage(ChatMessage(
-            sender: aiAgent!.name,
-            wallet: aiAgent!.wallet,
-            text: _invalidLocalAiActionMessage(action),
-            time: time,
-          ));
+          _appendMessage(
+            ChatMessage(
+              sender: aiAgent!.name,
+              wallet: aiAgent!.wallet,
+              text: _invalidLocalAiActionMessage(action),
+              time: time,
+            ),
+          );
           _isProcessingLocalAi = false;
-          Timer(const Duration(milliseconds: 1000), () => _processNextLocalAiAction(time));
+          Timer(
+            const Duration(milliseconds: 1000),
+            () => _processNextLocalAiAction(time),
+          );
           return;
         }
 
         final res = hasApi
-          ? await _submitChainActionWithRetry(
-              aiAgent!.wallet,
-              actionType,
-              action.plotNum,
-              amount,
-            )
-          : null;
-        
-        final tx = (res != null && res.isNotEmpty) ? res.substring(0, 8) : 'lokal';
+            ? await _submitChainActionWithRetry(
+                aiAgent!.wallet,
+                actionType,
+                action.plotNum,
+                amount,
+              )
+            : null;
+
+        final tx = (res != null && res.isNotEmpty)
+            ? res.substring(0, 8)
+            : 'lokal';
 
         if (action.intent == 'plant') {
-          onAiPlanted?.call(action.plotNum - 1, ['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(action.seed));
-          _appendMessage(ChatMessage(
-            sender: aiAgent!.name,
-            wallet: aiAgent!.wallet,
-            text: 'Bagus! Benih ${action.seed} ditanam di Lahan ${action.plotNum}. (Tx: $tx)',
-            time: time,
-          ));
+          onAiPlanted?.call(
+            action.plotNum - 1,
+            ['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(action.seed),
+          );
+          _appendMessage(
+            ChatMessage(
+              sender: aiAgent!.name,
+              wallet: aiAgent!.wallet,
+              text:
+                  'Bagus! Benih ${action.seed} ditanam di Lahan ${action.plotNum}. (Tx: $tx)',
+              time: time,
+            ),
+          );
           final entryId = farmState.addExternalHistory(
             'Tanam ${action.seed}',
             'plot ${action.plotNum}',
@@ -576,23 +655,31 @@ class MultiplayerClient extends ChangeNotifier {
           if (tx != 'lokal') {
             unawaited(() async {
               try {
-                final receipt = await farmState.chainClient.waitForTransaction(res!);
+                final receipt = await farmState.chainClient.waitForTransaction(
+                  res!,
+                );
                 if (receipt.confirmed && receipt.success) {
                   farmState.updateHistoryStatus(entryId, status: 'on-chain');
                 } else {
-                  farmState.updateHistoryStatus(entryId, status: 'gagal on-chain', errorMessage: receipt.message);
+                  farmState.updateHistoryStatus(
+                    entryId,
+                    status: 'gagal on-chain',
+                    errorMessage: receipt.message,
+                  );
                 }
               } catch (_) {}
             }());
           }
         } else if (action.intent == 'harvest') {
           onAiHarvested?.call(action.plotNum - 1);
-          _appendMessage(ChatMessage(
-            sender: aiAgent!.name,
-            wallet: aiAgent!.wallet,
-            text: 'Sukses! Hasil panen berhasil diambil. (Tx: $tx)',
-            time: time,
-          ));
+          _appendMessage(
+            ChatMessage(
+              sender: aiAgent!.name,
+              wallet: aiAgent!.wallet,
+              text: 'Sukses! Hasil panen berhasil diambil. (Tx: $tx)',
+              time: time,
+            ),
+          );
           final entryId = farmState.addExternalHistory(
             'Panen ${['Kentang', 'Bawang', 'Stroberi', 'Bit'][['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(action.seed) != -1 ? ['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(action.seed) : 0]}',
             '+3 panen',
@@ -602,22 +689,30 @@ class MultiplayerClient extends ChangeNotifier {
           if (tx != 'lokal') {
             unawaited(() async {
               try {
-                final receipt = await farmState.chainClient.waitForTransaction(res!);
+                final receipt = await farmState.chainClient.waitForTransaction(
+                  res!,
+                );
                 if (receipt.confirmed && receipt.success) {
                   farmState.updateHistoryStatus(entryId, status: 'on-chain');
                 } else {
-                  farmState.updateHistoryStatus(entryId, status: 'gagal on-chain', errorMessage: receipt.message);
+                  farmState.updateHistoryStatus(
+                    entryId,
+                    status: 'gagal on-chain',
+                    errorMessage: receipt.message,
+                  );
                 }
               } catch (_) {}
             }());
           }
         } else if (action.intent == 'buy') {
-          _appendMessage(ChatMessage(
-            sender: aiAgent!.name,
-            wallet: aiAgent!.wallet,
-            text: 'Selesai! Saya membeli 3 benih ${action.seed}. (Tx: $tx)',
-            time: time,
-          ));
+          _appendMessage(
+            ChatMessage(
+              sender: aiAgent!.name,
+              wallet: aiAgent!.wallet,
+              text: 'Selesai! Saya membeli 3 benih ${action.seed}. (Tx: $tx)',
+              time: time,
+            ),
+          );
           final entryId = farmState.addExternalHistory(
             'Beli ${action.seed}',
             '-60 coin',
@@ -627,22 +722,30 @@ class MultiplayerClient extends ChangeNotifier {
           if (tx != 'lokal') {
             unawaited(() async {
               try {
-                final receipt = await farmState.chainClient.waitForTransaction(res!);
+                final receipt = await farmState.chainClient.waitForTransaction(
+                  res!,
+                );
                 if (receipt.confirmed && receipt.success) {
                   farmState.updateHistoryStatus(entryId, status: 'on-chain');
                 } else {
-                  farmState.updateHistoryStatus(entryId, status: 'gagal on-chain', errorMessage: receipt.message);
+                  farmState.updateHistoryStatus(
+                    entryId,
+                    status: 'gagal on-chain',
+                    errorMessage: receipt.message,
+                  );
                 }
               } catch (_) {}
             }());
           }
         } else if (action.intent == 'sell') {
-          _appendMessage(ChatMessage(
-            sender: aiAgent!.name,
-            wallet: aiAgent!.wallet,
-            text: 'Hore! Seluruh hasil panen terjual. (Tx: $tx)',
-            time: time,
-          ));
+          _appendMessage(
+            ChatMessage(
+              sender: aiAgent!.name,
+              wallet: aiAgent!.wallet,
+              text: 'Hore! Seluruh hasil panen terjual. (Tx: $tx)',
+              time: time,
+            ),
+          );
           final entryId = farmState.addExternalHistory(
             'Jual panen Kentang',
             '+105 coin',
@@ -652,11 +755,17 @@ class MultiplayerClient extends ChangeNotifier {
           if (tx != 'lokal') {
             unawaited(() async {
               try {
-                final receipt = await farmState.chainClient.waitForTransaction(res!);
+                final receipt = await farmState.chainClient.waitForTransaction(
+                  res!,
+                );
                 if (receipt.confirmed && receipt.success) {
                   farmState.updateHistoryStatus(entryId, status: 'on-chain');
                 } else {
-                  farmState.updateHistoryStatus(entryId, status: 'gagal on-chain', errorMessage: receipt.message);
+                  farmState.updateHistoryStatus(
+                    entryId,
+                    status: 'gagal on-chain',
+                    errorMessage: receipt.message,
+                  );
                 }
               } catch (_) {}
             }());
@@ -667,12 +776,15 @@ class MultiplayerClient extends ChangeNotifier {
             farmState.coins -= amount;
             farmState.notifyExternalChange();
           }
-          _appendMessage(ChatMessage(
-            sender: aiAgent!.name,
-            wallet: aiAgent!.wallet,
-            text: 'Withdraw $amount Game Coin ke ETH Sepolia berhasil! (Tx: $tx)',
-            time: time,
-          ));
+          _appendMessage(
+            ChatMessage(
+              sender: aiAgent!.name,
+              wallet: aiAgent!.wallet,
+              text:
+                  'Withdraw $amount Game Coin ke ETH Sepolia berhasil! (Tx: $tx)',
+              time: time,
+            ),
+          );
           final entryId = farmState.addExternalHistory(
             'Payout Game Coin ke ETH',
             '-$amount coin',
@@ -682,33 +794,53 @@ class MultiplayerClient extends ChangeNotifier {
           if (tx != 'lokal') {
             unawaited(() async {
               try {
-                final receipt = await farmState.chainClient.waitForTransaction(res!);
+                final receipt = await farmState.chainClient.waitForTransaction(
+                  res!,
+                );
                 if (receipt.confirmed && receipt.success) {
                   farmState.updateHistoryStatus(entryId, status: 'on-chain');
                 } else {
-                  farmState.updateHistoryStatus(entryId, status: 'gagal on-chain', errorMessage: receipt.message);
+                  farmState.updateHistoryStatus(
+                    entryId,
+                    status: 'gagal on-chain',
+                    errorMessage: receipt.message,
+                  );
                 }
               } catch (_) {}
             }());
           }
         }
       } catch (e) {
-        _appendMessage(ChatMessage(
-          sender: aiAgent!.name,
-          wallet: aiAgent!.wallet,
-          text: 'Transaksi selesai secara lokal. (Gagal Sepolia: ${e.toString().split('\n').first})',
-          time: time,
-        ));
+        _appendMessage(
+          ChatMessage(
+            sender: aiAgent!.name,
+            wallet: aiAgent!.wallet,
+            text:
+                'Transaksi selesai secara lokal. (Gagal Sepolia: ${e.toString().split('\n').first})',
+            time: time,
+          ),
+        );
         // Run visual fallback only if the current local state still permits it.
         if (action.intent == 'plant') {
           if (_isLocalAiActionStillValid(action)) {
-            onAiPlanted?.call(action.plotNum - 1, ['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(action.seed));
-            farmState.addExternalHistory('Tanam ${action.seed}', 'plot ${action.plotNum}', 'lokal tersimpan');
+            onAiPlanted?.call(
+              action.plotNum - 1,
+              ['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(action.seed),
+            );
+            farmState.addExternalHistory(
+              'Tanam ${action.seed}',
+              'plot ${action.plotNum}',
+              'lokal tersimpan',
+            );
           }
         } else if (action.intent == 'harvest') {
           if (_isLocalAiActionStillValid(action)) {
             onAiHarvested?.call(action.plotNum - 1);
-            farmState.addExternalHistory('Panen Kentang', '+3 panen', 'lokal tersimpan');
+            farmState.addExternalHistory(
+              'Panen Kentang',
+              '+3 panen',
+              'lokal tersimpan',
+            );
           }
         } else if (action.intent == 'withdraw') {
           final amount = math.min(50, farmState.coins);
@@ -716,13 +848,20 @@ class MultiplayerClient extends ChangeNotifier {
             farmState.coins -= amount;
             farmState.notifyExternalChange();
           }
-          farmState.addExternalHistory('Payout Game Coin ke ETH', '-$amount coin', 'lokal tersimpan');
+          farmState.addExternalHistory(
+            'Payout Game Coin ke ETH',
+            '-$amount coin',
+            'lokal tersimpan',
+          );
         }
       }
 
       // Finish this action and queue the next one
       _isProcessingLocalAi = false;
-      Timer(const Duration(milliseconds: 1000), () => _processNextLocalAiAction(time));
+      Timer(
+        const Duration(milliseconds: 1000),
+        () => _processNextLocalAiAction(time),
+      );
     });
   }
 
@@ -786,57 +925,85 @@ class MultiplayerClient extends ChangeNotifier {
     if (aiAgent == null) return;
 
     // Generate waypoints path to follow the roads and avoid fences/obstacles
-    final waypoints = _calculateAiPath(Offset(aiAgent!.x, aiAgent!.y), finalTarget);
+    final waypoints = _calculateAiPath(
+      Offset(aiAgent!.x, aiAgent!.y),
+      finalTarget,
+    );
     _followWaypoints(waypoints, 0, onArrival);
   }
 
   List<Offset> _calculateAiPath(Offset start, Offset target) {
     final path = <Offset>[];
-    
-    // Define areas based on the horizontal fence at Y = 23.0 * 128 and vertical fence at X = 14.0 * 128
-    final startInside = start.dx < 14.0 * 128.0 && start.dy < 23.0 * 128.0;
-    final targetInside = target.dx < 14.0 * 128.0 && target.dy < 23.0 * 128.0;
 
-    const innerY = 19.5 * 128.0;   // Safe horizontal path inside fence
-    const outerY = 27.5 * 128.0;   // Front road below the shop and fence
-    const gateX = 5.0 * 128.0;     // Gate X coordinate (below Plot 1, next to lake/lake-path)
+    const innerY = 19.5 * 128.0; // Safe horizontal path inside fence
+    const outerY = 27.5 * 128.0; // Front road below the shop and fence
+    const gateX =
+        5.0 * 128.0; // Gate X coordinate (below Plot 1, next to lake/lake-path)
     const mainRoadX = 18.5 * 128.0; // Vertical main road X
+
+    final safeStart = _moveOutOfShopBounds(start, path);
+
+    // Define areas based on the horizontal fence at Y = 23.0 * 128 and vertical fence at X = 14.0 * 128.
+    // Use safeStart so a character already clipped into the shop routes from the escape point.
+    final startInside =
+        safeStart.dx < 14.0 * 128.0 && safeStart.dy < 23.0 * 128.0;
+    final targetInside = target.dx < 14.0 * 128.0 && target.dy < 23.0 * 128.0;
 
     if (startInside && targetInside) {
       // Both inside the fence: walk along inner corridor Y = 19.5
-      path.add(Offset(start.dx, innerY));
+      path.add(Offset(safeStart.dx, innerY));
       path.add(Offset(target.dx, innerY));
       path.add(target);
-    } 
-    else if (startInside && !targetInside) {
+    } else if (startInside && !targetInside) {
       // Inside to Outside: walk to inner corridor, go left to gate, walk down to road, then to target
-      path.add(Offset(start.dx, innerY));
+      path.add(Offset(safeStart.dx, innerY));
       path.add(const Offset(gateX, innerY));
       path.add(const Offset(gateX, outerY));
-      
+
       // If target is outside, go along the main road
       path.add(const Offset(mainRoadX, outerY));
       path.add(Offset(mainRoadX, target.dy));
       path.add(target);
-    } 
-    else if (!startInside && targetInside) {
+    } else if (!startInside && targetInside) {
       // Outside to Inside: go to main road, walk left along road to gateX, go up, then to target
-      path.add(Offset(start.dx, outerY));
+      path.add(Offset(safeStart.dx, outerY));
       path.add(const Offset(mainRoadX, outerY));
       path.add(const Offset(gateX, outerY));
       path.add(const Offset(gateX, innerY));
       path.add(Offset(target.dx, innerY));
       path.add(target);
-    } 
-    else {
+    } else {
       // Both outside: walk along the front road and avoid crossing the shop.
-      path.add(Offset(start.dx, outerY));
-      path.add(const Offset(mainRoadX, outerY));
-      path.add(Offset(mainRoadX, target.dy));
+      path.add(Offset(safeStart.dx, outerY));
+      if (target.dy == outerY && target.dx < _shopRight) {
+        path.add(const Offset(_shopSafeX, outerY));
+      } else {
+        path.add(const Offset(mainRoadX, outerY));
+        path.add(Offset(mainRoadX, target.dy));
+      }
       path.add(target);
     }
 
     return path;
+  }
+
+  Offset _moveOutOfShopBounds(Offset start, List<Offset> path) {
+    if (!_isInsideShopBounds(start)) {
+      return start;
+    }
+
+    // If Pak Tani AI is already clipped into the shop sprite from an older
+    // route, force him out through the right-side/front walkway first.
+    path.add(Offset(_shopSafeX, start.dy.clamp(_shopTop, _shopFrontY)));
+    path.add(const Offset(_shopSafeX, _shopFrontY));
+    return const Offset(_shopSafeX, _shopFrontY);
+  }
+
+  bool _isInsideShopBounds(Offset point) {
+    return point.dx >= _shopLeft &&
+        point.dx <= _shopRight &&
+        point.dy >= _shopTop &&
+        point.dy <= _shopBottom;
   }
 
   void _followWaypoints(List<Offset> path, int index, VoidCallback onArrival) {
@@ -844,7 +1011,7 @@ class MultiplayerClient extends ChangeNotifier {
       aiTarget = null;
       return;
     }
-    
+
     if (index >= path.length) {
       aiTarget = null;
       aiAgent!.anim = 'idle';
@@ -889,7 +1056,7 @@ class MultiplayerClient extends ChangeNotifier {
         aiAgent!.y = target.dy;
         notifyListeners();
         timer.cancel();
-        
+
         // Move to the next waypoint in path
         _followWaypoints(path, index + 1, onArrival);
       }
