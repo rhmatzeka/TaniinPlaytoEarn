@@ -1,6 +1,0 @@
-# GitHub Linguist language statistics override.
-# Keep generated/tooling files out of the language bar when needed, but let
-# app source files count as their real languages.
-
-# Legacy Android Java migration source. The active app is in taniin_flutter/.
-app/src/main/java/** linguist-vendored
