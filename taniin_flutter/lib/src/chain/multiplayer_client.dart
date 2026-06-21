@@ -1228,6 +1228,8 @@ class MultiplayerClient extends ChangeNotifier {
     notifyListeners();
 
     const speed = 12.0; // speed per step
+    var stuckTicks = 0;
+    var lastPosition = Offset(aiAgent!.x, aiAgent!.y);
     Timer.periodic(const Duration(milliseconds: 50), (timer) {
       if (aiAgent == null) {
         timer.cancel();
@@ -1255,6 +1257,19 @@ class MultiplayerClient extends ChangeNotifier {
           ),
         );
         final decorSafePosition = _pushOutOfDecorObstacle(nextPosition);
+        if ((decorSafePosition - lastPosition).distance < 1.0) {
+          stuckTicks++;
+        } else {
+          stuckTicks = 0;
+        }
+        lastPosition = decorSafePosition;
+
+        if (stuckTicks >= 8) {
+          timer.cancel();
+          _rerouteAroundDecorObstacle(path, index, target, onArrival);
+          return;
+        }
+
         aiAgent!
           ..x = decorSafePosition.dx
           ..y = decorSafePosition.dy;
@@ -1272,6 +1287,48 @@ class MultiplayerClient extends ChangeNotifier {
         _followWaypoints(path, index + 1, onArrival);
       }
     });
+  }
+
+  void _rerouteAroundDecorObstacle(
+    List<Offset> path,
+    int index,
+    Offset blockedTarget,
+    VoidCallback onArrival,
+  ) {
+    if (aiAgent == null) return;
+    final current = Offset(aiAgent!.x, aiAgent!.y);
+    final obstacle = _nearestDecorObstacle(current);
+    if (obstacle == null) {
+      _followWaypoints(path, index + 1, onArrival);
+      return;
+    }
+
+    const padding = 52.0;
+    final escapeRight = Offset(obstacle.right + padding, current.dy);
+    final escapeBottom = Offset(
+      obstacle.right + padding,
+      obstacle.bottom + padding,
+    );
+    final nextPath = <Offset>[
+      escapeRight,
+      escapeBottom,
+      blockedTarget,
+      ...path.skip(index + 1),
+    ];
+    _followWaypoints(nextPath, 0, onArrival);
+  }
+
+  Rect? _nearestDecorObstacle(Offset point) {
+    Rect? nearest;
+    var best = double.infinity;
+    for (final obstacle in _aiDecorObstacles) {
+      final distance = (obstacle.center - point).distance;
+      if (distance < best) {
+        best = distance;
+        nearest = obstacle;
+      }
+    }
+    return nearest;
   }
 
   void _appendMessage(ChatMessage msg) {
