@@ -523,6 +523,8 @@ class MultiplayerClient extends ChangeNotifier {
             clean.contains('hello')) {
           reply =
               'Halo! Saya Pak Tani AI. Saya bertani secara mandiri. Contoh: "tanam stroberi di lahan 2".';
+        } else if (_isHelpQuestion(clean)) {
+          reply = _helpReply(clean);
         } else {
           reply =
               'Perintah kurang jelas. Coba katakan: "tanam kentang di lahan 2", "panen lahan 1", atau "jual hasil".';
@@ -540,6 +542,44 @@ class MultiplayerClient extends ChangeNotifier {
     }
 
     _processNextLocalAiAction(time);
+  }
+
+  bool _isHelpQuestion(String text) {
+    return text.contains('cara') ||
+        text.contains('main') ||
+        text.contains('bermain') ||
+        text.contains('bingung') ||
+        text.contains('apa yang harus') ||
+        text.contains('gimana') ||
+        text.contains('bagaimana') ||
+        text.contains('tutorial') ||
+        text.contains('panduan') ||
+        text.contains('help') ||
+        text.contains('bantuan') ||
+        text.contains('fungsi') ||
+        text.contains('tujuan');
+  }
+
+  String _helpReply(String text) {
+    if (text.contains('koin') || text.contains('coin')) {
+      return 'Koin dipakai untuk beli benih, beli lahan, dan bisa ditukar lewat rumah swap. Kumpulkan koin dengan menjual hasil panen.';
+    }
+    if (text.contains('benih') ||
+        text.contains('bibit') ||
+        text.contains('toko')) {
+      return 'Benih bisa dibeli di Toko Ucup. Kamu juga bisa suruh saya: "beli benih kentang", lalu pilih lahan kosong untuk menanam.';
+    }
+    if (text.contains('panen') ||
+        text.contains('tanam') ||
+        text.contains('lahan')) {
+      return 'Alur bertani: beli benih, tanam di lahan kosong, tunggu sampai siap panen, panen, lalu jual hasilnya untuk dapat koin.';
+    }
+    if (text.contains('swap') ||
+        text.contains('withdraw') ||
+        text.contains('sepolia')) {
+      return 'Rumah swap dipakai untuk menukar Game Coin dengan aset Sepolia. Pastikan wallet tersambung sebelum transaksi on-chain.';
+    }
+    return 'Cara main singkat: beli benih di toko, tanam di lahan kosong, tunggu tanaman siap, panen, lalu jual hasil panen untuk dapat koin. Kamu bisa tanya saya atau beri perintah seperti "tanam kentang di lahan 1".';
   }
 
   void _processNextLocalAiAction(String time) async {
@@ -1054,7 +1094,11 @@ class MultiplayerClient extends ChangeNotifier {
       final detourY = to.dy > obstacle.center.dy
           ? obstacle.bottom + padding
           : obstacle.top - padding;
-      return <Offset>[Offset(detourX, from.dy), Offset(detourX, detourY)];
+      return <Offset>[
+        Offset(from.dx, detourY),
+        Offset(detourX, detourY),
+        Offset(detourX, to.dy),
+      ];
     }
     return const <Offset>[];
   }
@@ -1148,16 +1192,16 @@ class MultiplayerClient extends ChangeNotifier {
         math.min(topDistance, bottomDistance),
       );
 
-      if (nearest == rightDistance) {
-        return Offset(expanded.right + padding, point.dy);
-      }
       if (nearest == bottomDistance) {
         return Offset(point.dx, expanded.bottom + padding);
+      }
+      if (nearest == rightDistance || nearest == leftDistance) {
+        return Offset(expanded.right + padding, point.dy);
       }
       if (nearest == topDistance) {
         return Offset(point.dx, expanded.top - padding);
       }
-      return Offset(expanded.left - padding, point.dy);
+      return Offset(expanded.right + padding, point.dy);
     }
     return point;
   }
