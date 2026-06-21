@@ -81,26 +81,6 @@ const double _shopBottom = 23.95 * _tileSize;
 const double _shopSafeX = 5.95 * _tileSize;
 const double _shopFrontY = 26.85 * _tileSize;
 const double _shopDoorX = 3.35 * _tileSize;
-final List<Rect> _aiDecorObstacles = <Rect>[
-  Rect.fromLTRB(
-    4.05 * _tileSize,
-    20.1 * _tileSize,
-    5.45 * _tileSize,
-    22.25 * _tileSize,
-  ),
-  Rect.fromLTRB(
-    5.05 * _tileSize,
-    20.55 * _tileSize,
-    6.15 * _tileSize,
-    26.05 * _tileSize,
-  ),
-  Rect.fromLTRB(
-    6.95 * _tileSize,
-    23.0 * _tileSize,
-    8.15 * _tileSize,
-    24.25 * _tileSize,
-  ),
-];
 
 class MultiplayerClient extends ChangeNotifier {
   MultiplayerClient(this.farmState) {
@@ -1055,75 +1035,17 @@ class MultiplayerClient extends ChangeNotifier {
       path.add(target);
     }
 
-    return _avoidDecorObstacles(safeStart, path);
+    return path;
   }
 
   List<Offset> _calculateShopPathFromInside(Offset start, Offset target) {
     const lowerOpenY = 25.6 * _tileSize;
 
-    return _avoidDecorObstacles(start, <Offset>[
+    return <Offset>[
       Offset(start.dx, lowerOpenY),
       Offset(target.dx, _shopFrontY),
       target,
-    ]);
-  }
-
-  List<Offset> _avoidDecorObstacles(Offset start, List<Offset> rawPath) {
-    final result = <Offset>[];
-    var from = start;
-    for (final point in rawPath) {
-      final detour = _detourAroundFirstObstacle(from, point);
-      result.addAll(detour);
-      result.add(point);
-      from = point;
-    }
-    return result;
-  }
-
-  List<Offset> _detourAroundFirstObstacle(Offset from, Offset to) {
-    for (final obstacle in _aiDecorObstacles) {
-      if (!_segmentIntersectsRect(from, to, obstacle)) {
-        continue;
-      }
-      const padding = 34.0;
-      final goRight =
-          from.dx <= obstacle.center.dx || to.dx <= obstacle.center.dx;
-      final detourX = goRight
-          ? obstacle.right + padding
-          : obstacle.left - padding;
-      final detourY = to.dy > obstacle.center.dy
-          ? obstacle.bottom + padding
-          : obstacle.top - padding;
-      return <Offset>[
-        Offset(from.dx, detourY),
-        Offset(detourX, detourY),
-        Offset(detourX, to.dy),
-      ];
-    }
-    return const <Offset>[];
-  }
-
-  bool _segmentIntersectsRect(Offset from, Offset to, Rect rect) {
-    final expanded = rect.inflate(18.0);
-    if (expanded.contains(from) || expanded.contains(to)) {
-      return true;
-    }
-    final segmentBounds = Rect.fromLTRB(
-      math.min(from.dx, to.dx),
-      math.min(from.dy, to.dy),
-      math.max(from.dx, to.dx),
-      math.max(from.dy, to.dy),
-    ).inflate(1.0);
-    if (!segmentBounds.overlaps(expanded)) {
-      return false;
-    }
-    if ((from.dx - to.dx).abs() < 0.1) {
-      return from.dx >= expanded.left && from.dx <= expanded.right;
-    }
-    if ((from.dy - to.dy).abs() < 0.1) {
-      return from.dy >= expanded.top && from.dy <= expanded.bottom;
-    }
-    return true;
+    ];
   }
 
   bool _isShopFrontTarget(Offset target) {
@@ -1176,36 +1098,6 @@ class MultiplayerClient extends ChangeNotifier {
     return Offset(point.dx, _shopTop - padding);
   }
 
-  Offset _pushOutOfDecorObstacle(Offset point) {
-    for (final obstacle in _aiDecorObstacles) {
-      final expanded = obstacle.inflate(14.0);
-      if (!expanded.contains(point)) {
-        continue;
-      }
-      const padding = 18.0;
-      final leftDistance = (point.dx - expanded.left).abs();
-      final rightDistance = (expanded.right - point.dx).abs();
-      final topDistance = (point.dy - expanded.top).abs();
-      final bottomDistance = (expanded.bottom - point.dy).abs();
-      final nearest = math.min(
-        math.min(leftDistance, rightDistance),
-        math.min(topDistance, bottomDistance),
-      );
-
-      if (nearest == bottomDistance) {
-        return Offset(point.dx, expanded.bottom + padding);
-      }
-      if (nearest == rightDistance || nearest == leftDistance) {
-        return Offset(expanded.right + padding, point.dy);
-      }
-      if (nearest == topDistance) {
-        return Offset(point.dx, expanded.top - padding);
-      }
-      return Offset(expanded.right + padding, point.dy);
-    }
-    return point;
-  }
-
   void _followWaypoints(List<Offset> path, int index, VoidCallback onArrival) {
     if (aiAgent == null) {
       aiTarget = null;
@@ -1256,30 +1148,28 @@ class MultiplayerClient extends ChangeNotifier {
             aiAgent!.y + (dy / distance) * speed,
           ),
         );
-        final decorSafePosition = _pushOutOfDecorObstacle(nextPosition);
-        if ((decorSafePosition - lastPosition).distance < 1.0) {
+        if ((nextPosition - lastPosition).distance < 1.0) {
           stuckTicks++;
         } else {
           stuckTicks = 0;
         }
-        lastPosition = decorSafePosition;
+        lastPosition = nextPosition;
 
         if (stuckTicks >= 8) {
           timer.cancel();
-          _rerouteAroundDecorObstacle(path, index, target, onArrival);
+          _followWaypoints(path, index + 1, onArrival);
           return;
         }
 
         aiAgent!
-          ..x = decorSafePosition.dx
-          ..y = decorSafePosition.dy;
+          ..x = nextPosition.dx
+          ..y = nextPosition.dy;
         notifyListeners();
       } else {
         final safeTarget = _pushOutOfShopBounds(target);
-        final decorSafeTarget = _pushOutOfDecorObstacle(safeTarget);
         aiAgent!
-          ..x = decorSafeTarget.dx
-          ..y = decorSafeTarget.dy;
+          ..x = safeTarget.dx
+          ..y = safeTarget.dy;
         notifyListeners();
         timer.cancel();
 
@@ -1287,48 +1177,6 @@ class MultiplayerClient extends ChangeNotifier {
         _followWaypoints(path, index + 1, onArrival);
       }
     });
-  }
-
-  void _rerouteAroundDecorObstacle(
-    List<Offset> path,
-    int index,
-    Offset blockedTarget,
-    VoidCallback onArrival,
-  ) {
-    if (aiAgent == null) return;
-    final current = Offset(aiAgent!.x, aiAgent!.y);
-    final obstacle = _nearestDecorObstacle(current);
-    if (obstacle == null) {
-      _followWaypoints(path, index + 1, onArrival);
-      return;
-    }
-
-    const padding = 52.0;
-    final escapeRight = Offset(obstacle.right + padding, current.dy);
-    final escapeBottom = Offset(
-      obstacle.right + padding,
-      obstacle.bottom + padding,
-    );
-    final nextPath = <Offset>[
-      escapeRight,
-      escapeBottom,
-      blockedTarget,
-      ...path.skip(index + 1),
-    ];
-    _followWaypoints(nextPath, 0, onArrival);
-  }
-
-  Rect? _nearestDecorObstacle(Offset point) {
-    Rect? nearest;
-    var best = double.infinity;
-    for (final obstacle in _aiDecorObstacles) {
-      final distance = (obstacle.center - point).distance;
-      if (distance < best) {
-        best = distance;
-        nearest = obstacle;
-      }
-    }
-    return nearest;
   }
 
   void _appendMessage(ChatMessage msg) {
