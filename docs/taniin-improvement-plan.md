@@ -600,6 +600,38 @@ Demo mode harus jelas agar tidak menyesatkan pengunjung.
 12. Refactor `taniin_game.dart` gradually.
 13. Polish presentation docs and screenshots.
 
+## Remaining Gaps After Auth Guard
+
+Backend auth guard sudah tersedia sebagai fondasi, tetapi beberapa bagian masih perlu ditambahkan agar fitur ini benar-benar end-to-end dari game ke signer.
+
+- Flutter wallet bridge belum memanggil `/auth/nonce` dan `/auth/verify`.
+- Flutter belum meminta wallet signature saat connect wallet.
+- Flutter belum menyimpan session token, expiry, wallet type, dan verified status.
+- `ChainClient.submitGameAction` belum mengirim `Authorization: Bearer <session>`.
+- `ChainClient.submitGameAction` belum mengirim `Idempotency-Key` per action.
+- `TANIIN_REQUIRE_AUTH` masih harus `false` sampai Flutter client mendukung bearer session.
+- Halaman `/wallet-connect` belum memakai Reown AppKit, wagmi, viem, atau WalletConnect v2.
+- Tombol wallet masih fallback ke MetaMask deep link secara teknis, walaupun copy sudah dibuat generic.
+- Session auth saat ini masih in-memory; untuk Vercel/serverless production perlu persistent store seperti Upstash Redis, Vercel KV, Supabase, atau Neon.
+- Rate limit saat ini masih in-memory; untuk deployment multi-instance/serverless perlu persistent/shared rate limit.
+- Idempotency result saat ini masih in-memory; untuk production perlu shared storage agar replay aman lintas instance.
+- Backend belum menyimpan server-side gameplay state, sehingga validasi ekonomi game belum sepenuhnya authoritative.
+- Multiplayer Socket.IO belum memakai session token untuk join.
+- Chat AI/multiplayer belum punya sanitasi dan rate limit yang kuat di sisi server.
+- Smart contract belum punya role granularity atau emergency pause; owner/signer masih sangat powerful.
+- Flutter analyze/test belum diverifikasi di environment ini karena binary `flutter` tidak tersedia di PATH.
+
+### Next Concrete Implementation
+
+1. Update wallet connect page menjadi Reown AppKit + wagmi + viem.
+2. Tambahkan signature login di wallet connect page dan redirect session ke Flutter.
+3. Extend Android `PlatformBridge` deep link payload agar membawa `session`, `verified`, `walletType`, dan `expiresAt`.
+4. Simpan session metadata di `FarmStateController` dan persistence.
+5. Kirim bearer token dan idempotency key dari `ChainClient.submitGameAction`.
+6. Setelah client siap, aktifkan `TANIIN_REQUIRE_AUTH=true` di backend deployment.
+7. Ganti in-memory nonce/session/rate-limit/idempotency ke persistent store untuk deployment publik.
+8. Tambahkan server-side gameplay validation minimal untuk action reward paling sensitif.
+
 ## Short Pitch After Improvements
 
 Taniin adalah game pertanian digital berbasis Flutter/Flame yang menggabungkan gameplay farming, AI farmer assistant, multiplayer, dan integrasi Web3. Pemain bisa bertani, berinteraksi dengan AI agent, terhubung dengan berbagai wallet, dan mencatat progress tertentu ke Sepolia melalui backend signer yang aman untuk prototype.
