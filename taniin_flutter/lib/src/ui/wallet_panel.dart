@@ -129,16 +129,18 @@ class _WalletPanelState extends State<WalletPanel> {
                         SizedBox(
                           width: double.infinity,
                           child: _WalletActionButton(
-                            label: 'MetaMask',
+                            label: PlatformBridge.hasBrowserWalletProvider()
+                                ? 'Connect Browser Wallet'
+                                : 'Connect Wallet App',
                             icon: Icons.account_balance_wallet,
                             color: const Color(0xFFB85B1E),
                             prominent: contentProminent,
-                            onPressed: () => _openWalletConnect(metaMask: true),
+                            onPressed: _openWalletConnect,
                           ),
                         ),
                         SizedBox(height: contentProminent ? 24 : 16),
                         Text(
-                          'Public address Sepolia',
+                          'Manual public address Sepolia (demo fallback)',
                           style: Theme.of(context).textTheme.labelLarge
                               ?.copyWith(
                                 color: const Color(0xFFE9C692),
@@ -263,10 +265,10 @@ class _WalletPanelState extends State<WalletPanel> {
     }
   }
 
-  Future<void> _openWalletConnect({required bool metaMask}) async {
+  Future<void> _openWalletConnect() async {
     farmState.playClick();
-    if (metaMask && PlatformBridge.hasBrowserWalletProvider()) {
-      farmState.showMessage('Menunggu approve MetaMask...');
+    if (PlatformBridge.hasBrowserWalletProvider()) {
+      farmState.showMessage('Menunggu approve wallet browser...');
       final address = await PlatformBridge.requestBrowserWalletAddress();
       if (address.isNotEmpty) {
         _controller.text = address;
@@ -279,15 +281,13 @@ class _WalletPanelState extends State<WalletPanel> {
       }
       final error = PlatformBridge.browserWalletConnectError();
       farmState.showMessage(
-        error.isEmpty ? 'Connect MetaMask dibatalkan.' : error,
+        error.isEmpty ? 'Connect wallet dibatalkan.' : error,
         success: false,
       );
       return;
     }
 
-    final url = metaMask
-        ? PlatformBridge.metamaskWalletConnectUrl(farmState.chainConfig)
-        : PlatformBridge.walletConnectUrl(farmState.chainConfig);
+    final url = PlatformBridge.walletConnectUrl(farmState.chainConfig);
     if (url.isEmpty) {
       farmState.showMessage(
         'TANIIN_GAME_API_URL belum diset untuk connect wallet app.',
@@ -298,9 +298,7 @@ class _WalletPanelState extends State<WalletPanel> {
     final opened = await PlatformBridge.openUrl(url);
     farmState.showMessage(
       opened
-          ? (metaMask
-                ? 'Membuka MetaMask connect...'
-                : 'Membuka halaman connect wallet...')
+          ? 'Membuka halaman connect wallet...'
           : 'Tidak bisa membuka wallet connect di perangkat ini.',
       success: opened,
     );
