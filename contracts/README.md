@@ -62,6 +62,8 @@ DEPLOYER_PRIVATE_KEY=replace_with_new_private_key_do_not_commit
 TANIIN_COIN_CONTRACT_ADDRESS=0x...
 TANIIN_LAND_CONTRACT_ADDRESS=0x...
 TANIIN_ITEMS_CONTRACT_ADDRESS=0x...
+TANIIN_ALLOWED_ORIGIN=https://your-project.vercel.app
+TANIIN_REQUIRE_AUTH=false
 ```
 
 5. Deploy, then verify the signer health endpoint:
@@ -76,6 +78,6 @@ curl https://your-project.vercel.app/health
 TANIIN_GAME_API_URL=https://your-project.vercel.app
 ```
 
-The Android app posts to `/game-actions`, so do not include `/api` in `TANIIN_GAME_API_URL`.
+The Android app posts to `/game-actions`, so do not include `/api` in `TANIIN_GAME_API_URL`. The signer also exposes `/auth/nonce` and `/auth/verify` for wallet-signature sessions. Set `TANIIN_REQUIRE_AUTH=true` only after the client sends `Authorization: Bearer <session>` to `/game-actions`; otherwise leave it `false` for the current prototype client.
 
-This Vercel signer is suitable for prototype testing. Before sharing the endpoint publicly, add authentication, server-side gameplay validation, and rate limiting; otherwise anyone who knows the endpoint can submit mint/reward actions through the deployer signer.
+This Vercel signer is suitable for prototype testing. Before sharing the endpoint publicly, enable wallet-signature auth, keep CORS restricted with `TANIIN_ALLOWED_ORIGIN`, add persistent server-side gameplay validation, and rate limit public traffic; otherwise anyone who knows the endpoint can submit mint/reward actions through the deployer signer.

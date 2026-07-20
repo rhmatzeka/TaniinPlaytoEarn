@@ -6,7 +6,8 @@
     "compile": "hardhat compile",
     "deploy:sepolia": "hardhat run scripts/deploy.cjs --network sepolia",
     "game-api": "node scripts/game-api.cjs",
-    "mint:tani": "hardhat run scripts/mint-tani.cjs --network sepolia"
+    "mint:tani": "hardhat run scripts/mint-tani.cjs --network sepolia",
+    "test:auth": "node scripts/test-auth.cjs"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^6.1.2",

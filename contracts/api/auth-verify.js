@@ -1,11 +1,5 @@
-const {
-  enqueueGameAction,
-  normalizeError
-} = require("../lib/game-action-service.cjs");
-const {
-  requireSession,
-  withIdempotency
-} = require("../lib/auth-service.cjs");
+const { verifySignature } = require("../lib/auth-service.cjs");
+const { normalizeError } = require("../lib/game-action-service.cjs");
 
 module.exports = async function handler(req, res) {
   setCorsHeaders(res);
@@ -19,9 +13,7 @@ module.exports = async function handler(req, res) {
 
   try {
     const body = await readJson(req);
-    const session = requireSession(req, body.wallet);
-    const result = await withIdempotency(req, session.wallet, () => enqueueGameAction(body));
-    return res.status(200).json(result);
+    return res.status(200).json(verifySignature(body, clientKey(req)));
   } catch (error) {
     return res.status(error.statusCode || 500).json({ ok: false, error: normalizeError(error) });
   }
@@ -29,23 +21,14 @@ module.exports = async function handler(req, res) {
 
 async function readJson(req) {
   if (req.body !== undefined) {
-    if (Buffer.isBuffer(req.body)) {
-      return parseJsonBody(req.body.toString("utf8"));
-    }
-    if (typeof req.body === "string") {
-      return parseJsonBody(req.body);
-    }
-    if (typeof req.body === "object" && req.body !== null) {
-      return req.body;
-    }
+    if (Buffer.isBuffer(req.body)) return parseJsonBody(req.body.toString("utf8"));
+    if (typeof req.body === "string") return parseJsonBody(req.body);
+    if (typeof req.body === "object" && req.body !== null) return req.body;
   }
-
   let raw = "";
   for await (const chunk of req) {
     raw += chunk;
-    if (raw.length > 16_384) {
-      throw httpError(413, "Payload terlalu besar.");
-    }
+    if (raw.length > 16_384) throw httpError(413, "Payload terlalu besar.");
   }
   return parseJsonBody(raw);
 }
@@ -53,7 +36,7 @@ async function readJson(req) {
 function parseJsonBody(raw) {
   try {
     return raw && raw.trim() ? JSON.parse(raw) : {};
-  } catch (error) {
+  } catch (_error) {
     throw httpError(400, "JSON tidak valid.");
   }
 }
@@ -61,7 +44,11 @@ function parseJsonBody(raw) {
 function setCorsHeaders(res) {
   res.setHeader("Access-Control-Allow-Origin", process.env.TANIIN_ALLOWED_ORIGIN || "*");
   res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization,Idempotency-Key");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
+}
+
+function clientKey(req) {
+  return String(req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "unknown");
 }
 
 function httpError(statusCode, message) {

@@ -9,6 +9,14 @@
       "destination": "/api/health"
     },
     {
+      "source": "/auth/nonce",
+      "destination": "/api/auth-nonce"
+    },
+    {
+      "source": "/auth/verify",
+      "destination": "/api/auth-verify"
+    },
+    {
       "source": "/wallet-connect",
       "destination": "/api/wallet-connect"
     }

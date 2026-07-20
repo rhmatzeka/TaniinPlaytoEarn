@@ -7,6 +7,12 @@ const {
   health,
   normalizeError
 } = require("../lib/game-action-service.cjs");
+const {
+  createNonce,
+  requireSession,
+  verifySignature,
+  withIdempotency
+} = require("../lib/auth-service.cjs");
 const { initMultiplayer } = require("../lib/multiplayer-service.cjs");
 
 const DEFAULT_PORT = 8787;
@@ -53,18 +59,41 @@ function handleRequest(req, res) {
     return;
   }
 
+  if (req.method === "POST" && url.pathname === "/auth/nonce") {
+    readJson(req)
+      .then((body) => createNonce(body.wallet, clientKey(req)))
+      .then((result) => sendJson(res, 200, result))
+      .catch((error) => sendJson(res, error.statusCode || 500, { ok: false, error: normalizeError(error) }));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/auth/verify") {
+    readJson(req)
+      .then((body) => verifySignature(body, clientKey(req)))
+      .then((result) => sendJson(res, 200, result))
+      .catch((error) => sendJson(res, error.statusCode || 500, { ok: false, error: normalizeError(error) }));
+    return;
+  }
+
   if (req.method !== "POST" || url.pathname !== "/game-actions") {
     sendJson(res, 404, { ok: false, error: "Endpoint tidak ditemukan." });
     return;
   }
 
   readJson(req)
-    .then((body) => enqueueGameAction(body))
+    .then((body) => {
+      const session = requireSession(req, body.wallet);
+      return withIdempotency(req, session.wallet, () => enqueueGameAction(body));
+    })
     .then((result) => sendJson(res, 200, result))
     .catch((error) => {
       const status = error.statusCode || 500;
       sendJson(res, status, { ok: false, error: normalizeError(error) });
     });
+}
+
+function clientKey(req) {
+  return String(req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "unknown");
 }
 
 function readJson(req) {
@@ -99,9 +128,9 @@ function sendJson(res, status, body) {
 }
 
 function setCorsHeaders(res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Origin", process.env.TANIIN_ALLOWED_ORIGIN || "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization,Idempotency-Key");
 }
 
 function httpError(statusCode, message) {

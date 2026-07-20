@@ -42,7 +42,7 @@ const HOTSPOTS = {
 function initMultiplayer(server) {
   io = new Server(server, {
     cors: {
-      origin: "*",
+      origin: process.env.TANIIN_ALLOWED_ORIGIN || "*",
       methods: ["GET", "POST"]
     }
   });

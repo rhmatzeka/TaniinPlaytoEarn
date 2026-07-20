@@ -45,13 +45,19 @@ TANIIN_ITEMS_CONTRACT_ADDRESS=
 TANIIN_LAND_CONTRACT_ADDRESS=
 TANIIN_GAME_API_URL=http://127.0.0.1:8787
 TANIIN_GAME_API_PORT=8787
+TANIIN_ALLOWED_ORIGIN=
+TANIIN_REQUIRE_AUTH=false
+TANIIN_AUTH_NONCE_TTL_MS=300000
+TANIIN_AUTH_SESSION_TTL_MS=3600000
+TANIIN_AUTH_RATE_LIMIT=20
+TANIIN_ACTION_RATE_LIMIT=30
 TANIIN_ETH_WEI_PER_COIN=10000000000
 TANIIN_MAX_ETH_PAYOUT_WEI=10000000000000000
 TANIIN_DEFAULT_WALLET_ADDRESS=
 DEPLOYER_PRIVATE_KEY=replace_with_new_private_key_do_not_commit
 ```
 
-The Android build reads the public values into `BuildConfig`. Flutter Web reads the same public values from `--dart-define` at build/run time. On Web, if `TANIIN_GAME_API_URL` is omitted, the app uses the current site origin, which works when the Flutter static files and Vercel API live in the same Vercel project. `TANIIN_DEFAULT_WALLET_ADDRESS` is optional and lets debug builds prefill a public wallet address when no player wallet has been saved yet. A saved in-app wallet always wins, and tapping the wallet HUD opens the wallet connect/sync dialog. When `TANIIN_GAME_API_URL` is set, or when Web uses the same-origin fallback, `/wallet-connect` can be opened in MetaMask or another injected Ethereum wallet browser; the page requests the public account and returns to Android through `taniin://wallet` or to Flutter Web through an `?address=...` callback. Manual address entry remains a fallback only. For USB device testing, run `adb reverse tcp:8787 tcp:8787` and use `TANIIN_GAME_API_URL=http://127.0.0.1:8787`. For WiFi ADB, use the computer LAN IP, for example `http://192.168.1.9:8787`. For an emulator without `adb reverse`, use `http://10.0.2.2:8787`; the app also tries the matching local fallback. Only public values should be shipped in the APK or web build. Never put a real private key in Android source, Gradle config, Flutter assets, screenshots, commits, or browser-delivered files. If a private key has been pasted into chat or git, treat it as compromised and move funds/assets to a new wallet.
+The Android build reads the public values into `BuildConfig`. Flutter Web reads the same public values from `--dart-define` at build/run time. On Web, if `TANIIN_GAME_API_URL` is omitted, the app uses the current site origin, which works when the Flutter static files and Vercel API live in the same Vercel project. `TANIIN_DEFAULT_WALLET_ADDRESS` is optional and lets debug builds prefill a public wallet address when no player wallet has been saved yet. A saved in-app wallet always wins, and tapping the wallet HUD opens the wallet connect/sync dialog. When `TANIIN_GAME_API_URL` is set, or when Web uses the same-origin fallback, `/wallet-connect` can be opened in an injected Ethereum wallet browser; the page requests the public account and returns to Android through `taniin://wallet` or to Flutter Web through an `?address=...` callback. Manual address entry remains a fallback only. `TANIIN_ALLOWED_ORIGIN` can restrict browser/API/Socket.IO CORS for deployed environments; leave it empty for local development. `TANIIN_REQUIRE_AUTH=true` makes `/game-actions` require a wallet-signature session from `/auth/nonce` and `/auth/verify`; keep it `false` until the Flutter wallet bridge sends bearer sessions. For USB device testing, run `adb reverse tcp:8787 tcp:8787` and use `TANIIN_GAME_API_URL=http://127.0.0.1:8787`. For WiFi ADB, use the computer LAN IP, for example `http://192.168.1.9:8787`. For an emulator without `adb reverse`, use `http://10.0.2.2:8787`; the app also tries the matching local fallback. Only public values should be shipped in the APK or web build. Never put a real private key in Android source, Gradle config, Flutter assets, screenshots, commits, or browser-delivered files. If a private key has been pasted into chat or git, treat it as compromised and move funds/assets to a new wallet.
 
 ## Build And Run
 

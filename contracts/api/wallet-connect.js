@@ -99,7 +99,7 @@ function html() {
     }
     button:active, a.button:active { transform: translateY(2px); }
     a.button { background: #b85b1e; }
-    body[data-wallet="inside"] #metamask { display: none; }
+    body[data-wallet="inside"] #walletApp { display: none; }
     #status { min-height: 24px; margin-top: 16px; color: #a9edae; font-weight: 800; line-height: 1.35; }
     .network {
       margin-top: 16px;
@@ -135,10 +135,10 @@ function html() {
     </header>
     <section class="content">
       <div class="frame">
-        <p>Approve public account access in your wallet. Taniin will return to the Android app automatically; no private key is needed.</p>
+        <p>Approve public account access in your Ethereum wallet. Taniin will return to the Android app automatically; no private key is needed.</p>
         <div id="hint" class="hint"></div>
         <button id="connect">Connect Wallet</button>
-        <a id="metamask" class="button" href="#">Open in MetaMask</a>
+        <a id="walletApp" class="button" href="#">Open in Wallet App</a>
         <div id="status"></div>
         <div class="network">Sepolia network</div>
       </div>
@@ -148,7 +148,7 @@ function html() {
     const statusEl = document.getElementById('status');
     const hintEl = document.getElementById('hint');
     const connectButton = document.getElementById('connect');
-    const metamaskButton = document.getElementById('metamask');
+    const walletAppButton = document.getElementById('walletApp');
     const callback = new URLSearchParams(location.search).get('return') || 'taniin://wallet';
 
     function setStatus(message, bad) {
@@ -166,9 +166,9 @@ function html() {
       document.body.dataset.wallet = insideWallet ? 'inside' : 'outside';
       hintEl.textContent = insideWallet
         ? 'Sudah di browser wallet. Tap Connect Wallet untuk approve akun Sepolia.'
-        : 'Belum ada provider wallet di halaman ini. Buka lewat MetaMask dulu.';
+        : 'Belum ada provider wallet di halaman ini. Buka lewat wallet Ethereum yang mendukung browser dapp.';
       connectButton.textContent = insideWallet ? 'Connect Wallet' : 'Cek Wallet';
-      metamaskButton.style.display = insideWallet ? 'none' : 'flex';
+      walletAppButton.style.display = insideWallet ? 'none' : 'flex';
     }
 
     function appCallback(account, chainId) {
@@ -182,7 +182,7 @@ function html() {
       const ethereum = walletProvider();
       if (!ethereum) {
         syncWalletMode();
-        setStatus('Open this page inside MetaMask or another Ethereum wallet browser.', true);
+        setStatus('Open this page inside an Ethereum wallet browser, or use WalletConnect after the multi-wallet upgrade.', true);
         return;
       }
       try {
@@ -213,7 +213,7 @@ function html() {
     }
 
     const dappPath = location.host + location.pathname + location.search;
-    metamaskButton.href = 'https://metamask.app.link/dapp/' + dappPath;
+    walletAppButton.href = 'https://metamask.app.link/dapp/' + dappPath;
     connectButton.addEventListener('click', connect);
     syncWalletMode();
     window.addEventListener('ethereum#initialized', syncWalletMode, { once: true });
