@@ -212,6 +212,7 @@ class FarmStateController extends ChangeNotifier {
   ChainClient get chainClient => _chainClient;
   int _nextHistoryId = 1;
   Timer? _saveDebounce;
+  final Set<int> _readyPlotIndexes = <int>{};
   bool _persistenceReady = false;
   bool _restoringPersistence = false;
   String chainStatus =
@@ -900,11 +901,15 @@ class FarmStateController extends ChangeNotifier {
     _commitState();
   }
 
-  void refreshGrowth() {    final now = DateTime.now();
+  void refreshGrowth() {
+    final now = DateTime.now();
     var changed = false;
-    for (final plot in plots) {
-      if (plot.isReady(now)) {
+    for (var index = 0; index < plots.length; index += 1) {
+      final ready = plots[index].isReady(now);
+      if (ready && _readyPlotIndexes.add(index)) {
         changed = true;
+      } else if (!ready) {
+        _readyPlotIndexes.remove(index);
       }
     }
     if (changed) {
@@ -1229,6 +1234,7 @@ class FarmStateController extends ChangeNotifier {
           ..seedIndex = selectedSeedIndex
           ..status = PlotStatus.growing
           ..plantedAt = DateTime.now();
+        _readyPlotIndexes.remove(plotIndex);
         _queueChainAction(
           ChainAction(
             type: 'PLANT',
@@ -1251,6 +1257,7 @@ class FarmStateController extends ChangeNotifier {
         plot
           ..status = PlotStatus.empty
           ..plantedAt = null;
+        _readyPlotIndexes.remove(plotIndex);
         _queueChainAction(
           ChainAction(type: 'HARVEST', plotId: plotIndex + 1, amount: amount),
           title: 'Panen ${seeds[seedIndex].name}',
@@ -1286,6 +1293,7 @@ class FarmStateController extends ChangeNotifier {
       ..owned = false
       ..seedIndex = 0
       ..plantedAt = null;
+    _readyPlotIndexes.remove(plotIndex);
     coins += landSellPrice;
     ownedLand = _ownedLandCount();
     _queueChainAction(
