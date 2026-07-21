@@ -100,7 +100,7 @@
       window.taniinLastEthereumError = '';
       const ethereum = window.ethereum;
       if (!ethereum || typeof ethereum.request !== 'function') {
-        window.taniinLastEthereumError = 'MetaMask extension tidak terdeteksi di browser ini.';
+        window.taniinLastEthereumError = 'Wallet browser Ethereum tidak terdeteksi di browser ini.';
         return '';
       }
 
@@ -108,7 +108,7 @@
         const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
         const account = accounts && accounts[0] ? String(accounts[0]) : '';
         if (!account) {
-          window.taniinLastEthereumError = 'MetaMask tidak mengirim public address.';
+          window.taniinLastEthereumError = 'Wallet tidak mengirim public address.';
           return '';
         }
 
@@ -141,7 +141,7 @@
       } catch (error) {
         window.taniinLastEthereumError = error && error.message
           ? error.message
-          : 'Connect MetaMask dibatalkan.';
+          : 'Connect wallet dibatalkan.';
         return '';
       }
     };

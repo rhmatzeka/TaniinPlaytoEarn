@@ -96080,12 +96080,12 @@ k=k.c
 a0=k.fx
 k=k.x
 a1=A.bN(b2,p?24:14,b2)
-a2=A.bN(new A.p5("MetaMask",B.hP,B.I7,new A.ayr(b1),p,b2),b2,1/0)
+a2=A.bN(new A.p5("Connect Wallet App",B.hP,B.I7,new A.ayr(b1),p,b2),b2,1/0)
 a3=A.bN(b2,p?24:16,b2)
 a4=A.Q(b4).ok.as
 if(a4==null)a4=b2
 else a4=a4.bt(B.cD,p?22:15)
-a4=A.aF("Public address Sepolia",b2,b2,b2,a4,b2,b2)
+a4=A.aF("Manual public address Sepolia (demo fallback)",b2,b2,b2,a4,b2,b2)
 a5=A.bN(b2,p?12:8,b2)
 a6=b1.d
 a6===$&&A.a()
@@ -96130,7 +96130,7 @@ for(;;)switch(s){case 0:p.a.c.da()
 o=A.b0N()
 s=o?3:4
 break
-case 3:p.a.c.fU("Menunggu approve MetaMask...")
+case 3:p.a.c.fU("Menunggu approve wallet browser...")
 s=5
 return A.B(A.afu(),$async$v3)
 case 5:n=c
@@ -96145,7 +96145,7 @@ if(o.e)o.tf()
 s=1
 break}l=A.b_L()
 o=p.a.c
-o.cg(l.length===0?"Connect MetaMask dibatalkan.":l,!1)
+o.cg(l.length===0?"Connect wallet dibatalkan.":l,!1)
 s=1
 break
 case 4:k=A.aU9(p.a.c.CW)
@@ -96155,7 +96155,7 @@ break}s=6
 return A.B(A.P2(k),$async$v3)
 case 6:j=c
 o=p.a.c
-if(j)m="Membuka MetaMask connect..."
+if(j)m="Membuka halaman connect wallet..."
 else m="Tidak bisa membuka wallet connect di perangkat ini."
 o.cg(m,j)
 if(j){o=p.a
