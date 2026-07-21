@@ -6,7 +6,7 @@ import '../chain/platform_bridge.dart';
 import '../state/farm_state.dart';
 import 'pixel_panel.dart';
 
-enum _SettingsSection { audio, about }
+enum _SettingsSection { audio, wallet, about }
 
 class SettingsPanel extends StatefulWidget {
   const SettingsPanel({
@@ -56,7 +56,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     SizedBox(
-                      width: 198,
+                      width: 246,
                       child: _SettingsSidebar(
                         selectedSection: _selectedSection,
                         onSelected: _selectSection,
@@ -81,6 +81,8 @@ class _SettingsPanelState extends State<SettingsPanel> {
                               children:
                                   _selectedSection == _SettingsSection.audio
                                   ? _buildAudioContent()
+                                  : _selectedSection == _SettingsSection.wallet
+                                  ? _buildWalletContent()
                                   : _buildAboutContent(context),
                             ),
                           ),
@@ -150,17 +152,29 @@ class _SettingsPanelState extends State<SettingsPanel> {
         title: 'PROJECT',
         value: 'Taniin Play to Earn - Flutter game farming',
       ),
+    ];
+  }
+
+  List<Widget> _buildWalletContent() {
+    return [
+      const _SettingsTitle(icon: Icons.account_balance_wallet, title: 'WALLET'),
+      const SizedBox(height: 24),
+      _AboutInfoRow(
+        icon: farmState.walletConnected ? Icons.verified_user : Icons.link_off,
+        title: farmState.walletConnected ? 'CONNECTED WALLET' : 'WALLET BELUM LOGIN',
+        value: farmState.walletConnected
+            ? farmState.walletLabel
+            : 'Connect wallet dari panel login untuk mengirim aksi on-chain.',
+      ),
       const SizedBox(height: 14),
       _AboutInfoRow(
-        icon: Icons.account_balance_wallet,
-        title: 'WALLET',
-        value: farmState.walletConnected
-            ? 'Login sebagai ${farmState.walletLabel}'
-            : 'Login wallet dibutuhkan sebelum bermain',
+        icon: Icons.cloud_sync,
+        title: 'CHAIN STATUS',
+        value: farmState.chainStatus,
       ),
       if (farmState.walletConnected) ...[
         const SizedBox(height: 18),
-        _AboutLogoutButton(onTap: _logoutWallet),
+        _WalletLogoutButton(onTap: _logoutWallet),
       ],
     ];
   }
@@ -258,7 +272,14 @@ class _SettingsSidebar extends StatelessWidget {
               selected: selectedSection == _SettingsSection.audio,
               onTap: () => onSelected(_SettingsSection.audio),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+            _SideTab(
+              icon: Icons.account_balance_wallet,
+              label: 'WALLET',
+              selected: selectedSection == _SettingsSection.wallet,
+              onTap: () => onSelected(_SettingsSection.wallet),
+            ),
+            const SizedBox(height: 16),
             _SideTab(
               icon: Icons.info,
               label: 'ABOUT',
@@ -299,27 +320,33 @@ class _SideTab extends StatelessWidget {
           ),
         ),
         child: SizedBox(
-          height: 116,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          height: 82,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
+              const SizedBox(width: 16),
               Icon(
                 icon,
-                size: 46,
+                size: 34,
                 color: selected
                     ? const Color(0xFF42B8E9)
                     : const Color(0xFFFFD65A),
               ),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: selected
-                      ? const Color(0xFF3C250D)
-                      : const Color(0xFFFFF0CE),
-                  fontSize: 20,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: selected
+                        ? const Color(0xFF3C250D)
+                        : const Color(0xFFFFF0CE),
+                    fontSize: 19,
+                  ),
                 ),
               ),
+              const SizedBox(width: 12),
             ],
           ),
         ),
@@ -510,8 +537,8 @@ class _AboutInfoRow extends StatelessWidget {
   }
 }
 
-class _AboutLogoutButton extends StatelessWidget {
-  const _AboutLogoutButton({required this.onTap});
+class _WalletLogoutButton extends StatelessWidget {
+  const _WalletLogoutButton({required this.onTap});
 
   final VoidCallback onTap;
 

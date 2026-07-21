@@ -95920,7 +95920,7 @@ A.DC.prototype={
 aq(){return new A.Ih(B.jp)},
 tf(){return this.d.$0()}}
 A.Ih.prototype={
-G(a){var s,r,q=this,p=null,o=A.bo(a,B.bG,t.w).w.a,n=Math.max(360,o.a-80),m=Math.max(300,o.b-80),l=q.a,k=l.d,j=q.d,i=A.bN(new A.YW(j,q.gamK(),p),p,198),h=A.b2(16),g=A.by(B.k4,5)
+G(a){var s,r,q=this,p=null,o=A.bo(a,B.bG,t.w).w.a,n=Math.max(360,o.a-80),m=Math.max(300,o.b-80),l=q.a,k=l.d,j=q.d,i=A.bN(new A.YW(j,q.gamK(),p),p,246),h=A.b2(16),g=A.by(B.k4,5)
 if(j===B.jp){l=l.c
 j=l.k3
 s=l.k1
@@ -95930,7 +95930,7 @@ if(l.x){l=A.tH(l.y)
 l="Login sebagai "+l}else l="Login wallet dibutuhkan sebelum bermain"
 j=t.p
 l=A.b([B.a3w,B.BC,new A.SC(q.gakc(),p),B.dn,new A.wZ(B.Ly,"CREATOR","Rahmat Eka Satria",p),B.iM,new A.wZ(B.Lt,"PROJECT","Taniin Play to Earn - Flutter game farming",p),B.iM,new A.wZ(B.hP,"WALLET",l,p)],j)
-if(q.a.c.x)B.b.K(l,A.b([B.dn,new A.SD(q.gan2(),p)],j))}j=t.p
+if(false)B.b.K(l,A.b([B.dn,new A.SD(q.gan2(),p)],j))}j=t.p
 return new A.e1(new A.aa(0,n,0,m),A.bN(new A.lV(A.ca(A.b([new A.Wf("MENU",B.q_,k,p),A.c5(A.ce(A.b([i,A.c5(new A.b0(B.KV,A.bl(new A.b0(B.KU,A.aHD(l,B.ar,p,!1),p),new A.aE(B.jM,p,g,h,p,p,B.p),B.w),p),1)],j),B.bd,B.o,B.y),1)],j),B.B,B.o,B.y),B.ar,B.jQ,B.hb,p),640,1120),p)},
 amL(a){var s=this
 s.a.c.da()
@@ -95967,11 +95967,11 @@ $0(){return this.a.d.$1(B.CQ)},
 $S:0}
 A.In.prototype={
 G(a){var s,r=this,q=null,p=r.e,o=p?B.c_:B.Ij,n=A.b2(12),m=A.by(p?B.GB:B.J2,4),l=p?B.Jc:B.Hf
-l=A.dT(r.c,l,q,46)
+l=A.dT(r.c,l,q,34)
 s=A.Q(a).ok.as
 if(s==null)p=q
-else{s=s.bt(p?B.HT:B.aW,20)
-p=s}return A.cY(q,A.bl(A.bN(A.ca(A.b([l,B.BE,A.aF(r.d,q,q,q,p,q,q)],t.p),B.B,B.fg,B.y),116,q),new A.aE(o,q,m,n,q,q,B.p),B.w),B.I,!1,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,r.f,q,q,q)}}
+else{s=s.bt(p?B.HT:B.aW,16)
+p=s}return A.cY(q,A.bl(A.bN(A.ca(A.b([l,B.BE,A.aF(r.d,q,q,q,p,q,q)],t.p),B.B,B.fg,B.y),92,q),new A.aE(o,q,m,n,q,q,B.p),B.w),B.I,!1,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,q,r.f,q,q,q)}}
 A.Ii.prototype={
 G(a){var s=null,r=A.b2(12),q=A.dT(this.c,B.G4,s,48),p=A.Q(a).ok.r
 p=p==null?s:p.bt(B.b4,38)
