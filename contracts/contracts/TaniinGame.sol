@@ -76,7 +76,9 @@ contract TaniinLand is ERC721URIStorage, Ownable {
     }
 
     function sellLandFor(address player, uint256 plotId, string calldata tokenUri) external onlyOwner returns (uint256 landId) {
-        landId = _ensurePlayerPlot(player, plotId, tokenUri);
+        tokenUri;
+        landId = _requirePlayerPlot(player, plotId);
+        require(!planted[landId], "LAND_PLANTED");
 
         delete planted[landId];
         delete playerPlotLandId[player][plotId];
@@ -96,7 +98,9 @@ contract TaniinLand is ERC721URIStorage, Ownable {
     }
 
     function harvestFor(address player, uint256 plotId, string calldata tokenUri) external onlyOwner returns (uint256 landId, uint256 cropAmount) {
-        landId = _ensurePlayerPlot(player, plotId, tokenUri);
+        tokenUri;
+        landId = _requirePlayerPlot(player, plotId);
+        require(planted[landId], "NOT_PLANTED");
         planted[landId] = false;
         cropAmount = 3;
         emit LandHarvested(player, landId, cropAmount);

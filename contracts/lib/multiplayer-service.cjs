@@ -5,6 +5,7 @@ const { interpret } = require("./ai-brain.cjs");
 // AI Agent State
 // Valid checksummed Sepolia address used as the AI Farmer Agent's smart account.
 const AI_WALLET_ADDRESS = "0x000000000000000000000000000000000000dEaD"; // AI Virtual Address
+const AI_ONCHAIN_ENABLED = String(process.env.TANIIN_AI_ONCHAIN_ENABLED || "").trim().toLowerCase() === "true";
 let aiState = {
   id: "ai-agent",
   wallet: AI_WALLET_ADDRESS,
@@ -250,12 +251,12 @@ function executeAiAction(action) {
       // Simulate API action (Local fallback or Sepolia transaction)
       try {
         const seedIndex = ["Kentang", "Bawang", "Stroberi", "Bit"].indexOf(seedType) + 1;
-        const res = await enqueueGameAction({
+        const res = AI_ONCHAIN_ENABLED ? await enqueueGameAction({
           wallet: aiState.wallet,
           type: "BUY_SEED",
           plotId: seedIndex,
           amount: 3
-        });
+        }) : { txHash: "" };
         
         aiState.inventory.coins -= 60; // Approximate price
         aiState.inventory.seeds[seedType] += 3;
@@ -269,7 +270,7 @@ function executeAiAction(action) {
       speakAi(`Tiba di toko. Membeli benih ${seedType} dulu...`);
       try {
         const seedIndex = ["Kentang", "Bawang", "Stroberi", "Bit"].indexOf(seedType) + 1;
-        await enqueueGameAction({
+        if (AI_ONCHAIN_ENABLED) await enqueueGameAction({
           wallet: aiState.wallet,
           type: "BUY_SEED",
           plotId: seedIndex,
@@ -292,12 +293,12 @@ function executeAiAction(action) {
       const seedIndex = ["Kentang", "Bawang", "Stroberi", "Bit"].indexOf(seedType) + 1;
       let txLabel = "lokal";
       try {
-        const res = await enqueueGameAction({
+        const res = AI_ONCHAIN_ENABLED ? await enqueueGameAction({
           wallet: aiState.wallet,
           type: "PLANT",
           plotId: plotNum,
           amount: seedIndex
-        });
+        }) : { txHash: "" };
         if (res && res.txHash) txLabel = res.txHash.substring(0, 8);
       } catch (err) {
         console.log(`[AI] plant on-chain gagal (lanjut lokal): ${err.message || err}`);
@@ -320,12 +321,12 @@ function executeAiAction(action) {
 
       let txLabel = "lokal";
       try {
-        const res = await enqueueGameAction({
+        const res = AI_ONCHAIN_ENABLED ? await enqueueGameAction({
           wallet: aiState.wallet,
           type: "HARVEST",
           plotId: plotNum,
           amount: 3 // Yield amount
-        });
+        }) : { txHash: "" };
         if (res && res.txHash) txLabel = res.txHash.substring(0, 8);
       } catch (err) {
         console.log(`[AI] harvest on-chain gagal (lanjut lokal): ${err.message || err}`);
@@ -349,12 +350,12 @@ function executeAiAction(action) {
           return;
         }
         
-        const res = await enqueueGameAction({
+        const res = AI_ONCHAIN_ENABLED ? await enqueueGameAction({
           wallet: aiState.wallet,
           type: "SELL_CROP",
           plotId: 0,
           amount: cropsToSell
-        });
+        }) : { txHash: "" };
         
         const earned = cropsToSell * 35;
         aiState.inventory.coins += earned;

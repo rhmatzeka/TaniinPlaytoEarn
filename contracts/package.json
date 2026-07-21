@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "test": "hardhat test",
     "compile": "hardhat compile",
     "deploy:sepolia": "hardhat run scripts/deploy.cjs --network sepolia",
     "game-api": "node scripts/game-api.cjs",

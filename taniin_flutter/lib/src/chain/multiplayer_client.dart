@@ -1188,7 +1188,8 @@ class MultiplayerClient extends ChangeNotifier {
   }
 
   void reconnect() {
-    _socket?.disconnect();
+    _socket?.dispose();
+    _socket = null;
     _initConnection();
   }
 

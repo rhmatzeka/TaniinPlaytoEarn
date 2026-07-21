@@ -240,6 +240,9 @@ class ChainClient {
     }
     try {
       final network = await checkSepolia();
+      if (!network.success) {
+        return ChainWalletState.error(network.message);
+      }
       final nativeWei = await _ethGetBalance(wallet);
       final nativeEth = _formatEth(nativeWei);
       final gameApiHealth = await _loadGameApiHealthOrEmpty();
@@ -349,8 +352,8 @@ class ChainClient {
               'Transaksi Sepolia gagal: ${shortTransactionHash(hash)}.',
             );
           }
-          return ChainReceiptState.ok(
-            'Transaksi Sepolia sudah punya receipt: ${shortTransactionHash(hash)}.',
+          return ChainReceiptState.failed(
+            'Receipt transaksi Sepolia tidak memiliki status yang valid: ${shortTransactionHash(hash)}.',
           );
         }
       } on Object catch (error) {

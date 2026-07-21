@@ -205,6 +205,7 @@ class FarmStateController extends ChangeNotifier {
   String chainSignerAddress = '';
   bool walletTaniBalanceAvailable = false;
   bool checkingChain = false;
+  int _walletRequestGeneration = 0;
   ChainConfig chainConfig = const ChainConfig();
   final ChainClient Function(ChainConfig) _chainClientFactory;
   late ChainClient _chainClient;
@@ -896,7 +897,7 @@ class FarmStateController extends ChangeNotifier {
   /// Notifies listeners after an external (AI agent / multiplayer) change to
   /// plot state so the HUD and game can repaint.
   void notifyExternalChange() {
-    notifyListeners();
+    _commitState();
   }
 
   void refreshGrowth() {    final now = DateTime.now();
@@ -952,6 +953,8 @@ class FarmStateController extends ChangeNotifier {
   }
 
   void configureChain(ChainConfig config) {
+    _walletRequestGeneration += 1;
+    checkingChain = false;
     chainConfig = config;
     _chainClient = _chainClientFactory(config);
     if (walletConnected) {
@@ -1006,6 +1009,7 @@ class FarmStateController extends ChangeNotifier {
     chainSignerAddress = '';
     walletTaniBalanceAvailable = false;
     checkingChain = false;
+    _walletRequestGeneration += 1;
     chainStatus = chainConfig.hasGameApi
         ? 'Wallet dilepas. Connect lagi supaya aksi terkirim on-chain.'
         : 'Mode lokal: signer backend belum diset.';
@@ -1027,11 +1031,14 @@ class FarmStateController extends ChangeNotifier {
       return;
     }
     checkingChain = true;
+    final requestGeneration = ++_walletRequestGeneration;
+    final requestedWallet = walletAddress;
+    final requestedClient = _chainClient;
     chainStatus = 'Sync wallet Sepolia...';
     notifyListeners();
     late final ChainWalletState state;
     try {
-      state = await _chainClient.loadWalletState(walletAddress);
+      state = await requestedClient.loadWalletState(requestedWallet);
     } on Object {
       state = chainConfig.hasGameApi
           ? ChainWalletState.ok(
@@ -1046,6 +1053,11 @@ class FarmStateController extends ChangeNotifier {
               maxEthPayoutWei: '',
             )
           : ChainWalletState.error('Gagal sync wallet.');
+    }
+    if (requestGeneration != _walletRequestGeneration ||
+        requestedWallet != walletAddress ||
+        !walletConnected) {
+      return;
     }
     checkingChain = false;
     _applyWalletState(state);
@@ -1070,7 +1082,6 @@ class FarmStateController extends ChangeNotifier {
     maxEthPayoutWei = state.maxEthPayoutWei;
     if (state.success && state.coinBalanceAvailable) {
       tani = state.coinBalance;
-      coins = state.coinBalance;
       walletTaniBalanceAvailable = true;
     } else if (state.success) {
       walletTaniBalanceAvailable = false;
@@ -2088,6 +2099,8 @@ class FarmStateController extends ChangeNotifier {
     walletConnected = true;
     walletAddress = cleaned;
     if (changed) {
+      _walletRequestGeneration += 1;
+      checkingChain = false;
       walletNativeBalance = '';
       walletNativeWei = '';
       ethWeiPerCoin = '';

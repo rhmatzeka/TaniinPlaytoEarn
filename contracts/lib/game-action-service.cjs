@@ -97,6 +97,13 @@ async function submitGameAction(body) {
   let ethPayoutAmountWei = 0n;
   const { coin, land, items } = service.contracts;
 
+  if (_unsafeEconomyActions.has(type) && !unsafeEconomyEnabled()) {
+    throw httpError(
+      503,
+      `Aksi ${type} dinonaktifkan sampai accounting server/on-chain yang aman tersedia.`
+    );
+  }
+
   switch (type) {
     case "BUY_LAND": {
       const existingLandId = await land.playerPlotLandId(walletAddress, plotId);
@@ -121,7 +128,7 @@ async function submitGameAction(body) {
     }
     case "HARVEST": {
       txHashes.push(await sendTransaction("harvest", () => land.harvestFor(walletAddress, plotId, tokenUri)));
-      txHashes.push(await sendTransaction("mint crop", () => items.mint(walletAddress, CROP_ITEM_ID, BigInt(amount))));
+      txHashes.push(await sendTransaction("mint crop", () => items.mint(walletAddress, CROP_ITEM_ID, 3n)));
       break;
     }
     case "BUY_SEED": {
@@ -242,14 +249,25 @@ function ethSwapConfig() {
   const configuredWeiPerCoin = envBigInt("TANIIN_ETH_WEI_PER_COIN", DEFAULT_ETH_WEI_PER_COIN);
   const configuredMaxPayoutWei = envBigInt("TANIIN_MAX_ETH_PAYOUT_WEI", DEFAULT_MAX_ETH_PAYOUT_WEI);
   return {
-    weiPerCoin: maxBigInt(configuredWeiPerCoin, BigInt(DEFAULT_ETH_WEI_PER_COIN)),
-    maxPayoutWei: maxBigInt(configuredMaxPayoutWei, BigInt(DEFAULT_MAX_ETH_PAYOUT_WEI))
+    weiPerCoin: configuredWeiPerCoin,
+    maxPayoutWei: configuredMaxPayoutWei
   };
 }
 
-function maxBigInt(left, right) {
-  return left > right ? left : right;
+function unsafeEconomyEnabled() {
+  return String(process.env.TANIIN_ENABLE_UNSAFE_ECONOMY || "").trim().toLowerCase() === "true";
 }
+
+const _unsafeEconomyActions = new Set([
+  "BUY_SEED",
+  "HARVEST",
+  "SELL_CROP",
+  "SWAP_CROP",
+  "SWAP_COIN",
+  "SWAP_TANI_COIN",
+  "SWAP_ETH_COIN",
+  "SWAP_COIN_ETH"
+]);
 
 function ensureRecipientIsNotSigner(service, walletAddress) {
   if (walletAddress.toLowerCase() === service.wallet.address.toLowerCase()) {
