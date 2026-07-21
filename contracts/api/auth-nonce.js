@@ -23,7 +23,10 @@ async function readJson(req) {
   if (req.body !== undefined) {
     if (Buffer.isBuffer(req.body)) return parseJsonBody(req.body.toString("utf8"));
     if (typeof req.body === "string") return parseJsonBody(req.body);
-    if (typeof req.body === "object" && req.body !== null) return req.body;
+    if (typeof req.body === "object" && req.body !== null) {
+      if (Buffer.byteLength(JSON.stringify(req.body)) > 16_384) throw httpError(413, "Payload terlalu besar.");
+      return req.body;
+    }
   }
   let raw = "";
   for await (const chunk of req) {

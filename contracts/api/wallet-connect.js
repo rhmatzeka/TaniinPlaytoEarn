@@ -149,7 +149,17 @@ function html() {
     const hintEl = document.getElementById('hint');
     const connectButton = document.getElementById('connect');
     const walletAppButton = document.getElementById('walletApp');
-    const callback = new URLSearchParams(location.search).get('return') || 'taniin://wallet';
+    const requestedCallback = new URLSearchParams(location.search).get('return') || 'taniin://wallet';
+    const callback = safeCallback(requestedCallback);
+
+    function safeCallback(value) {
+      try {
+        const uri = new URL(value, location.origin);
+        if (uri.protocol === 'taniin:' && uri.host === 'wallet') return uri.toString();
+        if (uri.protocol === 'https:' && uri.origin === location.origin) return uri.toString();
+      } catch (_) {}
+      return 'taniin://wallet';
+    }
 
     function setStatus(message, bad) {
       statusEl.style.color = bad ? '#ffb199' : '#a9edae';
@@ -226,5 +236,9 @@ function html() {
 module.exports = function walletConnect(_request, response) {
   response.setHeader('Content-Type', 'text/html; charset=utf-8');
   response.setHeader('Cache-Control', 'no-store');
+  response.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'");
+  response.setHeader('X-Content-Type-Options', 'nosniff');
+  response.setHeader('Referrer-Policy', 'no-referrer');
+  response.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   response.status(200).send(html());
 };

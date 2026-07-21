@@ -1,11 +1,11 @@
 const crypto = require("crypto");
 const { ethers } = require("ethers");
 
-const NONCE_TTL_MS = Number(process.env.TANIIN_AUTH_NONCE_TTL_MS || 5 * 60 * 1000);
-const SESSION_TTL_MS = Number(process.env.TANIIN_AUTH_SESSION_TTL_MS || 60 * 60 * 1000);
-const RATE_LIMIT_WINDOW_MS = Number(process.env.TANIIN_RATE_LIMIT_WINDOW_MS || 60 * 1000);
-const AUTH_LIMIT = Number(process.env.TANIIN_AUTH_RATE_LIMIT || 20);
-const ACTION_LIMIT = Number(process.env.TANIIN_ACTION_RATE_LIMIT || 30);
+const NONCE_TTL_MS = positiveEnvInt("TANIIN_AUTH_NONCE_TTL_MS", 5 * 60 * 1000, 60_000, 15 * 60 * 1000);
+const SESSION_TTL_MS = positiveEnvInt("TANIIN_AUTH_SESSION_TTL_MS", 60 * 60 * 1000, 5 * 60 * 1000, 24 * 60 * 60 * 1000);
+const RATE_LIMIT_WINDOW_MS = positiveEnvInt("TANIIN_RATE_LIMIT_WINDOW_MS", 60 * 1000, 1000, 60 * 60 * 1000);
+const AUTH_LIMIT = positiveEnvInt("TANIIN_AUTH_RATE_LIMIT", 20, 1, 1000);
+const ACTION_LIMIT = positiveEnvInt("TANIIN_ACTION_RATE_LIMIT", 30, 1, 1000);
 
 const nonces = new Map();
 const sessions = new Map();
@@ -14,6 +14,16 @@ const idempotencyResults = new Map();
 
 function authRequired() {
   return String(process.env.TANIIN_REQUIRE_AUTH || "").trim().toLowerCase() === "true";
+}
+
+function positiveEnvInt(name, fallback, minimum, maximum) {
+  const raw = process.env[name];
+  if (raw === undefined || String(raw).trim() === "") return fallback;
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
+    throw new Error(`${name} harus bilangan bulat antara ${minimum} dan ${maximum}.`);
+  }
+  return value;
 }
 
 function createNonce(wallet, origin) {

@@ -36,6 +36,9 @@ async function readJson(req) {
       return parseJsonBody(req.body);
     }
     if (typeof req.body === "object" && req.body !== null) {
+      if (Buffer.byteLength(JSON.stringify(req.body)) > 16_384) {
+        throw httpError(413, "Payload terlalu besar.");
+      }
       return req.body;
     }
   }
