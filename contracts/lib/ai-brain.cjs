@@ -96,6 +96,7 @@ function normalize(parsed, originalText) {
   }
 
   let reply = typeof parsed.reply === "string" ? parsed.reply.trim() : "";
+  reply = reply.replace(/[\u0000-\u001F\u007F]/g, " ").replace(/\s+/g, " ").slice(0, 400);
   if (!reply) reply = defaultReply(finalIntent, seed, plot);
 
   return { intent: finalIntent, seed, plot, reply };

@@ -6,6 +6,10 @@ const { interpret } = require("./ai-brain.cjs");
 // Valid checksummed Sepolia address used as the AI Farmer Agent's smart account.
 const AI_WALLET_ADDRESS = "0x000000000000000000000000000000000000dEaD"; // AI Virtual Address
 const AI_ONCHAIN_ENABLED = String(process.env.TANIIN_AI_ONCHAIN_ENABLED || "").trim().toLowerCase() === "true";
+const MAX_AI_QUEUE = 20;
+const MAX_CHAT_LENGTH = 300;
+const MAP_MIN = 0;
+const MAP_MAX = 8192;
 let aiState = {
   id: "ai-agent",
   wallet: AI_WALLET_ADDRESS,
@@ -24,6 +28,7 @@ let aiState = {
 };
 
 let io;
+let aiInterval;
 const players = {}; // id -> { wallet, name, x, y, anim }
 
 // Target positions on map (approximate pixels)
@@ -58,12 +63,13 @@ function initMultiplayer(server) {
     });
 
     socket.on("join", (data) => {
+      const payload = data && typeof data === "object" ? data : {};
       players[socket.id] = {
-        wallet: data.wallet || "0x",
-        name: data.name || "Anon Player",
-        x: data.x || 200,
-        y: data.y || 300,
-        anim: data.anim || "idle"
+        wallet: normalizeWallet(payload.wallet),
+        name: cleanText(payload.name, 32) || "Anon Player",
+        x: finiteCoordinate(payload.x, 200),
+        y: finiteCoordinate(payload.y, 300),
+        anim: normalizeAnimation(payload.anim)
       };
       console.log(`[multiplayer] Player joined: ${players[socket.id].name} (${players[socket.id].wallet})`);
       socket.broadcast.emit("player_joined", {
@@ -74,20 +80,22 @@ function initMultiplayer(server) {
 
     socket.on("move", (data) => {
       if (players[socket.id]) {
-        players[socket.id].x = data.x;
-        players[socket.id].y = data.y;
-        players[socket.id].anim = data.anim;
+        const payload = data && typeof data === "object" ? data : {};
+        players[socket.id].x = finiteCoordinate(payload.x, players[socket.id].x);
+        players[socket.id].y = finiteCoordinate(payload.y, players[socket.id].y);
+        players[socket.id].anim = normalizeAnimation(payload.anim);
         socket.broadcast.emit("player_moved", {
           id: socket.id,
-          x: data.x,
-          y: data.y,
-          anim: data.anim
+          x: players[socket.id].x,
+          y: players[socket.id].y,
+          anim: players[socket.id].anim
         });
       }
     });
 
     socket.on("chat", (data) => {
-      const text = data.text || "";
+      const text = cleanText(data && data.text, MAX_CHAT_LENGTH);
+      if (!text) return;
       const wallet = players[socket.id] ? players[socket.id].wallet : "0x";
       console.log(`[chat] ${players[socket.id]?.name || "Anon"}: ${text}`);
 
@@ -115,7 +123,10 @@ function initMultiplayer(server) {
   });
 
   // Start the AI simulation loop (ticks every 100ms)
-  setInterval(updateAiAgent, 100);
+  if (aiInterval) clearInterval(aiInterval);
+  aiInterval = setInterval(updateAiAgent, 100);
+  aiInterval.unref?.();
+  return shutdownMultiplayer;
 }
 
 // LLM-powered command handler for the AI Farmer Agent.
@@ -176,7 +187,46 @@ function speakAi(text) {
 const aiActionQueue = [];
 
 function queueAiAction(action) {
+  if (aiActionQueue.length >= MAX_AI_QUEUE) {
+    speakAi("Antrean bantuan AI sedang penuh. Coba lagi sebentar ya.");
+    return false;
+  }
   aiActionQueue.push(action);
+  return true;
+}
+
+function cleanText(value, maxLength) {
+  return String(value || "")
+    .replace(/[\u0000-\u001F\u007F]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLength);
+}
+
+function finiteCoordinate(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.min(MAP_MAX, Math.max(MAP_MIN, number)) : fallback;
+}
+
+function normalizeAnimation(value) {
+  const animation = String(value || "idle").toLowerCase();
+  return animation === "walk" ? "walk" : "idle";
+}
+
+function normalizeWallet(value) {
+  const wallet = cleanText(value, 42);
+  return /^0x[0-9a-fA-F]{40}$/.test(wallet) ? wallet : "0x";
+}
+
+function shutdownMultiplayer() {
+  if (aiInterval) {
+    clearInterval(aiInterval);
+    aiInterval = undefined;
+  }
+  aiActionQueue.length = 0;
+  for (const id of Object.keys(players)) delete players[id];
+  io?.close();
+  io = undefined;
 }
 
 function updateAiAgent() {

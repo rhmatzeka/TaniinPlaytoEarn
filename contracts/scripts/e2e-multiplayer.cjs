@@ -76,7 +76,18 @@ async function main() {
   process.exit(fail === 0 ? 0 : 1);
 }
 
-function once(sock, ev) { return new Promise((res) => sock.once(ev, res)); }
+function once(sock, ev, timeout = 8000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      sock.close();
+      reject(new Error(`timeout menunggu event ${ev} dari ${URL}; pastikan game-api sedang berjalan`));
+    }, timeout);
+    sock.once(ev, (...args) => {
+      clearTimeout(timer);
+      resolve(...args);
+    });
+  });
+}
 function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
 function waitFor(cond, timeout) {
   return new Promise((res, rej) => {
