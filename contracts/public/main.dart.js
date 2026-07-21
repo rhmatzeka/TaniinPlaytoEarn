@@ -96080,7 +96080,7 @@ k=k.c
 a0=k.fx
 k=k.x
 a1=A.bN(b2,p?24:14,b2)
-a2=A.bN(new A.p5("Connect Wallet App",B.hP,B.I7,new A.ayr(b1),p,b2),b2,1/0)
+a2=A.bN(new A.p5("Pilih Wallet",B.hP,B.I7,new A.ayr(b1),p,b2),b2,1/0)
 a3=A.bN(b2,p?24:16,b2)
 a4=A.Q(b4).ok.as
 if(a4==null)a4=b2

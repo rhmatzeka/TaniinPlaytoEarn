@@ -129,9 +129,7 @@ class _WalletPanelState extends State<WalletPanel> {
                         SizedBox(
                           width: double.infinity,
                           child: _WalletActionButton(
-                            label: PlatformBridge.hasBrowserWalletProvider()
-                                ? 'Connect Browser Wallet'
-                                : 'Connect Wallet App',
+                            label: 'Pilih Wallet',
                             icon: Icons.account_balance_wallet,
                             color: const Color(0xFFB85B1E),
                             prominent: contentProminent,
@@ -267,26 +265,6 @@ class _WalletPanelState extends State<WalletPanel> {
 
   Future<void> _openWalletConnect() async {
     farmState.playClick();
-    if (PlatformBridge.hasBrowserWalletProvider()) {
-      farmState.showMessage('Menunggu approve wallet browser...');
-      final address = await PlatformBridge.requestBrowserWalletAddress();
-      if (address.isNotEmpty) {
-        _controller.text = address;
-        _controller.selection = TextSelection.collapsed(offset: address.length);
-        unawaited(farmState.connectWalletFromDeepLink(address));
-        if (widget.showCloseButton) {
-          widget.onClose();
-        }
-        return;
-      }
-      final error = PlatformBridge.browserWalletConnectError();
-      farmState.showMessage(
-        error.isEmpty ? 'Connect wallet dibatalkan.' : error,
-        success: false,
-      );
-      return;
-    }
-
     final url = PlatformBridge.walletConnectUrl(farmState.chainConfig);
     if (url.isEmpty) {
       farmState.showMessage(
