@@ -56,7 +56,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     SizedBox(
-                      width: 246,
+                      width: 300,
                       child: _SettingsSidebar(
                         selectedSection: _selectedSection,
                         onSelected: _selectSection,
@@ -320,14 +320,14 @@ class _SideTab extends StatelessWidget {
           ),
         ),
         child: SizedBox(
-          height: 82,
+          height: 104,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
               const SizedBox(width: 16),
               Icon(
                 icon,
-                size: 34,
+                size: 42,
                 color: selected
                     ? const Color(0xFF42B8E9)
                     : const Color(0xFFFFD65A),
@@ -342,7 +342,7 @@ class _SideTab extends StatelessWidget {
                     color: selected
                         ? const Color(0xFF3C250D)
                         : const Color(0xFFFFF0CE),
-                    fontSize: 19,
+                    fontSize: 21,
                   ),
                 ),
               ),
