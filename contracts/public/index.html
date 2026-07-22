@@ -2,29 +2,11 @@
 <html lang="id">
 <head>
   <script>
-    (function() {
-      const version = 'v44';
-      if (window.location.search === '?v=' + version && window.history && window.history.replaceState) {
-        window.history.replaceState(null, '', window.location.pathname + window.location.hash);
-      }
-      if (localStorage.getItem('taniin_cache_version') !== version) {
-        localStorage.setItem('taniin_cache_version', version);
-        const unregisterWorkers = 'serviceWorker' in navigator
-          ? navigator.serviceWorker.getRegistrations().then(function(registrations) {
-              return Promise.all(registrations.map(function(r) { return r.unregister(); }));
-            })
-          : Promise.resolve();
-        const clearCaches = 'caches' in window
-          ? caches.keys().then(function(names) {
-              return Promise.all(names.map(function(name) { return caches.delete(name); }));
-            })
-          : Promise.resolve();
-
-        Promise.all([unregisterWorkers, clearCaches]).finally(function() {
-          window.location.replace(window.location.pathname + '?v=' + version + window.location.hash);
-        });
-      }
-    })();
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        registrations.forEach(function(registration) { registration.unregister(); });
+      });
+    }
   </script>
   <base href="/">
 
@@ -146,6 +128,6 @@
       }
     };
   </script>
-  <script src="flutter_bootstrap.js?v=44" async></script>
+  <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
