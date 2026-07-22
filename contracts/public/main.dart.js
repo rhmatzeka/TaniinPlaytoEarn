@@ -28096,9 +28096,10 @@ _.c=a
 _.d=b
 _.e=c
 _.a=d},
-YW:function YW(a,b,c){this.c=a
+YW:function YW(a,b,c,d){this.c=a
 this.d=b
-this.a=c},
+this.e=c
+this.a=d},
 aww:function aww(a){this.a=a},
 awx:function awx(a){this.a=a},
 In:function In(a,b,c,d,e){var _=this
@@ -95920,7 +95921,7 @@ A.DC.prototype={
 aq(){return new A.Ih(B.jp)},
 tf(){return this.d.$0()}}
 A.Ih.prototype={
-G(a){var s,r,q=this,p=null,o=A.bo(a,B.bG,t.w).w.a,n=Math.max(360,o.a-80),m=Math.max(300,o.b-80),l=q.a,k=l.d,j=q.d,i=A.bN(new A.YW(j,q.gamK(),p),p,300),h=A.b2(16),g=A.by(B.k4,5)
+G(a){var s,r,q=this,p=null,o=A.bo(a,B.bG,t.w).w.a,n=Math.max(360,o.a-80),m=Math.max(300,o.b-80),l=q.a,k=l.d,j=q.d,i=A.bN(new A.YW(j,q.gamK(),q.gan2(),p),p,300),h=A.b2(16),g=A.by(B.k4,5)
 if(j===B.jp){l=l.c
 j=l.k3
 s=l.k1
@@ -95958,7 +95959,7 @@ q=q==null?s:q.bt(B.b4,42)
 return A.eR(s,A.ce(A.b([B.a3I,B.W4,r,B.W3,A.c5(A.aF(this.c,s,s,s,q,s,s),1),new A.lS(this.e,72,52,s)],t.p),B.B,B.o,B.y),B.x,s,B.nb,116,s,B.ph,s)}}
 A.YW.prototype={
 G(a){var s=this.c
-return A.bl(new A.b0(B.KQ,A.ca(A.b([new A.In(B.q2,"AUDIO",s===B.jp,new A.aww(this),null),B.W5,new A.In(B.pZ,"ABOUT",s===B.CQ,new A.awx(this),null)],t.p),B.B,B.o,B.y),null),B.DF,B.w)}}
+return A.bl(new A.b0(B.KQ,A.ca(A.b([new A.In(B.q2,"AUDIO",s===B.jp,new A.aww(this),null),B.W5,new A.In(B.pZ,"ABOUT",s===B.CQ,new A.awx(this),null),B.W5,new A.SD(this.e,null)],t.p),B.B,B.o,B.y),null),B.DF,B.w)}}
 A.aww.prototype={
 $0(){return this.a.d.$1(B.jp)},
 $S:0}

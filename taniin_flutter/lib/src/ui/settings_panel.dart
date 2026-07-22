@@ -6,7 +6,7 @@ import '../chain/platform_bridge.dart';
 import '../state/farm_state.dart';
 import 'pixel_panel.dart';
 
-enum _SettingsSection { audio, wallet, about }
+enum _SettingsSection { audio, about }
 
 class SettingsPanel extends StatefulWidget {
   const SettingsPanel({
@@ -60,6 +60,8 @@ class _SettingsPanelState extends State<SettingsPanel> {
                       child: _SettingsSidebar(
                         selectedSection: _selectedSection,
                         onSelected: _selectSection,
+                        showLogout: farmState.walletConnected,
+                        onLogout: _logoutWallet,
                       ),
                     ),
                     Expanded(
@@ -81,8 +83,6 @@ class _SettingsPanelState extends State<SettingsPanel> {
                               children:
                                   _selectedSection == _SettingsSection.audio
                                   ? _buildAudioContent()
-                                  : _selectedSection == _SettingsSection.wallet
-                                  ? _buildWalletContent()
                                   : _buildAboutContent(context),
                             ),
                           ),
@@ -152,30 +152,6 @@ class _SettingsPanelState extends State<SettingsPanel> {
         title: 'PROJECT',
         value: 'Taniin Play to Earn - Flutter game farming',
       ),
-    ];
-  }
-
-  List<Widget> _buildWalletContent() {
-    return [
-      const _SettingsTitle(icon: Icons.account_balance_wallet, title: 'WALLET'),
-      const SizedBox(height: 24),
-      _AboutInfoRow(
-        icon: farmState.walletConnected ? Icons.verified_user : Icons.link_off,
-        title: farmState.walletConnected ? 'CONNECTED WALLET' : 'WALLET BELUM LOGIN',
-        value: farmState.walletConnected
-            ? farmState.walletLabel
-            : 'Connect wallet dari panel login untuk mengirim aksi on-chain.',
-      ),
-      const SizedBox(height: 14),
-      _AboutInfoRow(
-        icon: Icons.cloud_sync,
-        title: 'CHAIN STATUS',
-        value: farmState.chainStatus,
-      ),
-      if (farmState.walletConnected) ...[
-        const SizedBox(height: 18),
-        _WalletLogoutButton(onTap: _logoutWallet),
-      ],
     ];
   }
 
@@ -253,10 +229,14 @@ class _SettingsSidebar extends StatelessWidget {
   const _SettingsSidebar({
     required this.selectedSection,
     required this.onSelected,
+    required this.showLogout,
+    required this.onLogout,
   });
 
   final _SettingsSection selectedSection;
   final ValueChanged<_SettingsSection> onSelected;
+  final bool showLogout;
+  final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -272,20 +252,17 @@ class _SettingsSidebar extends StatelessWidget {
               selected: selectedSection == _SettingsSection.audio,
               onTap: () => onSelected(_SettingsSection.audio),
             ),
-            const SizedBox(height: 16),
-            _SideTab(
-              icon: Icons.account_balance_wallet,
-              label: 'WALLET',
-              selected: selectedSection == _SettingsSection.wallet,
-              onTap: () => onSelected(_SettingsSection.wallet),
-            ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
             _SideTab(
               icon: Icons.info,
               label: 'ABOUT',
               selected: selectedSection == _SettingsSection.about,
               onTap: () => onSelected(_SettingsSection.about),
             ),
+            if (showLogout) ...[
+              const SizedBox(height: 18),
+              _SidebarLogoutButton(onTap: onLogout),
+            ],
           ],
         ),
       ),
@@ -537,8 +514,8 @@ class _AboutInfoRow extends StatelessWidget {
   }
 }
 
-class _WalletLogoutButton extends StatelessWidget {
-  const _WalletLogoutButton({required this.onTap});
+class _SidebarLogoutButton extends StatelessWidget {
+  const _SidebarLogoutButton({required this.onTap});
 
   final VoidCallback onTap;
 
@@ -550,11 +527,11 @@ class _WalletLogoutButton extends StatelessWidget {
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: const Color(0xFF832C20),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFFFFB23F), width: 3),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFFF8B63), width: 4),
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
