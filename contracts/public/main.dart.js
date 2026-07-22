@@ -27320,12 +27320,7 @@ q=t.N
 r=A.aaO(s.gMa(),q,q)
 r.m(0,"return",A.anj().Mq(A.q(q,q)).gor())
 return s.Mq(r).gor()},
-aU9(a){var s,r,q,p=A.aUb(a)
-if(p.length===0)return""
-s=A.ft(p)
-r=s.gwo()?":"+s.gm2():""
-q=s.gC_()?s.ghk()+"?"+s.gnw():s.ghk()
-return"https://metamask.app.link/dapp/"+s.glR()+r+q},
+aU9(a){return A.aUb(a)},
 aU7(){var s,r,q,p=B.c.aO("")
 if(p.length!==0)return p
 s=A.anj()
