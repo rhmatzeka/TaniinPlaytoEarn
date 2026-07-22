@@ -99,7 +99,9 @@ function html() {
     }
     button:active, a.button:active { transform: translateY(2px); }
     a.button { background: #b85b1e; }
-    body[data-wallet="inside"] #walletApp { display: none; }
+    #wallets { display: grid; gap: 10px; }
+    .wallet-choice { justify-content: flex-start; padding: 0 18px; gap: 12px; }
+    .wallet-choice img { width: 30px; height: 30px; border-radius: 7px; }
     #status { min-height: 24px; margin-top: 16px; color: #a9edae; font-weight: 800; line-height: 1.35; }
     .network {
       margin-top: 16px;
@@ -135,10 +137,9 @@ function html() {
     </header>
     <section class="content">
       <div class="frame">
-        <p>Approve public account access in your Ethereum wallet. Taniin will return to the Android app automatically; no private key is needed.</p>
+        <p>Pilih wallet yang ingin digunakan. Taniin tidak meminta seed phrase atau private key.</p>
         <div id="hint" class="hint"></div>
-        <button id="connect">Connect Wallet</button>
-        <a id="walletApp" class="button" href="#">Open in Wallet App</a>
+        <div id="wallets"></div>
         <div id="status"></div>
         <div class="network">Sepolia network</div>
       </div>
@@ -147,8 +148,7 @@ function html() {
   <script>
     const statusEl = document.getElementById('status');
     const hintEl = document.getElementById('hint');
-    const connectButton = document.getElementById('connect');
-    const walletAppButton = document.getElementById('walletApp');
+    const walletsEl = document.getElementById('wallets');
     const requestedCallback = new URLSearchParams(location.search).get('return') || 'taniin://wallet';
     const callback = safeCallback(requestedCallback);
 
@@ -166,19 +166,36 @@ function html() {
       statusEl.textContent = message;
     }
 
-    function walletProvider() {
-      const provider = window.ethereum;
-      return provider && provider.request ? provider : null;
+    const providers = new Map();
+
+    function addProvider(info, provider) {
+      if (!provider || typeof provider.request !== 'function') return;
+      const key = info && info.uuid ? info.uuid : (info && info.rdns ? info.rdns : 'legacy');
+      if (providers.has(key)) return;
+      providers.set(key, { info: info || { name: 'Browser Wallet', icon: '' }, provider });
+      renderProviders();
     }
 
-    function syncWalletMode() {
-      const insideWallet = !!walletProvider();
-      document.body.dataset.wallet = insideWallet ? 'inside' : 'outside';
-      hintEl.textContent = insideWallet
-        ? 'Sudah di browser wallet. Tap Connect Wallet untuk approve akun Sepolia.'
-        : 'Belum ada provider wallet di halaman ini. Buka lewat wallet Ethereum yang mendukung browser dapp.';
-      connectButton.textContent = insideWallet ? 'Connect Wallet' : 'Cek Wallet';
-      walletAppButton.style.display = insideWallet ? 'none' : 'flex';
+    function renderProviders() {
+      walletsEl.replaceChildren();
+      for (const entry of providers.values()) {
+        const button = document.createElement('button');
+        button.className = 'wallet-choice';
+        if (entry.info.icon && entry.info.icon.startsWith('data:image/')) {
+          const icon = document.createElement('img');
+          icon.src = entry.info.icon;
+          icon.alt = '';
+          button.appendChild(icon);
+        }
+        const label = document.createElement('span');
+        label.textContent = entry.info.name || 'Browser Wallet';
+        button.appendChild(label);
+        button.addEventListener('click', () => connect(entry.provider, label.textContent));
+        walletsEl.appendChild(button);
+      }
+      hintEl.textContent = providers.size
+        ? 'Pilih salah satu wallet yang terpasang di browser ini.'
+        : 'Tidak ada wallet Ethereum yang terdeteksi. Install wallet yang mendukung EIP-6963, lalu reload halaman.';
     }
 
     function appCallback(account, chainId) {
@@ -188,15 +205,9 @@ function html() {
         + '&chainId=' + encodeURIComponent(chainId || '');
     }
 
-    async function connect() {
-      const ethereum = walletProvider();
-      if (!ethereum) {
-        syncWalletMode();
-        setStatus('Open this page inside an Ethereum wallet browser, or use WalletConnect after the multi-wallet upgrade.', true);
-        return;
-      }
+    async function connect(ethereum, walletName) {
       try {
-        setStatus('Waiting for wallet approval...');
+        setStatus('Menunggu persetujuan ' + walletName + '...');
         const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
         const account = accounts && accounts[0];
         if (!account) {
@@ -222,12 +233,17 @@ function html() {
       }
     }
 
-    const dappPath = location.host + location.pathname + location.search;
-    walletAppButton.href = 'https://metamask.app.link/dapp/' + dappPath;
-    connectButton.addEventListener('click', connect);
-    syncWalletMode();
-    window.addEventListener('ethereum#initialized', syncWalletMode, { once: true });
-    window.setTimeout(syncWalletMode, 800);
+    window.addEventListener('eip6963:announceProvider', (event) => {
+      addProvider(event.detail && event.detail.info, event.detail && event.detail.provider);
+    });
+    window.dispatchEvent(new Event('eip6963:requestProvider'));
+    window.setTimeout(() => {
+      if (providers.size === 0 && window.ethereum) {
+        addProvider({ name: 'Browser Wallet', uuid: 'legacy', icon: '' }, window.ethereum);
+      } else {
+        renderProviders();
+      }
+    }, 500);
   </script>
 </body>
 </html>`;
@@ -236,7 +252,7 @@ function html() {
 module.exports = function walletConnect(_request, response) {
   response.setHeader('Content-Type', 'text/html; charset=utf-8');
   response.setHeader('Cache-Control', 'no-store');
-  response.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'");
+  response.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'");
   response.setHeader('X-Content-Type-Options', 'nosniff');
   response.setHeader('Referrer-Policy', 'no-referrer');
   response.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');

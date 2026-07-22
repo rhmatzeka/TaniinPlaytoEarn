@@ -33,29 +33,10 @@ class WalletPanel extends StatefulWidget {
 }
 
 class _WalletPanelState extends State<WalletPanel> {
-  late final TextEditingController _controller;
-
   FarmStateController get farmState => widget.farmState;
 
   @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: farmState.walletAddress);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    // Keep text controller synchronized if the wallet address changes externally (e.g. via deep link).
-    if (farmState.walletConnected && _controller.text != farmState.walletAddress) {
-      _controller.text = farmState.walletAddress;
-    }
-    
     final media = MediaQuery.sizeOf(context);
     final compact = media.width < 560 || media.height < 720;
     final contentProminent = widget.prominent && !compact;
@@ -136,53 +117,12 @@ class _WalletPanelState extends State<WalletPanel> {
                             onPressed: _openWalletConnect,
                           ),
                         ),
-                        SizedBox(height: contentProminent ? 24 : 16),
+                        const SizedBox(height: 14),
                         Text(
-                          'Manual public address Sepolia (demo fallback)',
-                          style: Theme.of(context).textTheme.labelLarge
-                              ?.copyWith(
-                                color: const Color(0xFFE9C692),
-                                fontSize: contentProminent ? 22 : 15,
-                              ),
-                        ),
-                        SizedBox(height: contentProminent ? 12 : 8),
-                        TextField(
-                          controller: _controller,
-                          maxLines: 1,
-                          keyboardType: TextInputType.url,
-                          textInputAction: TextInputAction.done,
-                          style: Theme.of(context).textTheme.bodyLarge
-                              ?.copyWith(
-                                color: const Color(0xFFFFF0D4),
-                                fontSize: contentProminent ? 26 : 17,
-                              ),
-                          decoration: InputDecoration(
-                            hintText: '0x wallet address',
-                            hintStyle: const TextStyle(
-                              color: Color(0xFFD2AA7D),
-                            ),
-                            filled: true,
-                            fillColor: const Color(0xFF7A3713),
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: contentProminent ? 22 : 14,
-                              vertical: contentProminent ? 20 : 12,
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(
-                                color: Color(0xFF5C2A0C),
-                                width: 3,
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(
-                                color: Color(0xFFFFD900),
-                                width: 3,
-                              ),
-                            ),
-                          ),
-                          onSubmitted: (_) => _saveWallet(),
+                          'Pilih wallet yang kamu miliki. Taniin tidak meminta seed phrase atau private key.',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: const Color(0xFFE9C692)),
                         ),
                         if (widget.showFacts) ...[
                           const SizedBox(height: 16),
@@ -203,15 +143,14 @@ class _WalletPanelState extends State<WalletPanel> {
                                 ),
                                 const SizedBox(height: 12),
                               ],
-                              _WalletActionButton(
-                                label: farmState.walletConnected
-                                    ? 'Ganti'
-                                    : 'Simpan',
-                                icon: Icons.check,
-                                color: const Color(0xFFD68127),
-                                prominent: contentProminent,
-                                onPressed: _saveWallet,
-                              ),
+                              if (!farmState.walletConnected)
+                                _WalletActionButton(
+                                  label: 'Pilih Wallet',
+                                  icon: Icons.account_balance_wallet,
+                                  color: const Color(0xFFD68127),
+                                  prominent: contentProminent,
+                                  onPressed: _openWalletConnect,
+                                ),
                             ],
                           )
                         else
@@ -228,15 +167,14 @@ class _WalletPanelState extends State<WalletPanel> {
                                   prominent: contentProminent,
                                   onPressed: _logoutWallet,
                                 ),
-                              _WalletActionButton(
-                                label: farmState.walletConnected
-                                    ? 'Ganti'
-                                    : 'Simpan',
-                                icon: Icons.check,
-                                color: const Color(0xFFD68127),
-                                prominent: contentProminent,
-                                onPressed: _saveWallet,
-                              ),
+                              if (!farmState.walletConnected)
+                                _WalletActionButton(
+                                  label: 'Pilih Wallet',
+                                  icon: Icons.account_balance_wallet,
+                                  color: const Color(0xFFD68127),
+                                  prominent: contentProminent,
+                                  onPressed: _openWalletConnect,
+                                ),
                             ],
                           ),
                       ],
@@ -249,18 +187,6 @@ class _WalletPanelState extends State<WalletPanel> {
         ),
       ),
     );
-  }
-
-  void _saveWallet() async {
-    final address = _controller.text.trim();
-    if (!isValidAddress(address)) {
-      farmState.showMessage('Wallet address tidak valid.', success: false);
-      return;
-    }
-    await farmState.connectWallet(address);
-    if (widget.showCloseButton) {
-      widget.onClose();
-    }
   }
 
   Future<void> _openWalletConnect() async {

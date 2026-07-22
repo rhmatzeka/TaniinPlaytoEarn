@@ -148,17 +148,6 @@ class PlatformBridge {
     return uri.replace(queryParameters: nextParams).toString();
   }
 
-  static String metamaskWalletConnectUrl(ChainConfig config) {
-    final connectUrl = walletConnectUrl(config);
-    if (connectUrl.isEmpty) {
-      return '';
-    }
-    final uri = Uri.parse(connectUrl);
-    final port = uri.hasPort ? ':${uri.port}' : '';
-    final path = uri.hasQuery ? '${uri.path}?${uri.query}' : uri.path;
-    return 'https://metamask.app.link/dapp/${uri.host}$port$path';
-  }
-
   static ChainConfig _environmentChainConfig() {
     return ChainConfig.fromMap(<Object?, Object?>{
       'rpcUrl': _envRpcUrl,

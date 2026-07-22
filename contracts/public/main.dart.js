@@ -96085,7 +96085,7 @@ a3=A.bN(b2,p?24:16,b2)
 a4=A.Q(b4).ok.as
 if(a4==null)a4=b2
 else a4=a4.bt(B.cD,p?22:15)
-a4=A.aF("Manual public address Sepolia (demo fallback)",b2,b2,b2,a4,b2,b2)
+a4=A.aF("Pilih wallet yang kamu miliki. Taniin tidak meminta seed phrase atau private key.",b2,b2,b2,a4,b2,b2)
 a5=A.bN(b2,p?12:8,b2)
 a6=b1.d
 a6===$&&A.a()
@@ -96095,18 +96095,16 @@ else a7=a7.bt(B.aL,p?26:17)
 a8=p?22:14
 a9=p?20:12
 b0=t.p
-a7=A.b([new A.Zj(a0,k,p,b2),a1,a2,a3,a4,a5,A.aJe(a6,A.aCc(b2,b2,b2,new A.af(a8,a9,a8,a9),b2,b2,b2,b2,!0,new A.hV(4,A.b2(8),B.Dk),b2,b2,b2,b2,b2,B.I0,!0,b2,b2,b2,b2,new A.hV(4,A.b2(8),B.Dn),b2,b2,b2,b2,b2,b2,b2,b2,B.ZP,"0x wallet address",b2,b2,b2,b2,b2,b2,b2,b2,b2,!0,!0,!1,b2,b2,b2,b2,b2,b2,b2,b2,b2,b2,b2,b2,b2,b2),b2,B.C3,1,new A.ays(b1),a7,B.C0)],b0)
+a7=A.b([new A.Zj(a0,k,p,b2),a1,a2,a3,a4],b0)
 k=b1.a
 if(k.r)B.b.K(a7,A.b([B.iN,new A.a_P(k.c,b2)],b0))
 a7.push(A.bN(b2,p?26:18,b2))
 if(q||b1.a.f){k=A.b([],b0)
 if(b1.a.c.x)B.b.K(k,A.b([new A.p5("Logout",B.lh,B.oH,b1.gTd(),p,b2),B.mk],b0))
-a0=b1.a.c.x?"Ganti":"Simpan"
-k.push(new A.p5(a0,B.lg,B.ox,b1.gUJ(),p,b2))
+if(b1.a.c.x)k.push(new A.p5("Ganti Wallet",B.lg,B.ox,new A.ayr(b1),p,b2))
 a7.push(A.ca(k,B.bd,B.o,B.y))}else{k=A.b([],b0)
 if(b1.a.c.x)k.push(new A.p5("Logout",B.lh,B.oH,b1.gTd(),p,b2))
-a0=b1.a.c.x?"Ganti":"Simpan"
-k.push(new A.p5(a0,B.lg,B.ox,b1.gUJ(),p,b2))
+if(b1.a.c.x)k.push(new A.p5("Ganti Wallet",B.lg,B.ox,new A.ayr(b1),p,b2))
 a7.push(A.anT(B.Cp,k,12,14))}return new A.e1(new A.aa(0,j,0,i),new A.lV(A.ca(A.b([new A.a_T(o,n,b3,s,p,q,l,h,b2),new A.uN(1,B.pG,A.aIS(A.bl(new A.b0(new A.af(a,a,a,a),A.ca(a7,B.bd,B.o,B.as),b2),new A.aE(B.jM,b2,b,c,b2,b2,B.p),B.w),new A.af(g,f,e,d),b2),b2)],b0),B.B,B.o,B.as),B.ar,B.jQ,B.hb,b2),b2)},
 vc(){var s=0,r=A.F(t.H),q,p=this,o,n,m
 var $async$vc=A.G(function(a,b){if(a===1)return A.C(b,r)
