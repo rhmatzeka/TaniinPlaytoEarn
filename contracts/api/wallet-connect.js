@@ -126,22 +126,92 @@ function html() {
       header { padding: 16px 18px; }
       button, a.button { min-height: 56px; }
     }
+    body { background: radial-gradient(circle at 50% 0%, #28563b 0, #102c20 42%, #091b14 100%); }
+    main { width: min(100%, 720px); border-radius: 22px; border-width: 4px; background: #132d21; }
+    header { min-height: 84px; padding: 16px 20px; background: #173b2a; border-bottom: 1px solid #315943; }
+    h1 { font-size: clamp(24px, 5vw, 32px); color: #fff4d8; }
+    .dot { display: none; }
+    .badge { background: #ffcf32; border-color: #78520b; border-radius: 12px; }
+    .back {
+      margin-left: auto;
+      width: 44px;
+      min-height: 44px;
+      padding: 0;
+      border: 1px solid #496d58;
+      border-radius: 12px;
+      background: #234b36;
+      font-size: 24px;
+    }
+    .content { padding: 22px; }
+    .frame { padding: 0; border: 0; background: transparent; }
+    .lead { color: #c9d9ce; font-weight: 600; margin-bottom: 16px; }
+    .search {
+      width: 100%;
+      height: 50px;
+      padding: 0 16px;
+      border: 1px solid #496d58;
+      border-radius: 13px;
+      outline: none;
+      background: #0d2419;
+      color: #fff4d8;
+      font: inherit;
+      font-weight: 700;
+    }
+    .search:focus { border-color: #74d693; box-shadow: 0 0 0 3px rgba(116, 214, 147, .14); }
+    .section-title { margin: 22px 0 10px; color: #fff4d8; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; }
+    .hint { margin: 10px 0 0; border: 0; padding: 0; background: transparent; color: #8eaa98; font-weight: 600; }
+    #wallets, #popular { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .wallet-choice, .popular-wallet {
+      position: relative;
+      min-height: 68px;
+      margin: 0;
+      padding: 10px 14px;
+      justify-content: flex-start;
+      gap: 12px;
+      border: 1px solid #426650;
+      border-radius: 14px;
+      background: #1b432f;
+      transition: border-color .15s, background .15s, transform .15s;
+    }
+    .wallet-choice:hover, .popular-wallet:hover { background: #24583d; border-color: #79d596; transform: translateY(-1px); }
+    .wallet-choice img, .popular-icon { width: 38px; height: 38px; border-radius: 10px; object-fit: contain; }
+    .popular-icon { display: grid; place-items: center; background: #0d2419; color: #ffcf32; font-size: 20px; font-weight: 900; }
+    .wallet-copy { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+    .wallet-name { color: #fff4d8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    .wallet-state { color: #91b19c; font-size: 12px; font-weight: 700; }
+    .installed { color: #7bea9f; }
+    #status { padding: 10px 0 0; margin: 0; }
+    .footer { margin-top: 20px; padding-top: 16px; border-top: 1px solid #315943; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .network { margin: 0; color: #a9c1b0; }
+    .safety { color: #789484; font-size: 12px; font-weight: 600; }
+    @media (max-width: 560px) {
+      #wallets, #popular { grid-template-columns: 1fr; }
+      main { border-radius: 16px; }
+      .content { padding: 18px; }
+    }
   </style>
 </head>
 <body>
   <main>
     <header>
-      <span class="dot"></span>
       <div class="badge">W</div>
-      <h1>Connect Taniin Wallet</h1>
+      <h1>Pilih Wallet</h1>
+      <button id="back" class="back" aria-label="Kembali">&times;</button>
     </header>
     <section class="content">
       <div class="frame">
-        <p>Pilih wallet yang ingin digunakan. Taniin tidak meminta seed phrase atau private key.</p>
+        <p class="lead">Hubungkan wallet Ethereum untuk bermain dan menyinkronkan aktivitas Sepolia.</p>
+        <input id="search" class="search" type="search" placeholder="Cari wallet..." autocomplete="off">
+        <h2 class="section-title">Tersedia di browser</h2>
         <div id="hint" class="hint"></div>
         <div id="wallets"></div>
+        <h2 class="section-title">Wallet populer</h2>
+        <div id="popular"></div>
         <div id="status"></div>
-        <div class="network">Sepolia network</div>
+        <div class="footer">
+          <div class="network">Sepolia network</div>
+          <div class="safety">Taniin tidak pernah meminta seed phrase.</div>
+        </div>
       </div>
     </section>
   </main>
@@ -149,6 +219,9 @@ function html() {
     const statusEl = document.getElementById('status');
     const hintEl = document.getElementById('hint');
     const walletsEl = document.getElementById('wallets');
+    const popularEl = document.getElementById('popular');
+    const searchEl = document.getElementById('search');
+    const backButton = document.getElementById('back');
     const requestedCallback = new URLSearchParams(location.search).get('return') || 'taniin://wallet';
     const callback = safeCallback(requestedCallback);
 
@@ -167,6 +240,14 @@ function html() {
     }
 
     const providers = new Map();
+    const popularWallets = [
+      { name: 'Rabby Wallet', short: 'R', url: 'https://rabby.io/' },
+      { name: 'Coinbase Wallet', short: 'C', url: 'https://www.coinbase.com/wallet/downloads' },
+      { name: 'OKX Wallet', short: 'O', url: 'https://www.okx.com/web3' },
+      { name: 'Trust Wallet', short: 'T', url: 'https://trustwallet.com/download' },
+      { name: 'MetaMask', short: 'M', url: 'https://metamask.io/download/' },
+      { name: 'WalletConnect', short: 'W', url: '', disabled: true }
+    ];
 
     function addProvider(info, provider) {
       if (!provider || typeof provider.request !== 'function') return;
@@ -176,26 +257,67 @@ function html() {
       renderProviders();
     }
 
+    function walletButton(name, icon, subtitle, onClick, className) {
+      const button = document.createElement('button');
+      button.className = className;
+      button.dataset.walletName = name.toLowerCase();
+      if (icon && icon.startsWith('data:image/')) {
+        const image = document.createElement('img');
+        image.src = icon;
+        image.alt = '';
+        button.appendChild(image);
+      } else {
+        const fallback = document.createElement('span');
+        fallback.className = 'popular-icon';
+        fallback.textContent = icon || name.slice(0, 1);
+        button.appendChild(fallback);
+      }
+      const copy = document.createElement('span');
+      copy.className = 'wallet-copy';
+      const title = document.createElement('span');
+      title.className = 'wallet-name';
+      title.textContent = name;
+      const state = document.createElement('span');
+      state.className = 'wallet-state' + (subtitle === 'Terpasang' ? ' installed' : '');
+      state.textContent = subtitle;
+      copy.append(title, state);
+      button.appendChild(copy);
+      if (onClick) button.addEventListener('click', onClick);
+      if (!onClick) button.disabled = true;
+      return button;
+    }
+
     function renderProviders() {
       walletsEl.replaceChildren();
       for (const entry of providers.values()) {
-        const button = document.createElement('button');
-        button.className = 'wallet-choice';
-        if (entry.info.icon && entry.info.icon.startsWith('data:image/')) {
-          const icon = document.createElement('img');
-          icon.src = entry.info.icon;
-          icon.alt = '';
-          button.appendChild(icon);
-        }
-        const label = document.createElement('span');
-        label.textContent = entry.info.name || 'Browser Wallet';
-        button.appendChild(label);
-        button.addEventListener('click', () => connect(entry.provider, label.textContent));
-        walletsEl.appendChild(button);
+        const name = entry.info.name || 'Browser Wallet';
+        walletsEl.appendChild(walletButton(name, entry.info.icon, 'Terpasang', () => connect(entry.provider, name), 'wallet-choice'));
       }
       hintEl.textContent = providers.size
-        ? 'Pilih salah satu wallet yang terpasang di browser ini.'
-        : 'Tidak ada wallet Ethereum yang terdeteksi. Install wallet yang mendukung EIP-6963, lalu reload halaman.';
+        ? ''
+        : 'Belum ada wallet Ethereum yang terdeteksi di browser ini.';
+      renderPopular();
+      filterWallets();
+    }
+
+    function renderPopular() {
+      popularEl.replaceChildren();
+      const installedNames = Array.from(providers.values()).map((entry) => String(entry.info.name || '').toLowerCase());
+      for (const wallet of popularWallets) {
+        const installed = installedNames.some((name) => name.includes(wallet.name.split(' ')[0].toLowerCase()));
+        if (installed) continue;
+        const action = wallet.disabled
+          ? null
+          : () => window.open(wallet.url, '_blank', 'noopener,noreferrer');
+        popularEl.appendChild(walletButton(wallet.name, wallet.short, wallet.disabled ? 'Segera hadir' : 'Install', action, 'popular-wallet'));
+      }
+    }
+
+    function filterWallets() {
+      const query = searchEl.value.trim().toLowerCase();
+      document.querySelectorAll('[data-wallet-name]').forEach((item) => {
+        item.hidden = query && !item.dataset.walletName.includes(query);
+      });
     }
 
     function appCallback(account, chainId) {
@@ -237,6 +359,11 @@ function html() {
       addProvider(event.detail && event.detail.info, event.detail && event.detail.provider);
     });
     window.dispatchEvent(new Event('eip6963:requestProvider'));
+    searchEl.addEventListener('input', filterWallets);
+    backButton.addEventListener('click', () => {
+      if (history.length > 1) history.back();
+      else location.href = location.origin;
+    });
     window.setTimeout(() => {
       if (providers.size === 0 && window.ethereum) {
         addProvider({ name: 'Browser Wallet', uuid: 'legacy', icon: '' }, window.ethereum);
