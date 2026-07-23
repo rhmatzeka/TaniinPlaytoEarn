@@ -1503,6 +1503,12 @@ class FarmStateController extends ChangeNotifier {
       showMessage(error.isEmpty ? 'Transfer ETH dibatalkan.' : error, success: false);
       return false;
     }
+    showMessage('Pembayaran ETH terkirim. Menunggu konfirmasi Sepolia...');
+    final paymentReceipt = await _chainClient.waitForTransaction(paymentTxHash);
+    if (!paymentReceipt.confirmed || !paymentReceipt.success) {
+      showMessage(paymentReceipt.message, success: false);
+      return false;
+    }
     _queueChainAction(
       ChainAction(type: 'SWAP_ETH_COIN', plotId: 0, amount: amount, paymentTxHash: paymentTxHash),
       title: 'Beli Game Coin dari ETH',

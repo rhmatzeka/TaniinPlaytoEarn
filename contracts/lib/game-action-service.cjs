@@ -324,12 +324,13 @@ async function verifyEthFundingTransaction(service, walletAddress, amount, payme
     throw httpError(409, "Transaksi pembayaran ETH sudah pernah dipakai.");
   }
   const requiredWei = ethPayoutWei(amount);
-  const [transaction, receipt] = await Promise.all([
-    service.provider.getTransaction(hash),
-    service.provider.getTransactionReceipt(hash)
-  ]);
-  if (!transaction || !receipt || receipt.status !== 1) {
-    throw httpError(409, "Pembayaran ETH belum confirmed di Sepolia.");
+  const transaction = await service.provider.getTransaction(hash);
+  const receipt = await service.provider.waitForTransaction(hash, 1, 120_000);
+  if (!transaction || !receipt) {
+    throw httpError(504, "Pembayaran ETH masih menunggu konfirmasi Sepolia. Coba Sync Wallet sebentar lagi.");
+  }
+  if (receipt.status !== 1) {
+    throw httpError(409, "Pembayaran ETH gagal di Sepolia.");
   }
   if (transaction.from.toLowerCase() !== walletAddress.toLowerCase()
       || String(transaction.to || "").toLowerCase() !== service.wallet.address.toLowerCase()) {
