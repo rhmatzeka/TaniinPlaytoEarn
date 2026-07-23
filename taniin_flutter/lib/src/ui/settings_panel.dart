@@ -245,6 +245,7 @@ class _SettingsSidebar extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(22, 28, 22, 22),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _SideTab(
               icon: Icons.volume_up,
@@ -297,6 +298,7 @@ class _SideTab extends StatelessWidget {
           ),
         ),
         child: SizedBox(
+          width: double.infinity,
           height: 104,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.start,

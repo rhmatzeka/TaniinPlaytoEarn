@@ -5,6 +5,7 @@
   "scripts": {
     "test": "hardhat test",
     "compile": "hardhat compile",
+    "build:wallet-connect": "esbuild wallet-connect/app.jsx --bundle --minify --legal-comments=none --format=iife --outfile=public/wallet-connect.js",
     "deploy:sepolia": "hardhat run scripts/deploy.cjs --network sepolia",
     "game-api": "node scripts/game-api.cjs",
     "mint:tani": "hardhat run scripts/mint-tani.cjs --network sepolia",
@@ -12,11 +13,18 @@
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^6.1.2",
+    "esbuild": "^0.25.6",
     "hardhat": "^2.28.6"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.6.1",
+    "@tanstack/react-query": "5.28.9",
+    "connectkit": "1.8.2",
     "dotenv": "^17.2.3",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "viem": "2.13.5",
+    "wagmi": "2.10.4",
     "socket.io": "^4.8.3"
   }
 }
