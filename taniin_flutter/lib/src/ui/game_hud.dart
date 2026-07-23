@@ -572,14 +572,18 @@ class _WalletButton extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      connected ? 'tap untuk ganti/sync' : 'mode lokal aktif',
+                      connected && farmState.walletNativeBalance.isNotEmpty
+                          ? '${farmState.walletNativeBalance} ETH - tap untuk sync'
+                          : connected
+                          ? 'tap untuk ganti/sync'
+                          : 'mode lokal aktif',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: connected
                             ? const Color(0xFFB1EEB9)
                             : const Color(0xFFD9EBCB),
-                        fontSize: compact ? 12 : 16,
+                        fontSize: compact ? 10 : 14,
                         height: 1.05,
                       ),
                     ),

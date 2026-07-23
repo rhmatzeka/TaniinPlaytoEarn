@@ -128,6 +128,30 @@ class _WalletPanelState extends State<WalletPanel> {
                           const SizedBox(height: 16),
                           _WalletFacts(farmState: farmState),
                         ],
+                        if (farmState.walletConnected) ...[
+                          const SizedBox(height: 14),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 10,
+                            alignment: WrapAlignment.center,
+                            children: [
+                              _WalletActionButton(
+                                label: 'Sync Saldo',
+                                icon: Icons.refresh,
+                                color: const Color(0xFF2C8356),
+                                prominent: contentProminent,
+                                onPressed: _syncBalance,
+                              ),
+                              _WalletActionButton(
+                                label: 'Buka Etherscan',
+                                icon: Icons.open_in_new,
+                                color: const Color(0xFF496A8A),
+                                prominent: contentProminent,
+                                onPressed: _openExplorer,
+                              ),
+                            ],
+                          ),
+                        ],
                         SizedBox(height: contentProminent ? 26 : 18),
                         if (compact || widget.prominent)
                           Column(
@@ -217,6 +241,19 @@ class _WalletPanelState extends State<WalletPanel> {
     farmState.disconnectWallet();
     if (widget.showCloseButton) {
       widget.onClose();
+    }
+  }
+
+  Future<void> _syncBalance() async {
+    await farmState.refreshWalletState(revealMessage: true);
+  }
+
+  Future<void> _openExplorer() async {
+    final opened = await PlatformBridge.openUrl(
+      'https://sepolia.etherscan.io/address/${farmState.walletAddress}',
+    );
+    if (!opened) {
+      farmState.showMessage('Tidak bisa membuka Etherscan.', success: false);
     }
   }
 }
