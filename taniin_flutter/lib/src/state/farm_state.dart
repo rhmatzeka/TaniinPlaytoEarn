@@ -1967,11 +1967,11 @@ class FarmStateController extends ChangeNotifier {
     }
     updateHistoryStatus(
       entryId,
-      status: 'belum sync',
+      status: 'gagal sync',
       errorMessage: cleanReason,
     );
-    chainStatus =
-        '${action.label} tersimpan lokal. $cleanReason';
+    chainStatus = '${action.label} gagal sync: $cleanReason';
+    showMessage('Sync Sepolia gagal. Coba lagi.', success: false, notify: false);
     _commitState();
   }
 
@@ -2081,7 +2081,7 @@ class FarmStateController extends ChangeNotifier {
   String _normalizeHistoryStatus(String status) {
     final lower = status.trim().toLowerCase();
     if (lower.contains('gagal kirim') || lower.contains('gagal sync')) {
-      return 'belum sync';
+      return 'gagal sync';
     }
     if (lower == 'pending signer' || lower == 'pending lokal') {
       return 'belum on-chain';

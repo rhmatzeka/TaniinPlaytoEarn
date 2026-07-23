@@ -94336,8 +94336,9 @@ r.fx=b.giM()+" gagal; saldo dikembalikan "+s+": "+q
 r.mg("Swap gagal, saldo dikembalikan.",!1,!1)
 r.ci()
 r.N()
-return}r.nG(a,q,"belum sync")
-r.fx=b.giM()+" tersimpan lokal. "+q
+return}r.nG(a,q,"gagal sync")
+r.fx=b.giM()+" gagal sync: "+q
+r.mg("Sync Sepolia gagal. Coba lagi.",!1,!1)
 r.ci()
 r.N()},
 r5(a,b,c,d){var s,r=this,q=new A.ds(Date.now(),0,!1),p=r.db++,o=r.RG
@@ -94372,7 +94373,7 @@ aiF(a){if(!this.x)return a.giM()+" tersimpan lokal. Connect wallet untuk sync ch
 if(this.CW.e.length===0)return"Signer backend belum diset; "+a.giM()+" baru tersimpan lokal."
 return a.giM()+" tersimpan lokal."},
 za(a){var s="belum sync",r=B.c.aO(a),q=r.toLowerCase()
-if(B.c.p(q,"gagal kirim")||B.c.p(q,"gagal sync"))return s
+if(B.c.p(q,"gagal kirim")||B.c.p(q,"gagal sync"))return"gagal sync"
 if(q==="pending signer"||q==="pending lokal")return"belum on-chain"
 if(q==="pending wallet")return"butuh wallet"
 if(q==="local saved"||q==="lokal"||q==="berhasil")return"lokal tersimpan"

@@ -129,8 +129,9 @@ async function submitGameAction(body) {
       break;
     }
     case "HARVEST": {
-      txHashes.push(await sendTransaction("harvest", () => land.harvestFor(walletAddress, plotId, tokenUri)));
-      txHashes.push(await sendTransaction("mint crop", () => items.mint(walletAddress, CROP_ITEM_ID, 3n)));
+      txHashes.push(await sendConfirmedTransaction("harvest", () => land.harvestFor(walletAddress, plotId, tokenUri)));
+      primaryTxHash = await sendTransaction("mint crop", () => items.mint(walletAddress, CROP_ITEM_ID, 3n));
+      txHashes.push(primaryTxHash);
       break;
     }
     case "BUY_SEED": {
@@ -285,7 +286,6 @@ function unsafeEconomyEnabled() {
 
 const _unsafeEconomyActions = new Set([
   "BUY_SEED",
-  "HARVEST",
   "SELL_CROP",
   "SWAP_CROP",
   "SWAP_ETH_COIN"
