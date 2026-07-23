@@ -1873,7 +1873,17 @@ class FarmStateController extends ChangeNotifier {
         coins = math.min(0x7fffffff, coins + action.amount);
       }
       if (_actionUpdatesCoinBalance(action) && action.type != 'SWAP_COIN_ETH') {
-        unawaited(refreshWalletState(revealMessage: false));
+        await refreshWalletState(revealMessage: false);
+        if (action.type == 'SWAP_ETH_COIN') {
+          chainStatus =
+              'Pembelian confirmed. Saldo ETH terbaru $walletNativeBalance ETH.';
+          showMessage(
+            'Game Coin masuk. Saldo ETH: $walletNativeBalance ETH.',
+            notify: false,
+          );
+        } else if (action.type == 'SWAP_TANI_COIN') {
+          chainStatus = 'Deposit confirmed. Saldo TANI terbaru $tani.';
+        }
       }
       _commitState();
       return;

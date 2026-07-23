@@ -408,7 +408,7 @@ class _WalletFacts extends StatelessWidget {
         ),
         _FactChip(
           icon: Icons.bolt,
-          label: 'ETH',
+          label: 'ETH (presisi)',
           value: farmState.walletNativeBalance.isEmpty
               ? '-'
               : farmState.walletNativeBalance,
