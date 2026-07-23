@@ -12,3 +12,17 @@ bool openBrowserUrl(String url, {bool sameTab = false}) {
   }
   return true;
 }
+
+void removeBrowserQueryParameters(Iterable<String> names) {
+  final uri = Uri.base;
+  final parameters = Map<String, String>.from(uri.queryParameters);
+  var changed = false;
+  for (final name in names) {
+    changed = parameters.remove(name) != null || changed;
+  }
+  if (!changed) {
+    return;
+  }
+  final cleaned = uri.replace(queryParameters: parameters.isEmpty ? null : parameters);
+  web.window.history.replaceState(null, '', cleaned.toString());
+}

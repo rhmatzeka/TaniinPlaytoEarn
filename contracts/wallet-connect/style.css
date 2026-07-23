@@ -18,6 +18,6 @@ button:hover { background: #ffe071; }
 button:active { transform: translateY(3px); box-shadow: 0 2px 0 #9b7b20; }
 button:disabled { opacity: .65; cursor: wait; }
 .status { min-height: 22px; margin: 20px 0 8px; color: #a8c8b2; font-size: 13px; line-height: 1.5; }
-.error { padding: 14px; border: 1px solid #985448; border-radius: 10px; color: #ffd2ca; background: #512c27; line-height: 1.45; }
+.notice { padding: 12px 14px; border: 1px solid #55705e; border-radius: 10px; color: #bed0c2; background: #183925; font-size: 12px; line-height: 1.45; }
 a { color: #f6c945; font-size: 13px; font-weight: 800; text-underline-offset: 4px; }
 @media (max-width: 760px) { main { grid-template-columns: 1fr; align-content: center; padding: 28px 20px 40px; gap: 36px; } h1 { font-size: clamp(43px, 14vw, 66px); } .intro { font-size: 16px; } .network { margin-top: 22px; } .connect-card { border-radius: 22px 7px; } }

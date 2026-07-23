@@ -92,6 +92,7 @@ class PlatformBridge {
       return '';
     }
     final address = Uri.base.queryParameters['address']?.trim() ?? '';
+    removeBrowserQueryParameters(const <String>['address', 'chainId']);
     return isValidAddress(address) ? address : '';
   }
 

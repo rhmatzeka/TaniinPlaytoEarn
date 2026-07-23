@@ -95404,7 +95404,8 @@ if(m==null)m=""
 n=A.bJ("^0x[0-9a-fA-F]{40}$",!0,!1)
 l=B.c.aO(m)
 k=n.b.test(l)?m:""
-if(k.length!==0)o.ro(k)
+if(k.length!==0){o.ro(k)
+v.G.window.history.replaceState(null,"",v.G.window.location.origin+v.G.window.location.pathname)}
 case 1:return A.D(q,r)}})
 return A.E($async$yT,r)},
 mX(a){var s,r=this

@@ -70,16 +70,15 @@ function WalletConnect() {
         <p className="step">Wallet access</p>
         <h2>Connect to Taniin</h2>
         <p className="copy">Select your wallet in the ConnectKit dialog. Taniin never asks for your seed phrase.</p>
-        {runtime.projectId ? (
-          <ConnectKitButton.Custom>
-            {({ show, isConnecting }) => (
-              <button type="button" onClick={show} disabled={isConnecting}>
-                {isConnecting ? 'Connecting...' : isConnected ? 'Connected' : 'Choose wallet'}
-              </button>
-            )}
-          </ConnectKitButton.Custom>
-        ) : (
-          <p className="error">WalletConnect is not configured. Set TANIIN_WALLETCONNECT_PROJECT_ID on the deployment.</p>
+        <ConnectKitButton.Custom>
+          {({ show, isConnecting }) => (
+            <button type="button" onClick={show} disabled={isConnecting}>
+              {isConnecting ? 'Connecting...' : isConnected ? 'Connected' : 'Choose wallet'}
+            </button>
+          )}
+        </ConnectKitButton.Custom>
+        {!runtime.projectId && (
+          <p className="notice">Browser wallets are available. QR and mobile wallets require the WalletConnect Project ID on deployment.</p>
         )}
         <p className="status" aria-live="polite">{status}</p>
         <a href={runtime.cancelUrl || '/'}>Back to game</a>
