@@ -167,7 +167,8 @@ class HistoryRecord {
 }
 
 class FarmStateController extends ChangeNotifier {
-  static const int maxOnChainSwapAmount = 100000;
+  static const int minEthSwapAmount = 100;
+  static const int maxOnChainSwapAmount = 10000;
   FarmStateController({
     this.onSfx,
     ChainClient Function(ChainConfig)? chainClientFactory,
@@ -180,9 +181,9 @@ class FarmStateController extends ChangeNotifier {
   }
 
   static const Duration growDuration = Duration(seconds: 12);
-  static const int landBuyPrice = 250;
-  static const int landSellPrice = 175;
-  static const int harvestSellPrice = 35;
+  static const int landBuyPrice = 1000;
+  static const int landSellPrice = 750;
+  static const int harvestSellPrice = 50;
   static const int seedBundleAmount = 3;
   static const int maxShopBundleQuantity = 9;
   static const String _saveKey = 'taniin.farmState.v1';
@@ -233,25 +234,25 @@ class FarmStateController extends ChangeNotifier {
     const SeedStack(
       name: 'Kentang',
       quantity: 6,
-      price: 60,
+      price: 100,
       color: Color(0xFFAE61DE),
     ),
     const SeedStack(
       name: 'Bawang',
       quantity: 0,
-      price: 75,
+      price: 140,
       color: Color(0xFF7ACD7E),
     ),
     const SeedStack(
       name: 'Stroberi',
       quantity: 0,
-      price: 110,
+      price: 220,
       color: Color(0xFFEC4667),
     ),
     const SeedStack(
       name: 'Bit',
       quantity: 0,
-      price: 90,
+      price: 180,
       color: Color(0xFFF79C58),
     ),
   ];
@@ -417,9 +418,9 @@ class FarmStateController extends ChangeNotifier {
     if (swappingGameCoinToEth) {
       final maxCoin = gameCoinEthPayoutCapacity;
       final maxEth = _formatEthWei(_ethWeiForCoinAmount(maxCoin));
-      return 'Rate 1 coin = $rate ETH | max payout $maxCoin coin ($maxEth ETH)';
+      return 'Rate 1 coin = $rate ETH | minimum $minEthSwapAmount coin | max $maxCoin coin ($maxEth ETH)';
     }
-    return 'Rate 1 coin = $rate ETH';
+    return 'Rate 1 coin = $rate ETH | minimum $minEthSwapAmount coin';
   }
 
   int balanceForSwapAsset(SwapAsset asset) {
@@ -1488,6 +1489,13 @@ class FarmStateController extends ChangeNotifier {
       );
       return false;
     }
+    if (amount < minEthSwapAmount) {
+      showMessage(
+        'Deposit ETH minimal $minEthSwapAmount coin supaya saldo wallet terlihat berubah.',
+        success: false,
+      );
+      return false;
+    }
     if (!isValidAddress(chainSignerAddress)) {
       showMessage('Sync wallet dulu supaya alamat pembayaran tersedia.', success: false);
       return false;
@@ -1551,6 +1559,13 @@ class FarmStateController extends ChangeNotifier {
     if (amount > payoutCapacity) {
       showMessage(
         'Payout ETH maksimal $payoutCapacity coin sekali swap.',
+        success: false,
+      );
+      return false;
+    }
+    if (amount < minEthSwapAmount) {
+      showMessage(
+        'Payout ETH minimal $minEthSwapAmount coin supaya saldo wallet terlihat berubah.',
         success: false,
       );
       return false;

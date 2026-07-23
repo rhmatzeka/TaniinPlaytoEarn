@@ -3,12 +3,14 @@ const { ethers } = require("ethers");
 const SEPOLIA_CHAIN_ID = 11155111n;
 const SEED_ITEM_ID = 1n;
 const CROP_ITEM_ID = 2n;
-const LAND_SELL_REWARD = 175;
-const CROP_REWARD = 35;
+const LAND_SELL_REWARD = 750;
+const CROP_REWARD = 50;
 const COIN_SWAP_RATE = 1;
-const DEFAULT_ETH_WEI_PER_COIN = "100000000000000";
+const MIN_ETH_WEI_PER_COIN = 10_000_000_000_000n;
+const MIN_ETH_SWAP_COIN = 100n;
+const DEFAULT_ETH_WEI_PER_COIN = "10000000000000";
 const DEFAULT_MAX_ETH_PAYOUT_WEI = "100000000000000000";
-const DEFAULT_MAX_GAME_COIN_SWAP = "100000";
+const DEFAULT_MAX_GAME_COIN_SWAP = "10000";
 
 const coinAbi = [
   "function mint(address to, uint256 amount) external",
@@ -161,11 +163,13 @@ async function submitGameAction(body) {
     }
     case "SWAP_ETH_COIN": {
       ensureGameCoinSwapWithinLimit(amount);
+      ensureEthSwapMinimum(amount);
       await verifyEthFundingTransaction(service, walletAddress, amount, body.paymentTxHash);
       txHashes.push(await sendTransaction("ETH funding receipt", () => coin.mint(walletAddress, toTani(BigInt(amount) * BigInt(COIN_SWAP_RATE)))));
       break;
     }
     case "SWAP_COIN_ETH": {
+      ensureEthSwapMinimum(amount);
       const payoutWei = ethPayoutWei(amount);
       ethPayoutAmountWei = payoutWei;
       ensureRecipientIsNotSigner(service, walletAddress);
@@ -275,15 +279,22 @@ function ethSwapConfig() {
   const configuredWeiPerCoin = envBigInt("TANIIN_ETH_WEI_PER_COIN", DEFAULT_ETH_WEI_PER_COIN);
   const configuredMaxPayoutWei = envBigInt("TANIIN_MAX_ETH_PAYOUT_WEI", DEFAULT_MAX_ETH_PAYOUT_WEI);
   return {
-    weiPerCoin: configuredWeiPerCoin,
+    weiPerCoin: configuredWeiPerCoin < MIN_ETH_WEI_PER_COIN ? MIN_ETH_WEI_PER_COIN : configuredWeiPerCoin,
     maxPayoutWei: configuredMaxPayoutWei
   };
 }
 
 function ensureGameCoinSwapWithinLimit(amount) {
   const maximum = envBigInt("TANIIN_MAX_GAME_COIN_SWAP", DEFAULT_MAX_GAME_COIN_SWAP);
-  if (BigInt(amount) > maximum) {
-    throw httpError(400, `Swap Game Coin maksimal ${maximum} coin per transaksi.`);
+  const effectiveMaximum = maximum > 10_000n ? 10_000n : maximum;
+  if (BigInt(amount) > effectiveMaximum) {
+    throw httpError(400, `Swap Game Coin maksimal ${effectiveMaximum} coin per transaksi.`);
+  }
+}
+
+function ensureEthSwapMinimum(amount) {
+  if (BigInt(amount) < MIN_ETH_SWAP_COIN) {
+    throw httpError(400, `Deposit dan payout ETH minimal ${MIN_ETH_SWAP_COIN} coin supaya perubahan terlihat di wallet.`);
   }
 }
 
