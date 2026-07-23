@@ -57,12 +57,13 @@ class ChainConfig {
 }
 
 class ChainAction {
-  ChainAction({required this.type, required this.plotId, required this.amount})
+  ChainAction({required this.type, required this.plotId, required this.amount, this.paymentTxHash = ''})
     : createdAtMs = DateTime.now().millisecondsSinceEpoch;
 
   final String type;
   final int plotId;
   final int amount;
+  final String paymentTxHash;
   final int createdAtMs;
 
   String get label {
@@ -89,6 +90,7 @@ class ChainAction {
       'plotId': plotId,
       'amount': amount,
       'createdAtMs': createdAtMs,
+      if (paymentTxHash.isNotEmpty) 'paymentTxHash': paymentTxHash,
     };
   }
 }

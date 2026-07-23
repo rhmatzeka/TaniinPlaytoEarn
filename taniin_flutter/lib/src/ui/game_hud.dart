@@ -1055,7 +1055,7 @@ class _InteractionButtons extends StatelessWidget {
     };
   }
 
-  void _performPrimary(BuildContext context) {
+  Future<void> _performPrimary(BuildContext context) async {
     switch (interaction) {
       case GameInteraction.sellHarvest:
         if (farmState.sellHarvest()) {
@@ -1063,7 +1063,7 @@ class _InteractionButtons extends StatelessWidget {
         }
         return;
       case GameInteraction.swapToken:
-        if (farmState.swapSelectedAssets()) {
+        if (await farmState.swapSelectedAssets()) {
           onClose();
         }
         return;

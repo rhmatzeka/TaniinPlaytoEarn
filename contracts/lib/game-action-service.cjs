@@ -31,6 +31,7 @@ const itemsAbi = [
 
 let servicePromise;
 let actionQueue = Promise.resolve();
+const usedFundingTransactions = new Set();
 
 function getGameService() {
   if (!servicePromise) {
@@ -138,7 +139,12 @@ async function submitGameAction(body) {
       txHashes.push(await sendTransaction("mint seed", () => items.mint(walletAddress, SEED_ITEM_ID, BigInt(amount))));
       break;
     }
-    case "SELL_CROP":
+    case "SELL_CROP": {
+      ensureGameCoinSwapWithinLimit(BigInt(amount) * BigInt(CROP_REWARD));
+      primaryTxHash = await sendTransaction("sell crop burn", () => items.burn(walletAddress, CROP_ITEM_ID, BigInt(amount)));
+      txHashes.push(primaryTxHash);
+      break;
+    }
     case "SWAP_CROP": {
       txHashes.push(await sendTransaction("crop reward", () => coin.mint(walletAddress, toTani(BigInt(amount) * BigInt(CROP_REWARD)))));
       break;
@@ -154,7 +160,8 @@ async function submitGameAction(body) {
       break;
     }
     case "SWAP_ETH_COIN": {
-      await ensureWalletHasEthForFunding(service, walletAddress, amount);
+      ensureGameCoinSwapWithinLimit(amount);
+      await verifyEthFundingTransaction(service, walletAddress, amount, body.paymentTxHash);
       txHashes.push(await sendTransaction("ETH funding receipt", () => coin.mint(walletAddress, toTani(BigInt(amount) * BigInt(COIN_SWAP_RATE)))));
       break;
     }
@@ -286,9 +293,7 @@ function unsafeEconomyEnabled() {
 
 const _unsafeEconomyActions = new Set([
   "BUY_SEED",
-  "SELL_CROP",
-  "SWAP_CROP",
-  "SWAP_ETH_COIN"
+  "SWAP_CROP"
 ]);
 
 function ensureRecipientIsNotSigner(service, walletAddress) {
@@ -310,12 +315,30 @@ async function ensureSignerCanPayEth(service, payoutWei) {
   }
 }
 
-async function ensureWalletHasEthForFunding(service, walletAddress, amount) {
-  const requiredWei = ethPayoutWei(amount);
-  const balanceWei = await service.provider.getBalance(walletAddress);
-  if (balanceWei < requiredWei) {
-    throw httpError(402, `Saldo ETH wallet belum cukup untuk isi Game Coin. Butuh minimal ${ethers.formatEther(requiredWei)} ETH.`);
+async function verifyEthFundingTransaction(service, walletAddress, amount, paymentTxHash) {
+  const hash = String(paymentTxHash || "").trim().toLowerCase();
+  if (!/^0x[0-9a-f]{64}$/.test(hash)) {
+    throw httpError(400, "Hash pembayaran ETH tidak valid.");
   }
+  if (usedFundingTransactions.has(hash)) {
+    throw httpError(409, "Transaksi pembayaran ETH sudah pernah dipakai.");
+  }
+  const requiredWei = ethPayoutWei(amount);
+  const [transaction, receipt] = await Promise.all([
+    service.provider.getTransaction(hash),
+    service.provider.getTransactionReceipt(hash)
+  ]);
+  if (!transaction || !receipt || receipt.status !== 1) {
+    throw httpError(409, "Pembayaran ETH belum confirmed di Sepolia.");
+  }
+  if (transaction.from.toLowerCase() !== walletAddress.toLowerCase()
+      || String(transaction.to || "").toLowerCase() !== service.wallet.address.toLowerCase()) {
+    throw httpError(400, "Pengirim atau penerima pembayaran ETH tidak cocok.");
+  }
+  if (transaction.value < requiredWei) {
+    throw httpError(402, `Pembayaran ETH kurang. Butuh minimal ${ethers.formatEther(requiredWei)} ETH.`);
+  }
+  usedFundingTransactions.add(hash);
 }
 
 function envBigInt(name, fallback) {

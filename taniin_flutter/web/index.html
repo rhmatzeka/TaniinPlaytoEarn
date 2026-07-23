@@ -127,6 +127,21 @@
         return '';
       }
     };
+
+    window.taniinSendEthereum = async function (from, to, valueHex) {
+      window.taniinLastEthereumError = '';
+      try {
+        return String(await window.ethereum.request({
+          method: 'eth_sendTransaction',
+          params: [{ from: from, to: to, value: valueHex }],
+        }));
+      } catch (error) {
+        window.taniinLastEthereumError = error && error.message
+          ? error.message
+          : 'Transfer ETH dibatalkan.';
+        return '';
+      }
+    };
   </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>

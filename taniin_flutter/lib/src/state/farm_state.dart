@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../chain/chain_client.dart';
+import '../chain/browser_wallet.dart' as browser_wallet;
+import '../chain/platform_bridge.dart';
 
 enum GamePanel { history, backpack, settings }
 
@@ -165,6 +167,7 @@ class HistoryRecord {
 }
 
 class FarmStateController extends ChangeNotifier {
+  static const int maxOnChainSwapAmount = 100000;
   FarmStateController({
     this.onSfx,
     ChainClient Function(ChainConfig)? chainClientFactory,
@@ -346,7 +349,7 @@ class FarmStateController extends ChangeNotifier {
         capacity = payoutCapacity;
       }
     }
-    return _clampBigIntToGameInt(capacity);
+    return math.min(maxOnChainSwapAmount, _clampBigIntToGameInt(capacity));
   }
 
   int get gameCoinEthPayoutCapacity {
@@ -1376,7 +1379,7 @@ class FarmStateController extends ChangeNotifier {
     return true;
   }
 
-  bool swapSelectedAssets() {
+  Future<bool> swapSelectedAssets() async {
     playClick();
     _normalizeSwapAssets(preferFrom: true);
     final fromAsset = swapFromAsset;
@@ -1413,7 +1416,7 @@ class FarmStateController extends ChangeNotifier {
     return false;
   }
 
-  bool swapCoinsToTani() => swapSelectedAssets();
+  Future<bool> swapCoinsToTani() => swapSelectedAssets();
 
   bool _swapGameCoinToTani(int amount) {
     coins -= amount;
@@ -1459,7 +1462,7 @@ class FarmStateController extends ChangeNotifier {
     return true;
   }
 
-  bool _swapEthToGameCoin(int amount) {
+  Future<bool> _swapEthToGameCoin(int amount) async {
     if (!chainConfig.hasGameApi) {
       showMessage(
         'Backend Sepolia belum aktif untuk beli coin dari ETH.',
@@ -1485,8 +1488,23 @@ class FarmStateController extends ChangeNotifier {
       );
       return false;
     }
+    if (!isValidAddress(chainSignerAddress)) {
+      showMessage('Sync wallet dulu supaya alamat pembayaran tersedia.', success: false);
+      return false;
+    }
+    final paymentWei = _ethWeiForCoinAmount(amount);
+    final paymentTxHash = await browser_wallet.sendBrowserWalletEthereum(
+      walletAddress,
+      chainSignerAddress,
+      paymentWei,
+    );
+    if (!isValidTransactionHash(paymentTxHash)) {
+      final error = PlatformBridge.browserWalletConnectError();
+      showMessage(error.isEmpty ? 'Transfer ETH dibatalkan.' : error, success: false);
+      return false;
+    }
     _queueChainAction(
-      ChainAction(type: 'SWAP_ETH_COIN', plotId: 0, amount: amount),
+      ChainAction(type: 'SWAP_ETH_COIN', plotId: 0, amount: amount, paymentTxHash: paymentTxHash),
       title: 'Beli Game Coin dari ETH',
       valueLabel: '+$amount coin',
       requiresTxHash: true,
