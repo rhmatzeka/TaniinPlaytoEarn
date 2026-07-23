@@ -94,6 +94,7 @@ async function submitGameAction(body) {
   const amount = toPositiveInt(body.amount || 1, "amount");
   const tokenUri = landTokenUri(walletAddress, plotId);
   const txHashes = [];
+  let primaryTxHash = "";
   let ethPayoutAmountWei = 0n;
   const { coin, land, items } = service.contracts;
 
@@ -158,18 +159,19 @@ async function submitGameAction(body) {
       ethPayoutAmountWei = payoutWei;
       ensureRecipientIsNotSigner(service, walletAddress);
       await ensureSignerCanPayEth(service, payoutWei);
-      txHashes.push(await sendTransaction("TANI swap burn", () => coin.gameSpend(walletAddress, toTani(amount))));
-      txHashes.push(await sendTransaction("ETH swap payout", () => service.signer.sendTransaction({
+      txHashes.push(await sendConfirmedTransaction("TANI swap burn", () => coin.gameSpend(walletAddress, toTani(amount))));
+      primaryTxHash = await sendTransaction("ETH swap payout", () => service.signer.sendTransaction({
         to: walletAddress,
         value: payoutWei
-      })));
+      }));
+      txHashes.push(primaryTxHash);
       break;
     }
     default:
       throw httpError(400, `Tipe aksi tidak dikenal: ${type || "kosong"}.`);
   }
 
-  const txHash = txHashes[0] || "";
+  const txHash = primaryTxHash || txHashes[0] || "";
   return {
     ok: true,
     type,
@@ -215,6 +217,19 @@ async function sendTransaction(label, createTx) {
   }
   console.log(`[game-api] ${label}: ${tx.hash}`);
   return tx.hash;
+}
+
+async function sendConfirmedTransaction(label, createTx) {
+  const txHash = await sendTransaction(label, createTx);
+  const service = await getGameService();
+  const receipt = await service.provider.waitForTransaction(txHash, 1, 120_000);
+  if (!receipt) {
+    throw httpError(504, `${label} belum terkonfirmasi Sepolia. Payout ETH belum dikirim.`);
+  }
+  if (receipt.status !== 1) {
+    throw httpError(409, `${label} gagal on-chain. Payout ETH dibatalkan.`);
+  }
+  return txHash;
 }
 
 function isReplacementFeeTooLow(error) {
@@ -265,8 +280,7 @@ const _unsafeEconomyActions = new Set([
   "SWAP_CROP",
   "SWAP_COIN",
   "SWAP_TANI_COIN",
-  "SWAP_ETH_COIN",
-  "SWAP_COIN_ETH"
+  "SWAP_ETH_COIN"
 ]);
 
 function ensureRecipientIsNotSigner(service, walletAddress) {

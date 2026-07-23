@@ -2128,6 +2128,7 @@ class FarmStateController extends ChangeNotifier {
       cleaned = cleaned.substring(prefix.length).trim();
     }
     cleaned = cleaned.replaceFirst(RegExp(r'^HTTP\s+\d+\s*'), '').trim();
+    cleaned = cleaned.replaceFirst(RegExp(r'^Bad state:\s*', caseSensitive: false), '').trim();
     final lower = cleaned.toLowerCase();
     if (lower.contains('wallet penerima eth sama dengan signer backend')) {
       cleaned = 'wallet sama signer; ganti wallet pemain';

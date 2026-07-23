@@ -94388,6 +94388,7 @@ s.fx="Wallet pemain diganti: "+A.tH(r)+". Sync Sepolia..."}return q},
 Qw(a){var s,r=B.c.aO(a)
 if(B.c.bU(r.toLowerCase(),"Gagal kirim aksi chain:".toLowerCase()))r=B.c.aO(B.c.c2(r,23))
 r=B.c.aO(B.c.m6(r,A.bJ("^HTTP\\s+\\d+\\s*",!0,!1),""))
+r=B.c.aO(B.c.m6(r,A.bJ("^Bad state:\\s*",!0,!1),""))
 s=r.toLowerCase()
 if(B.c.p(s,"wallet penerima eth sama dengan signer backend"))r="wallet sama signer; ganti wallet pemain"
 else if(B.c.p(s,"saldo eth signer backend tidak cukup"))r="saldo ETH signer backend kurang"

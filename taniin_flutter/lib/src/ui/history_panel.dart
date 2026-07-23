@@ -308,9 +308,11 @@ class _HistoryRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    record.valueLabel,
+                    isFailure ? 'GAGAL' : record.valueLabel,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: const Color(0xFFFFDE19),
+                      color: isFailure
+                          ? const Color(0xFFFF9B8F)
+                          : const Color(0xFFFFDE19),
                       fontSize: compact ? 17 : 26,
                     ),
                   ),
