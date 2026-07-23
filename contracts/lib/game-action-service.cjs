@@ -148,6 +148,7 @@ async function submitGameAction(body) {
       break;
     }
     case "SWAP_TANI_COIN": {
+      ensureGameCoinSwapWithinLimit(amount);
       txHashes.push(await sendTransaction("TANI deposit burn", () => coin.gameSpend(walletAddress, toTani(BigInt(amount) * BigInt(COIN_SWAP_RATE)))));
       break;
     }
@@ -287,7 +288,6 @@ const _unsafeEconomyActions = new Set([
   "HARVEST",
   "SELL_CROP",
   "SWAP_CROP",
-  "SWAP_TANI_COIN",
   "SWAP_ETH_COIN"
 ]);
 
