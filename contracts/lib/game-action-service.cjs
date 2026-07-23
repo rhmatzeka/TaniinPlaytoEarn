@@ -8,6 +8,7 @@ const CROP_REWARD = 35;
 const COIN_SWAP_RATE = 1;
 const DEFAULT_ETH_WEI_PER_COIN = "100000000000000";
 const DEFAULT_MAX_ETH_PAYOUT_WEI = "100000000000000000";
+const DEFAULT_MAX_GAME_COIN_SWAP = "100000";
 
 const coinAbi = [
   "function mint(address to, uint256 amount) external",
@@ -142,6 +143,7 @@ async function submitGameAction(body) {
       break;
     }
     case "SWAP_COIN": {
+      ensureGameCoinSwapWithinLimit(amount);
       txHashes.push(await sendTransaction("coin swap", () => coin.mint(walletAddress, toTani(BigInt(amount) * BigInt(COIN_SWAP_RATE)))));
       break;
     }
@@ -269,6 +271,13 @@ function ethSwapConfig() {
   };
 }
 
+function ensureGameCoinSwapWithinLimit(amount) {
+  const maximum = envBigInt("TANIIN_MAX_GAME_COIN_SWAP", DEFAULT_MAX_GAME_COIN_SWAP);
+  if (BigInt(amount) > maximum) {
+    throw httpError(400, `Swap Game Coin maksimal ${maximum} coin per transaksi.`);
+  }
+}
+
 function unsafeEconomyEnabled() {
   return String(process.env.TANIIN_ENABLE_UNSAFE_ECONOMY || "").trim().toLowerCase() === "true";
 }
@@ -278,7 +287,6 @@ const _unsafeEconomyActions = new Set([
   "HARVEST",
   "SELL_CROP",
   "SWAP_CROP",
-  "SWAP_COIN",
   "SWAP_TANI_COIN",
   "SWAP_ETH_COIN"
 ]);
