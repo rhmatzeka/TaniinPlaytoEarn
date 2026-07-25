@@ -104,10 +104,20 @@ function requireSession(req, wallet) {
   return { wallet: address, verified: true };
 }
 
+function requireVerifiedEconomySession(req, wallet) {
+  if (!authRequired()) {
+    throw httpError(
+      503,
+      "Aksi on-chain dinonaktifkan sampai autentikasi wallet production diaktifkan."
+    );
+  }
+  return requireSession(req, wallet);
+}
+
 async function withIdempotency(req, wallet, run) {
   const key = String(req.headers["idempotency-key"] || "").trim();
   if (!key) {
-    return run();
+    throw httpError(400, "Idempotency-Key wajib untuk aksi ekonomi.");
   }
   if (key.length > 128) {
     throw httpError(400, "Idempotency-Key terlalu panjang.");
@@ -115,9 +125,23 @@ async function withIdempotency(req, wallet, run) {
   const scopedKey = `${wallet.toLowerCase()}:${key}`;
   const cached = idempotencyResults.get(scopedKey);
   if (cached && cached.expiresAt > Date.now()) {
+    if (cached.pending) {
+      return { ...await cached.pending, idempotentReplay: true };
+    }
     return { ...cached.result, idempotentReplay: true };
   }
-  const result = await run();
+  const pending = Promise.resolve().then(run);
+  idempotencyResults.set(scopedKey, {
+    pending,
+    expiresAt: Date.now() + SESSION_TTL_MS
+  });
+  let result;
+  try {
+    result = await pending;
+  } catch (error) {
+    idempotencyResults.delete(scopedKey);
+    throw error;
+  }
   idempotencyResults.set(scopedKey, {
     result,
     expiresAt: Date.now() + SESSION_TTL_MS
@@ -182,6 +206,7 @@ module.exports = {
   authRequired,
   createNonce,
   requireSession,
+  requireVerifiedEconomySession,
   verifySignature,
   withIdempotency
 };

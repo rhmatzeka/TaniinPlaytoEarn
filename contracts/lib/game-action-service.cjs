@@ -86,9 +86,10 @@ function enqueueGameAction(body) {
 }
 
 async function submitGameAction(body) {
-  const service = await getGameService();
   const walletAddress = normalizeAddress(body.wallet, "wallet");
   const type = String(body.type || "").trim().toUpperCase();
+  assertPhase0ActionEnabled(type);
+  const service = await getGameService();
   const plotId = toPositiveInt(body.plotId || 0, "plotId", {
     allowZero: type === "SELL_CROP"
       || type === "SWAP_CROP"
@@ -103,13 +104,6 @@ async function submitGameAction(body) {
   let primaryTxHash = "";
   let ethPayoutAmountWei = 0n;
   const { coin, land, items } = service.contracts;
-
-  if (_unsafeEconomyActions.has(type) && !unsafeEconomyEnabled()) {
-    throw httpError(
-      503,
-      `Aksi ${type} dinonaktifkan sampai accounting server/on-chain yang aman tersedia.`
-    );
-  }
 
   switch (type) {
     case "BUY_LAND": {
@@ -317,13 +311,19 @@ function ensureEthSwapMinimum(amount) {
   }
 }
 
-function unsafeEconomyEnabled() {
-  return String(process.env.TANIIN_ENABLE_UNSAFE_ECONOMY || "").trim().toLowerCase() === "true";
-}
-
-const _unsafeEconomyActions = new Set([
-  "SWAP_CROP"
+const _phase0EnabledActions = new Set([
+  "SELL_CROP",
+  "SWAP_TANI_COIN"
 ]);
+
+function assertPhase0ActionEnabled(type) {
+  if (!_phase0EnabledActions.has(type)) {
+    throw httpError(
+      503,
+      `Aksi ${type || "kosong"} dinonaktifkan selama pengamanan ekonomi Phase 0.`
+    );
+  }
+}
 
 function seedPurchaseCost(seedType, amount) {
   const seedIndex = Number(seedType) - 1;
@@ -450,6 +450,7 @@ function normalizeError(error) {
 
 module.exports = {
   enqueueGameAction,
+  assertPhase0ActionEnabled,
   getGameService,
   health,
   httpError,

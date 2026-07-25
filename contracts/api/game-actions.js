@@ -3,7 +3,7 @@ const {
   normalizeError
 } = require("../lib/game-action-service.cjs");
 const {
-  requireSession,
+  requireVerifiedEconomySession,
   withIdempotency
 } = require("../lib/auth-service.cjs");
 
@@ -19,7 +19,7 @@ module.exports = async function handler(req, res) {
 
   try {
     const body = await readJson(req);
-    const session = requireSession(req, body.wallet);
+    const session = requireVerifiedEconomySession(req, body.wallet);
     const result = await withIdempotency(req, session.wallet, () => enqueueGameAction(body));
     return res.status(200).json(result);
   } catch (error) {

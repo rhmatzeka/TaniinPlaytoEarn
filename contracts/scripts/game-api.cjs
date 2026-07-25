@@ -9,7 +9,7 @@ const {
 } = require("../lib/game-action-service.cjs");
 const {
   createNonce,
-  requireSession,
+  requireVerifiedEconomySession,
   verifySignature,
   withIdempotency
 } = require("../lib/auth-service.cjs");
@@ -82,7 +82,7 @@ function handleRequest(req, res) {
 
   readJson(req)
     .then((body) => {
-      const session = requireSession(req, body.wallet);
+      const session = requireVerifiedEconomySession(req, body.wallet);
       return withIdempotency(req, session.wallet, () => enqueueGameAction(body));
     })
     .then((result) => sendJson(res, 200, result))

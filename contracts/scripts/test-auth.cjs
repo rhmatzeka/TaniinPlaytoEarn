@@ -5,6 +5,7 @@ process.env.TANIIN_REQUIRE_AUTH = "true";
 const {
   createNonce,
   requireSession,
+  requireVerifiedEconomySession,
   verifySignature,
   withIdempotency
 } = require("../lib/auth-service.cjs");
@@ -45,12 +46,51 @@ async function main() {
   assert(first.value === 1, "first action should run");
   assert(second.value === 1 && second.idempotentReplay === true, "second action should replay cached result");
   assert(runs === 1, "idempotent action should only run once");
+
+  const concurrentReq = {
+    headers: { "idempotency-key": "auth-test-concurrent" }
+  };
+  let concurrentRuns = 0;
+  const runConcurrent = () => withIdempotency(concurrentReq, wallet.address, async () => {
+    concurrentRuns += 1;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    return { ok: true, value: concurrentRuns };
+  });
+  const [concurrentFirst, concurrentSecond] = await Promise.all([
+    runConcurrent(),
+    runConcurrent()
+  ]);
+  assert(concurrentRuns === 1, "concurrent duplicate should only run once");
+  assert(concurrentFirst.value === 1 && concurrentSecond.value === 1, "concurrent duplicate should share result");
+
+  await assertRejects(
+    () => withIdempotency({ headers: {} }, wallet.address, async () => ({ ok: true })),
+    400,
+    "missing idempotency key should fail"
+  );
+
+  process.env.TANIIN_REQUIRE_AUTH = "false";
+  await assertRejects(
+    () => requireVerifiedEconomySession({ headers: {} }, wallet.address),
+    503,
+    "economy session should fail closed when auth is disabled"
+  );
 }
 
 function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
   }
+}
+
+async function assertRejects(run, statusCode, message) {
+  try {
+    await run();
+  } catch (error) {
+    assert(error.statusCode === statusCode, `${message}: wrong status ${error.statusCode}`);
+    return;
+  }
+  throw new Error(`${message}: did not reject`);
 }
 
 main()

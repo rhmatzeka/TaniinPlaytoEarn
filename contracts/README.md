@@ -78,6 +78,6 @@ curl https://your-project.vercel.app/health
 TANIIN_GAME_API_URL=https://your-project.vercel.app
 ```
 
-The Android app posts to `/game-actions`, so do not include `/api` in `TANIIN_GAME_API_URL`. The signer also exposes `/auth/nonce` and `/auth/verify` for wallet-signature sessions. Set `TANIIN_REQUIRE_AUTH=true` only after the client sends `Authorization: Bearer <session>` to `/game-actions`; otherwise leave it `false` for the current prototype client.
+The Android app posts to `/game-actions`, so do not include `/api` in `TANIIN_GAME_API_URL`. The signer also exposes `/auth/nonce` and `/auth/verify` for wallet-signature sessions. During Economy Safety Phase 0, `/game-actions` fails closed unless `TANIIN_REQUIRE_AUTH=true`, a verified bearer session is present, and the request includes an `Idempotency-Key`. The current Flutter client does not send these yet, so on-chain economy actions are intentionally unavailable until the auth flow and persistent storage are complete.
 
 This Vercel signer is suitable for prototype testing. Before sharing the endpoint publicly, enable wallet-signature auth, keep CORS restricted with `TANIIN_ALLOWED_ORIGIN`, add persistent server-side gameplay validation, and rate limit public traffic; otherwise anyone who knows the endpoint can submit mint/reward actions through the deployer signer.
