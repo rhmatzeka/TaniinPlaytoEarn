@@ -1326,15 +1326,22 @@ class FarmStateController extends ChangeNotifier {
       return false;
     }
     final price = seedTotalPrice(seedIndex);
-    if (coins < price) {
+    if (!walletTaniBalanceAvailable) {
       showMessage(
-        'Coin belum cukup untuk beli $shopBundleQuantity paket ${seeds[seedIndex].name}.',
+        'Sync saldo wallet dulu sebelum membeli benih on-chain.',
+        success: false,
+      );
+      return false;
+    }
+    if (tani < price) {
+      showMessage(
+        'TANI Sepolia belum cukup. Swap Game Coin ke TANI terlebih dahulu.',
         success: false,
       );
       return false;
     }
     final total = seedTotalAmount();
-    coins -= price;
+    tani -= price;
     selectedSeedIndex = seedIndex;
     seeds[seedIndex] = seeds[seedIndex].copyWith(
       quantity: seeds[seedIndex].quantity + total,
@@ -1342,9 +1349,15 @@ class FarmStateController extends ChangeNotifier {
     _queueChainAction(
       ChainAction(type: 'BUY_SEED', plotId: seedIndex + 1, amount: total),
       title: 'Beli ${seeds[seedIndex].name}',
-      valueLabel: '-$price coin',
+      valueLabel: '-$price TANI',
+      refundTaniOnFailure: price,
+      refundSeedIndexOnFailure: seedIndex,
+      refundSeedAmountOnFailure: total,
+      requiresTxHash: true,
     );
-    showMessage('Berhasil membeli $total benih ${seeds[seedIndex].name}.');
+    showMessage(
+      'Pembelian $total benih ${seeds[seedIndex].name} dikirim ke Sepolia.',
+    );
     _commitState();
     return true;
   }
@@ -1497,7 +1510,10 @@ class FarmStateController extends ChangeNotifier {
       return false;
     }
     if (!isValidAddress(chainSignerAddress)) {
-      showMessage('Sync wallet dulu supaya alamat pembayaran tersedia.', success: false);
+      showMessage(
+        'Sync wallet dulu supaya alamat pembayaran tersedia.',
+        success: false,
+      );
       return false;
     }
     final paymentWei = _ethWeiForCoinAmount(amount);
@@ -1508,7 +1524,10 @@ class FarmStateController extends ChangeNotifier {
     );
     if (!isValidTransactionHash(paymentTxHash)) {
       final error = PlatformBridge.browserWalletConnectError();
-      showMessage(error.isEmpty ? 'Transfer ETH dibatalkan.' : error, success: false);
+      showMessage(
+        error.isEmpty ? 'Transfer ETH dibatalkan.' : error,
+        success: false,
+      );
       return false;
     }
     showMessage('Pembayaran ETH terkirim. Menunggu konfirmasi Sepolia...');
@@ -1518,7 +1537,12 @@ class FarmStateController extends ChangeNotifier {
       return false;
     }
     _queueChainAction(
-      ChainAction(type: 'SWAP_ETH_COIN', plotId: 0, amount: amount, paymentTxHash: paymentTxHash),
+      ChainAction(
+        type: 'SWAP_ETH_COIN',
+        plotId: 0,
+        amount: amount,
+        paymentTxHash: paymentTxHash,
+      ),
       title: 'Beli Game Coin dari ETH',
       valueLabel: '+$amount coin',
       requiresTxHash: true,
@@ -1772,6 +1796,8 @@ class FarmStateController extends ChangeNotifier {
     String? title,
     int refundCoinsOnFailure = 0,
     int refundTaniOnFailure = 0,
+    int refundSeedIndexOnFailure = -1,
+    int refundSeedAmountOnFailure = 0,
     bool requiresTxHash = false,
   }) {
     final entryId = _addHistory(
@@ -1789,6 +1815,8 @@ class FarmStateController extends ChangeNotifier {
         action,
         refundCoinsOnFailure: refundCoinsOnFailure,
         refundTaniOnFailure: refundTaniOnFailure,
+        refundSeedIndexOnFailure: refundSeedIndexOnFailure,
+        refundSeedAmountOnFailure: refundSeedAmountOnFailure,
         requiresTxHash: requiresTxHash,
       ),
     );
@@ -1799,6 +1827,8 @@ class FarmStateController extends ChangeNotifier {
     ChainAction action, {
     required int refundCoinsOnFailure,
     required int refundTaniOnFailure,
+    required int refundSeedIndexOnFailure,
+    required int refundSeedAmountOnFailure,
     required bool requiresTxHash,
   }) async {
     final nativeWeiBeforeAction = action.type == 'SWAP_COIN_ETH'
@@ -1813,6 +1843,8 @@ class FarmStateController extends ChangeNotifier {
           action,
           refundCoinsOnFailure,
           refundTaniOnFailure,
+          refundSeedIndexOnFailure,
+          refundSeedAmountOnFailure,
           'Backend tidak mengembalikan tx hash.',
         );
         return;
@@ -1849,6 +1881,8 @@ class FarmStateController extends ChangeNotifier {
               action,
               refundCoinsOnFailure,
               refundTaniOnFailure,
+              refundSeedIndexOnFailure,
+              refundSeedAmountOnFailure,
               receipt.message,
             );
           } else {
@@ -1857,27 +1891,27 @@ class FarmStateController extends ChangeNotifier {
           return;
         }
         chainStatus = receipt.message;
-      if (action.type == 'SWAP_COIN_ETH') {
-        final payoutVisible = await _confirmEthPayoutBalance(
-          entryId,
-          action,
-          result.txHash,
-          nativeWeiBeforeAction,
-        );
-        if (!payoutVisible) {
-          _commitState();
-          return;
+        if (action.type == 'SWAP_COIN_ETH') {
+          final payoutVisible = await _confirmEthPayoutBalance(
+            entryId,
+            action,
+            result.txHash,
+            nativeWeiBeforeAction,
+          );
+          if (!payoutVisible) {
+            _commitState();
+            return;
+          }
         }
       }
-    }
-    updateHistoryStatus(
-      entryId,
-      status: hasValidHash ? 'on-chain' : 'dikirim',
-      txHash: result.txHash,
-    );
-    if (!hasValidHash) {
-      chainStatus = result.message;
-    }
+      updateHistoryStatus(
+        entryId,
+        status: hasValidHash ? 'on-chain' : 'dikirim',
+        txHash: result.txHash,
+      );
+      if (!hasValidHash) {
+        chainStatus = result.message;
+      }
       if (action.type == 'SWAP_COIN' && hasValidHash) {
         tani += action.amount;
       }
@@ -1908,6 +1942,8 @@ class FarmStateController extends ChangeNotifier {
       action,
       refundCoinsOnFailure,
       refundTaniOnFailure,
+      refundSeedIndexOnFailure,
+      refundSeedAmountOnFailure,
       result.message,
     );
   }
@@ -1974,8 +2010,7 @@ class FarmStateController extends ChangeNotifier {
       status: 'gagal on-chain',
       errorMessage: cleanReason,
     );
-    chainStatus =
-        '${action.label} gagal on-chain: $cleanReason';
+    chainStatus = '${action.label} gagal on-chain: $cleanReason';
     showMessage('Transaksi Sepolia gagal.', success: false, notify: false);
     _commitState();
   }
@@ -1985,15 +2020,27 @@ class FarmStateController extends ChangeNotifier {
     ChainAction action,
     int refundCoinsOnFailure,
     int refundTaniOnFailure,
+    int refundSeedIndexOnFailure,
+    int refundSeedAmountOnFailure,
     String reason,
   ) {
     final cleanReason = _conciseChainError(reason);
-    if (refundCoinsOnFailure > 0 || refundTaniOnFailure > 0) {
+    if (refundCoinsOnFailure > 0 ||
+        refundTaniOnFailure > 0 ||
+        refundSeedAmountOnFailure > 0) {
       if (refundCoinsOnFailure > 0) {
         coins = math.min(0x7fffffff, coins + refundCoinsOnFailure);
       }
       if (refundTaniOnFailure > 0) {
         tani = math.min(0x7fffffff, tani + refundTaniOnFailure);
+      }
+      if (refundSeedIndexOnFailure >= 0 &&
+          refundSeedIndexOnFailure < seeds.length &&
+          refundSeedAmountOnFailure > 0) {
+        final seed = seeds[refundSeedIndexOnFailure];
+        seeds[refundSeedIndexOnFailure] = seed.copyWith(
+          quantity: math.max(0, seed.quantity - refundSeedAmountOnFailure),
+        );
       }
       _clampSwapAmountToSource();
       updateHistoryStatus(
@@ -2007,7 +2054,9 @@ class FarmStateController extends ChangeNotifier {
       chainStatus =
           '${action.label} gagal; saldo dikembalikan $returned: $cleanReason';
       showMessage(
-        'Swap gagal, saldo dikembalikan.',
+        action.type == 'BUY_SEED'
+            ? 'Pembelian benih gagal. TANI dan stok sudah dikembalikan.'
+            : 'Swap gagal, saldo dikembalikan.',
         success: false,
         notify: false,
       );
@@ -2020,11 +2069,20 @@ class FarmStateController extends ChangeNotifier {
       errorMessage: cleanReason,
     );
     chainStatus = '${action.label} gagal sync: $cleanReason';
-    showMessage('Sync Sepolia gagal. Coba lagi.', success: false, notify: false);
+    showMessage(
+      'Sync Sepolia gagal. Coba lagi.',
+      success: false,
+      notify: false,
+    );
     _commitState();
   }
 
-  int addExternalHistory(String title, String valueLabel, String status, {String txHash = ''}) {
+  int addExternalHistory(
+    String title,
+    String valueLabel,
+    String status, {
+    String txHash = '',
+  }) {
     final now = DateTime.now();
     final id = _nextHistoryId++;
     history.insert(
@@ -2177,7 +2235,9 @@ class FarmStateController extends ChangeNotifier {
       cleaned = cleaned.substring(prefix.length).trim();
     }
     cleaned = cleaned.replaceFirst(RegExp(r'^HTTP\s+\d+\s*'), '').trim();
-    cleaned = cleaned.replaceFirst(RegExp(r'^Bad state:\s*', caseSensitive: false), '').trim();
+    cleaned = cleaned
+        .replaceFirst(RegExp(r'^Bad state:\s*', caseSensitive: false), '')
+        .trim();
     final lower = cleaned.toLowerCase();
     if (lower.contains('wallet penerima eth sama dengan signer backend')) {
       cleaned = 'wallet sama signer; ganti wallet pemain';

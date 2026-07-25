@@ -11,6 +11,8 @@ const MIN_ETH_SWAP_COIN = 100n;
 const DEFAULT_ETH_WEI_PER_COIN = "10000000000000";
 const DEFAULT_MAX_ETH_PAYOUT_WEI = "100000000000000000";
 const DEFAULT_MAX_GAME_COIN_SWAP = "10000";
+const SEED_BUNDLE_AMOUNT = 3n;
+const SEED_BUNDLE_PRICES = [100n, 140n, 220n, 180n];
 
 const coinAbi = [
   "function mint(address to, uint256 amount) external",
@@ -138,7 +140,24 @@ async function submitGameAction(body) {
       break;
     }
     case "BUY_SEED": {
-      txHashes.push(await sendTransaction("mint seed", () => items.mint(walletAddress, SEED_ITEM_ID, BigInt(amount))));
+      const seedCost = seedPurchaseCost(plotId, amount);
+      txHashes.push(await sendConfirmedTransaction(
+        "seed payment burn",
+        () => coin.gameSpend(walletAddress, toTani(seedCost))
+      ));
+      try {
+        primaryTxHash = await sendConfirmedTransaction(
+          "mint seed",
+          () => items.mint(walletAddress, SEED_ITEM_ID, BigInt(amount))
+        );
+        txHashes.push(primaryTxHash);
+      } catch (error) {
+        await sendConfirmedTransaction(
+          "seed payment compensation",
+          () => coin.mint(walletAddress, toTani(seedCost))
+        );
+        throw httpError(502, "Mint benih gagal. Pembayaran TANI sudah dikembalikan.");
+      }
       break;
     }
     case "SELL_CROP": {
@@ -303,9 +322,24 @@ function unsafeEconomyEnabled() {
 }
 
 const _unsafeEconomyActions = new Set([
-  "BUY_SEED",
   "SWAP_CROP"
 ]);
+
+function seedPurchaseCost(seedType, amount) {
+  const seedIndex = Number(seedType) - 1;
+  const seedAmount = BigInt(amount);
+  if (seedIndex < 0 || seedIndex >= SEED_BUNDLE_PRICES.length) {
+    throw httpError(400, "Jenis benih tidak valid.");
+  }
+  if (seedAmount % SEED_BUNDLE_AMOUNT !== 0n) {
+    throw httpError(400, `Benih hanya dapat dibeli per paket isi ${SEED_BUNDLE_AMOUNT}.`);
+  }
+  const bundleCount = seedAmount / SEED_BUNDLE_AMOUNT;
+  if (bundleCount < 1n || bundleCount > 9n) {
+    throw httpError(400, "Jumlah paket benih harus antara 1 dan 9.");
+  }
+  return SEED_BUNDLE_PRICES[seedIndex] * bundleCount;
+}
 
 function ensureRecipientIsNotSigner(service, walletAddress) {
   if (walletAddress.toLowerCase() === service.wallet.address.toLowerCase()) {

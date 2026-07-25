@@ -1802,7 +1802,7 @@ class _ShopSummary extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                'Game Coin: ${farmState.coins} | ${seed.name} | Paket x${farmState.shopBundleQuantity} = ${farmState.seedTotalAmount()} benih | Total ${farmState.seedTotalPrice(farmState.selectedSeedIndex)} Coin',
+                'TANI Sepolia: ${farmState.tani} | ${seed.name} | Paket x${farmState.shopBundleQuantity} = ${farmState.seedTotalAmount()} benih | Total ${farmState.seedTotalPrice(farmState.selectedSeedIndex)} TANI',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -1847,7 +1847,8 @@ class _ShopSeedCard extends StatelessWidget {
     final seed = farmState.seeds[seedIndex];
     final selected = farmState.selectedSeedIndex == seedIndex;
     final price = farmState.seedTotalPrice(seedIndex);
-    final canBuy = farmState.coins >= price;
+    final canBuy =
+        farmState.walletTaniBalanceAvailable && farmState.tani >= price;
     return GestureDetector(
       onTap: () => farmState.selectSeed(seedIndex),
       child: DecoratedBox(
@@ -2444,8 +2445,10 @@ class _ChatHudState extends State<_ChatHud> {
   // Compact floating button with unread badge.
   Widget _buildCollapsed() {
     final unread =
-        (widget.multiplayerClient.chatMessages.length - _lastSeenCount)
-            .clamp(0, 99);
+        (widget.multiplayerClient.chatMessages.length - _lastSeenCount).clamp(
+          0,
+          99,
+        );
     final compact = widget.compact;
     return GestureDetector(
       onTap: _toggle,
@@ -2462,7 +2465,11 @@ class _ChatHudState extends State<_ChatHud> {
               border: Border.all(color: _kBorder, width: 2.5),
               borderRadius: BorderRadius.circular(12),
               boxShadow: const [
-                BoxShadow(color: Color(0x66000000), blurRadius: 6, offset: Offset(0, 3)),
+                BoxShadow(
+                  color: Color(0x66000000),
+                  blurRadius: 6,
+                  offset: Offset(0, 3),
+                ),
               ],
             ),
             child: Row(
@@ -2480,7 +2487,11 @@ class _ChatHudState extends State<_ChatHud> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Icon(Icons.chat_bubble_outline, color: _kAccent, size: compact ? 18 : 22),
+                Icon(
+                  Icons.chat_bubble_outline,
+                  color: _kAccent,
+                  size: compact ? 18 : 22,
+                ),
               ],
             ),
           ),
@@ -2525,7 +2536,11 @@ class _ChatHudState extends State<_ChatHud> {
         border: Border.all(color: _kBorder, width: 2.5),
         borderRadius: BorderRadius.circular(14),
         boxShadow: const [
-          BoxShadow(color: Color(0x80000000), blurRadius: 10, offset: Offset(0, 4)),
+          BoxShadow(
+            color: Color(0x80000000),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
@@ -2534,7 +2549,12 @@ class _ChatHudState extends State<_ChatHud> {
         children: [
           // Header
           Container(
-            padding: EdgeInsets.fromLTRB(14, compact ? 12 : 14, 10, compact ? 12 : 14),
+            padding: EdgeInsets.fromLTRB(
+              14,
+              compact ? 12 : 14,
+              10,
+              compact ? 12 : 14,
+            ),
             decoration: const BoxDecoration(
               color: Color(0xFF2C3A24),
               borderRadius: BorderRadius.only(
@@ -2570,7 +2590,11 @@ class _ChatHudState extends State<_ChatHud> {
                   onTap: _toggle,
                   child: Padding(
                     padding: const EdgeInsets.all(4),
-                    child: Icon(Icons.close, color: const Color(0xFFE9C67B), size: compact ? 24 : 28),
+                    child: Icon(
+                      Icons.close,
+                      color: const Color(0xFFE9C67B),
+                      size: compact ? 24 : 28,
+                    ),
                   ),
                 ),
               ],
@@ -2597,7 +2621,10 @@ class _ChatHudState extends State<_ChatHud> {
                   )
                 : ListView.builder(
                     controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
                     itemCount: messages.length,
                     itemBuilder: (context, index) {
                       final msg = messages[index];
@@ -2622,12 +2649,15 @@ class _ChatHudState extends State<_ChatHud> {
                       }
                       final accent = isAi ? _kAi : _kPlayer;
                       return Align(
-                        alignment:
-                            isAi ? Alignment.centerLeft : Alignment.centerRight,
+                        alignment: isAi
+                            ? Alignment.centerLeft
+                            : Alignment.centerRight,
                         child: Container(
                           margin: const EdgeInsets.symmetric(vertical: 4),
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 9),
+                            horizontal: 12,
+                            vertical: 9,
+                          ),
                           constraints: BoxConstraints(maxWidth: width * 0.82),
                           decoration: BoxDecoration(
                             color: isAi
@@ -2693,8 +2723,13 @@ class _ChatHudState extends State<_ChatHud> {
                       decoration: InputDecoration(
                         isCollapsed: true,
                         hintText: 'Ketik perintah ke AI...',
-                        hintStyle: TextStyle(color: const Color(0xFF6F7B62), fontSize: compact ? 14 : 16),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                        hintStyle: TextStyle(
+                          color: const Color(0xFF6F7B62),
+                          fontSize: compact ? 14 : 16,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                        ),
                         border: InputBorder.none,
                       ),
                       textInputAction: TextInputAction.send,
@@ -2717,7 +2752,11 @@ class _ChatHudState extends State<_ChatHud> {
                       border: Border.all(color: _kAccent, width: 1.8),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(Icons.send, color: Colors.white, size: compact ? 20 : 23),
+                    child: Icon(
+                      Icons.send,
+                      color: Colors.white,
+                      size: compact ? 20 : 23,
+                    ),
                   ),
                 ),
               ],
@@ -2746,7 +2785,11 @@ class _AiAvatar extends StatelessWidget {
         border: Border.all(color: const Color(0xFF1B2A16), width: 1.5),
       ),
       alignment: Alignment.center,
-      child: Icon(Icons.smart_toy, color: const Color(0xFF15240F), size: size * 0.62),
+      child: Icon(
+        Icons.smart_toy,
+        color: const Color(0xFF15240F),
+        size: size * 0.62,
+      ),
     );
   }
 }
