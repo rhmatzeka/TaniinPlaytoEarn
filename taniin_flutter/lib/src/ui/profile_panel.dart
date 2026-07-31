@@ -56,39 +56,20 @@ class _ProfilePanelState extends State<ProfilePanel> {
               children: <Widget>[
                 _header(),
                 Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
-                        _identityCard(),
-                        const SizedBox(height: 20),
-                        LayoutBuilder(
-                          builder: (context, bodyConstraints) {
-                            if (bodyConstraints.maxWidth < 720) {
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: <Widget>[
-                                  _questSection(),
-                                  const SizedBox(height: 20),
-                                  _achievementSection(),
-                                ],
-                              );
-                            }
-                            return Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: <Widget>[
-                                Expanded(flex: 3, child: _questSection()),
-                                const SizedBox(width: 18),
-                                Expanded(flex: 2, child: _achievementSection()),
-                              ],
-                            );
-                          },
+                  child: LayoutBuilder(
+                    builder: (context, bodyConstraints) {
+                      return FittedBox(
+                        fit: BoxFit.contain,
+                        alignment: Alignment.topCenter,
+                        child: SizedBox(
+                          width: bodyConstraints.maxWidth,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+                            child: _profileContent(),
+                          ),
                         ),
-                        const SizedBox(height: 22),
-                        _wardrobeSection(),
-                      ],
-                    ),
+                      );
+                    },
                   ),
                 ),
               ],
@@ -98,6 +79,38 @@ class _ProfilePanelState extends State<ProfilePanel> {
       },
     );
   }
+
+  Widget _profileContent() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: <Widget>[
+      _identityCard(),
+      const SizedBox(height: 20),
+      LayoutBuilder(
+        builder: (context, bodyConstraints) {
+          if (bodyConstraints.maxWidth < 720) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                _questSection(),
+                const SizedBox(height: 20),
+                _achievementSection(),
+              ],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(flex: 3, child: _questSection()),
+              const SizedBox(width: 18),
+              Expanded(flex: 2, child: _achievementSection()),
+            ],
+          );
+        },
+      ),
+      const SizedBox(height: 22),
+      _wardrobeSection(),
+    ],
+  );
 
   Widget _header() => Container(
     height: 68,
