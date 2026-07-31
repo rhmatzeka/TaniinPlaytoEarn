@@ -854,6 +854,7 @@ class _InteractionPanel extends StatelessWidget {
     final wide = interaction == GameInteraction.swapToken;
     final tall = wide || interaction == GameInteraction.sellHarvest;
     final compact = media.height < 620 || media.width < 760;
+    final compactSwap = wide && (media.height < 980 || media.width < 980);
     final availableWidth = math.max(300.0, media.width - (compact ? 28 : 44));
     final panelWidth = math.max(
       compact ? 320.0 : 360.0,
@@ -877,7 +878,9 @@ class _InteractionPanel extends StatelessWidget {
               ? const EdgeInsets.fromLTRB(18, 16, 18, 18)
               : const EdgeInsets.fromLTRB(28, 24, 28, 26),
           child: SingleChildScrollView(
-            physics: const ClampingScrollPhysics(),
+            physics: wide
+                ? const NeverScrollableScrollPhysics()
+                : const ClampingScrollPhysics(),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -936,7 +939,7 @@ class _InteractionPanel extends StatelessWidget {
                 ],
                 if (interaction == GameInteraction.swapToken) ...[
                   SizedBox(height: compact ? 12 : 18),
-                  _SwapControl(farmState: farmState),
+                  _SwapControl(farmState: farmState, compact: compactSwap),
                 ],
                 SizedBox(height: compact ? 16 : 24),
                 _InteractionButtons(
@@ -1296,9 +1299,10 @@ class _CropOption extends StatelessWidget {
 }
 
 class _SwapControl extends StatelessWidget {
-  const _SwapControl({required this.farmState});
+  const _SwapControl({required this.farmState, required this.compact});
 
   final FarmStateController farmState;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -1312,10 +1316,10 @@ class _SwapControl extends StatelessWidget {
         border: Border.all(color: const Color(0xFF5E2C0D), width: 4),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: EdgeInsets.all(compact ? 10 : 18),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final vertical = constraints.maxWidth < 760;
+            final vertical = constraints.maxWidth < 650;
             final rateHint = farmState.swapRateHintLabel;
             final fromCard = _SwapAssetCard(
               label: 'DARI',
@@ -1345,8 +1349,8 @@ class _SwapControl extends StatelessWidget {
             );
             final arrow = Padding(
               padding: EdgeInsets.symmetric(
-                horizontal: vertical ? 0 : 14,
-                vertical: vertical ? 10 : 0,
+                horizontal: vertical ? 0 : (compact ? 8 : 14),
+                vertical: vertical ? (compact ? 5 : 10) : 0,
               ),
               child: _SwapArrow(
                 vertical: vertical,
@@ -1373,7 +1377,7 @@ class _SwapControl extends StatelessWidget {
                           Expanded(child: toCard),
                         ],
                       ),
-                const SizedBox(height: 18),
+                SizedBox(height: compact ? 9 : 18),
                 if (rateHint.isNotEmpty) ...[
                   DecoratedBox(
                     decoration: BoxDecoration(
@@ -1385,9 +1389,9 @@ class _SwapControl extends StatelessWidget {
                       ),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(
+                      padding: EdgeInsets.symmetric(
                         horizontal: 12,
-                        vertical: 9,
+                        vertical: compact ? 6 : 9,
                       ),
                       child: Text(
                         rateHint,
@@ -1395,12 +1399,12 @@ class _SwapControl extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: const Color(0xFFFFF0D4),
-                          fontSize: 16,
+                          fontSize: compact ? 13 : 16,
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  SizedBox(height: compact ? 8 : 14),
                 ],
                 Row(
                   children: [
@@ -1410,7 +1414,7 @@ class _SwapControl extends StatelessWidget {
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(
                               color: const Color(0xFFFFF0D4),
-                              fontSize: 22,
+                              fontSize: compact ? 17 : 22,
                             ),
                       ),
                     ),
@@ -1418,16 +1422,16 @@ class _SwapControl extends StatelessWidget {
                       farmState.swapAmountProgressLabel,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: const Color(0xFFFFDE19),
-                        fontSize: 22,
+                        fontSize: compact ? 17 : 22,
                       ),
                     ),
                   ],
                 ),
                 SliderTheme(
                   data: SliderTheme.of(context).copyWith(
-                    trackHeight: 10,
-                    thumbShape: const RoundSliderThumbShape(
-                      enabledThumbRadius: 15,
+                    trackHeight: compact ? 7 : 10,
+                    thumbShape: RoundSliderThumbShape(
+                      enabledThumbRadius: compact ? 11 : 15,
                     ),
                     activeTrackColor: const Color(0xFFFFD900),
                     inactiveTrackColor: const Color(0xFF5E2C0D),
@@ -1447,8 +1451,8 @@ class _SwapControl extends StatelessWidget {
                   ),
                 ),
                 Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
+                  spacing: compact ? 7 : 10,
+                  runSpacing: compact ? 7 : 10,
                   children: [
                     _SwapPresetButton(
                       label: '25%',
