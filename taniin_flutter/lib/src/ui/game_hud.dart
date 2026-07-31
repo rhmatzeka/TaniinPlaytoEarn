@@ -157,6 +157,14 @@ class GameHud extends StatelessWidget {
                       child: Column(
                         children: [
                           _HudIconButton(
+                            icon: Icons.person,
+                            tooltip: 'Profil & Wardrobe',
+                            isActive: activePanel == GamePanel.profile,
+                            badge: 'Lv${farmState.playerLevel}',
+                            onPressed: () => onPanelSelected(GamePanel.profile),
+                          ),
+                          const SizedBox(height: 8),
+                          _HudIconButton(
                             icon: Icons.history,
                             tooltip: 'Riwayat',
                             isActive: activePanel == GamePanel.history,

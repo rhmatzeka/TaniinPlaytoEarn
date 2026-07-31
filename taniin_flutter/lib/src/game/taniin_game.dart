@@ -1333,12 +1333,18 @@ class TaniinGame extends FlameGame {
           width: playerSize,
           height: playerSize,
         ),
-        _pixelPaint,
+        _skinPaint(farmState.equippedCosmeticId),
       );
       canvas.restore();
     } else {
-      canvas.drawImageRect(sheet, source, target, _pixelPaint);
+      canvas.drawImageRect(
+        sheet,
+        source,
+        target,
+        _skinPaint(farmState.equippedCosmeticId),
+      );
     }
+    _drawSkinBadge(canvas, target, farmState.equippedCosmeticId);
   }
 
   int _spriteRowForDirection() {
@@ -1755,9 +1761,7 @@ class TaniinGame extends FlameGame {
       );
 
       // Draw sprite solid (no transparent color filter)
-      final remotePaint = Paint()
-        ..isAntiAlias = false
-        ..filterQuality = FilterQuality.none;
+      final remotePaint = _skinPaint(player.skinId);
 
       const frameW = 32;
       const frameH = 32;
@@ -1779,6 +1783,7 @@ class TaniinGame extends FlameGame {
       );
 
       canvas.drawImageRect(sheet, source, target, remotePaint);
+      _drawSkinBadge(canvas, target, player.skinId);
 
       // Draw Name tag
       _drawNameTag(
@@ -1789,6 +1794,39 @@ class TaniinGame extends FlameGame {
         const Color(0xFF6FB7FF),
       );
     });
+  }
+
+  Paint _skinPaint(String skinId) {
+    final paint = Paint()
+      ..isAntiAlias = false
+      ..filterQuality = FilterQuality.none;
+    final color = switch (skinId) {
+      'farmer_nusantara' => const Color(0xFFFFC66D),
+      'forest_keeper' => const Color(0xFF8FE39A),
+      _ => Colors.white,
+    };
+    if (skinId != 'farmer_classic') {
+      paint.colorFilter = ColorFilter.mode(color, BlendMode.modulate);
+    }
+    return paint;
+  }
+
+  void _drawSkinBadge(Canvas canvas, Rect target, String skinId) {
+    if (skinId == 'farmer_classic') return;
+    final color = skinId == 'forest_keeper'
+        ? const Color(0xFF2F8B57)
+        : const Color(0xFFE78A2D);
+    _paint
+      ..style = PaintingStyle.fill
+      ..color = color;
+    canvas.drawCircle(
+      Offset(
+        target.right - target.width * 0.12,
+        target.top + target.height * 0.14,
+      ),
+      target.width * 0.09,
+      _paint,
+    );
   }
 
   void _drawAiAgent(Canvas canvas) {

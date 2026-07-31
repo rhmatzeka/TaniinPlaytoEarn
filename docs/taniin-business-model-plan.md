@@ -2013,3 +2013,39 @@ Next required milestone:
 4. Send bearer and stable idempotency headers from `ChainClient`.
 5. Keep manual-address connections read-only.
 6. Add an authoritative database ledger before re-enabling any mint, reward, land, funding, or payout action.
+
+### 2026-07-25: Retention Foundation And Cosmetic Vertical Slice
+
+Status: implemented as a local product-validation MVP; commercial payment and server entitlement remain deferred.
+
+Changes delivered:
+
+- Persisted player profile with editable display name.
+- XP and level progression with a 100 XP level curve.
+- Three daily quest templates for planting, harvesting, and selling crops.
+- Quest completion grants XP once and unlocks achievements.
+- Initial achievement set: `Langkah Pertama`, `Petani Berkembang`, and `Juragan Lahan`.
+- Cosmetic catalog with three visual loadouts:
+  - `Petani Klasik` at level 1.
+  - `Petani Nusantara` at level 2.
+  - `Penjaga Hutan` at level 4.
+- Profile and wardrobe panel with level progress, quests, achievements, cosmetic preview, and equip controls.
+- Cosmetic ownership and equipped loadout persist across restart.
+- Local and remote players display cosmetic tint and badge overlays without requiring new art assets.
+- Multiplayer join payload now includes validated display name and allowlisted `skinId`.
+- Unknown or malicious skin IDs fall back to `farmer_classic`.
+- Regression tests cover progression persistence, wardrobe UI, entitlement unlocks, and multiplayer cosmetic normalization.
+
+Validation purpose:
+
+- This vertical slice tests whether visible identity, progression, and quest goals improve engagement before investing in a full art pipeline or payment integration.
+- The included cosmetics are progression entitlements, not paid items or NFTs.
+- Local persistence is acceptable for this closed product-validation slice but is not a commercial entitlement source of truth.
+
+Next required milestone:
+
+1. Add analytics events for onboarding, quest, wardrobe preview, equip, and return sessions.
+2. Move player profile, progression, quest claims, and cosmetic entitlements to persistent server storage.
+3. Produce the first real modular `Petani Nusantara` art collection.
+4. Run qualified user tests before implementing payment or a full season.
+5. Add payment sandbox only after entitlement reconciliation is server-authoritative.

@@ -69,7 +69,8 @@ function initMultiplayer(server) {
         name: cleanText(payload.name, 32) || "Anon Player",
         x: finiteCoordinate(payload.x, 200),
         y: finiteCoordinate(payload.y, 300),
-        anim: normalizeAnimation(payload.anim)
+        anim: normalizeAnimation(payload.anim),
+        skinId: normalizeSkin(payload.skinId)
       };
       console.log(`[multiplayer] Player joined: ${players[socket.id].name} (${players[socket.id].wallet})`);
       socket.broadcast.emit("player_joined", {
@@ -216,6 +217,13 @@ function normalizeAnimation(value) {
 function normalizeWallet(value) {
   const wallet = cleanText(value, 42);
   return /^0x[0-9a-fA-F]{40}$/.test(wallet) ? wallet : "0x";
+}
+
+function normalizeSkin(value) {
+  const skin = cleanText(value, 32);
+  return ["farmer_classic", "farmer_nusantara", "forest_keeper"].includes(skin)
+    ? skin
+    : "farmer_classic";
 }
 
 function shutdownMultiplayer() {
@@ -421,5 +429,6 @@ function executeAiAction(action) {
 }
 
 module.exports = {
+  normalizeSkin,
   initMultiplayer
 };

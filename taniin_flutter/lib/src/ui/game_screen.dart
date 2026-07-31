@@ -14,6 +14,7 @@ import 'game_hud.dart';
 import 'history_panel.dart';
 import 'loading_overlay.dart';
 import 'physical_viewport.dart';
+import 'profile_panel.dart';
 import 'settings_panel.dart';
 import 'wallet_panel.dart';
 
@@ -336,6 +337,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   Widget _buildPanel() {
     return switch (_activePanel!) {
+      GamePanel.profile => ProfilePanel(
+        farmState: _farmState,
+        onClose: _closePanel,
+      ),
       GamePanel.backpack => BackpackPanel(
         farmState: _farmState,
         onClose: _closePanel,

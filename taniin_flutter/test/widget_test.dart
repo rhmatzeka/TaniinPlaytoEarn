@@ -8,6 +8,7 @@ import 'package:taniin_flutter/src/chain/chain_client.dart';
 import 'package:taniin_flutter/src/game/tmx_map.dart';
 import 'package:taniin_flutter/src/state/farm_state.dart';
 import 'package:taniin_flutter/src/ui/game_hud.dart';
+import 'package:taniin_flutter/src/ui/profile_panel.dart';
 import 'package:taniin_flutter/src/ui/settings_panel.dart';
 import 'package:taniin_flutter/src/ui/taniin_theme.dart';
 import 'package:taniin_flutter/src/ui/wallet_panel.dart';
@@ -326,6 +327,66 @@ void main() {
 
     farmState.dispose();
     restored.dispose();
+  });
+
+  test('unlocks and persists progression cosmetics', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final state = FarmStateController();
+    await state.loadSavedState();
+
+    for (var i = 0; i < 3; i++) {
+      state.seeds[0] = state.seeds[0].copyWith(quantity: 10);
+      final plot = state.plots[0]
+        ..status = PlotStatus.empty
+        ..plantedAt = null;
+      expect(state.performPlotAction(0), isTrue);
+      plot
+        ..status = PlotStatus.empty
+        ..plantedAt = null;
+    }
+
+    expect(state.playerXp, 30);
+    expect(state.dailyQuests.first.completed, isTrue);
+    expect(state.unlockedAchievements, contains('Langkah Pertama'));
+
+    state.playerXp = 100;
+    state.setPlayerName('  Petani   Nusantara  ');
+    state.equipCosmetic('farmer_classic');
+    state.performPlotAction(0);
+    expect(state.ownedCosmeticIds, contains('farmer_nusantara'));
+    expect(state.equipCosmetic('farmer_nusantara'), isTrue);
+    await state.saveNow();
+
+    final restored = FarmStateController();
+    await restored.loadSavedState();
+    expect(restored.playerName, 'Petani Nusantara');
+    expect(restored.playerLevel, 2);
+    expect(restored.equippedCosmeticId, 'farmer_nusantara');
+    expect(restored.ownedCosmeticIds, contains('farmer_nusantara'));
+
+    state.dispose();
+    restored.dispose();
+  });
+
+  testWidgets('profile panel shows quests and wardrobe', (tester) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final state = FarmStateController();
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTaniinTheme(),
+        home: Scaffold(
+          body: ProfilePanel(farmState: state, onClose: () {}),
+        ),
+      ),
+    );
+
+    expect(find.textContaining('PROFIL PETANI'), findsOneWidget);
+    expect(find.text('QUEST HARIAN'), findsOneWidget);
+    expect(find.text('WARDROBE'), findsOneWidget);
+    expect(find.text('Petani Klasik'), findsOneWidget);
+    expect(find.text('Petani Nusantara'), findsOneWidget);
   });
 
   test(

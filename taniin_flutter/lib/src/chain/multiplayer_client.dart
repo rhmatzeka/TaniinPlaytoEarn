@@ -13,6 +13,7 @@ class RemotePlayer {
     required this.x,
     required this.y,
     required this.anim,
+    this.skinId = 'farmer_classic',
   });
 
   final String id;
@@ -21,6 +22,7 @@ class RemotePlayer {
   double x;
   double y;
   String anim;
+  String skinId;
 }
 
 class AiAgentState {
@@ -94,6 +96,8 @@ class MultiplayerClient extends ChangeNotifier {
   bool connected = false;
   String _connectedHost = '';
   late String _lastWalletAddress;
+  late String _lastPlayerName = farmState.playerName;
+  late String _lastSkinId = farmState.equippedCosmeticId;
 
   final Map<String, RemotePlayer> remotePlayers = <String, RemotePlayer>{};
   AiAgentState? aiAgent;
@@ -105,8 +109,12 @@ class MultiplayerClient extends ChangeNotifier {
   void Function(int plotIndex)? onAiHarvested;
 
   void _onWalletAddressChanged() {
-    if (farmState.walletAddress != _lastWalletAddress) {
+    if (farmState.walletAddress != _lastWalletAddress ||
+        farmState.playerName != _lastPlayerName ||
+        farmState.equippedCosmeticId != _lastSkinId) {
       _lastWalletAddress = farmState.walletAddress;
+      _lastPlayerName = farmState.playerName;
+      _lastSkinId = farmState.equippedCosmeticId;
       debugPrint(
         '[multiplayer] Player wallet address changed, reconnecting...',
       );
@@ -188,6 +196,7 @@ class MultiplayerClient extends ChangeNotifier {
                   x: (val['x'] as num?)?.toDouble() ?? 0.0,
                   y: (val['y'] as num?)?.toDouble() ?? 0.0,
                   anim: val['anim']?.toString() ?? 'idle',
+                  skinId: val['skinId']?.toString() ?? 'farmer_classic',
                 );
               }
             });
@@ -220,6 +229,7 @@ class MultiplayerClient extends ChangeNotifier {
               x: (player['x'] as num?)?.toDouble() ?? 0.0,
               y: (player['y'] as num?)?.toDouble() ?? 0.0,
               anim: player['anim']?.toString() ?? 'idle',
+              skinId: player['skinId']?.toString() ?? 'farmer_classic',
             );
             notifyListeners();
           }
@@ -299,9 +309,7 @@ class MultiplayerClient extends ChangeNotifier {
     final wallet = farmState.walletAddress.isNotEmpty
         ? farmState.walletAddress
         : 'local-wallet';
-    final name = farmState.walletAddress.isNotEmpty
-        ? 'Petani ${farmState.walletAddress.substring(0, 6)}'
-        : 'Petani Lokal';
+    final name = farmState.playerName;
 
     _socket?.emit('join', <String, dynamic>{
       'wallet': wallet,
@@ -309,6 +317,7 @@ class MultiplayerClient extends ChangeNotifier {
       'x': 18.5 * 128,
       'y': 28.5 * 128,
       'anim': 'idle',
+      'skinId': farmState.equippedCosmeticId,
     });
   }
 

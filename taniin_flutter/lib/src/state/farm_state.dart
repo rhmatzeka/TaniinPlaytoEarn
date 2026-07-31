@@ -9,7 +9,7 @@ import '../chain/chain_client.dart';
 import '../chain/browser_wallet.dart' as browser_wallet;
 import '../chain/platform_bridge.dart';
 
-enum GamePanel { history, backpack, settings }
+enum GamePanel { profile, history, backpack, settings }
 
 enum PlotStatus { empty, growing }
 
@@ -26,6 +26,48 @@ enum GameInteraction {
 }
 
 enum SwapAsset { gameCoin, taniSepolia, ethSepolia }
+
+class CosmeticItem {
+  const CosmeticItem({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.color,
+    required this.unlockLevel,
+  });
+
+  final String id;
+  final String name;
+  final String description;
+  final Color color;
+  final int unlockLevel;
+}
+
+class DailyQuest {
+  const DailyQuest({
+    required this.id,
+    required this.title,
+    required this.target,
+    required this.progress,
+    required this.xpReward,
+  });
+
+  final String id;
+  final String title;
+  final int target;
+  final int progress;
+  final int xpReward;
+
+  bool get completed => progress >= target;
+
+  DailyQuest copyWith({int? progress}) => DailyQuest(
+    id: id,
+    title: title,
+    target: target,
+    progress: progress ?? this.progress,
+    xpReward: xpReward,
+  );
+}
 
 extension SwapAssetText on SwapAsset {
   String get label {
@@ -192,8 +234,60 @@ class FarmStateController extends ChangeNotifier {
   static const int _payoutBalancePollAttempts = 8;
   static final BigInt _weiPerEth = BigInt.parse('1000000000000000000');
 
+  static const List<CosmeticItem> cosmeticCatalog = <CosmeticItem>[
+    CosmeticItem(
+      id: 'farmer_classic',
+      name: 'Petani Klasik',
+      description: 'Tampilan asli untuk memulai perjalanan.',
+      color: Color(0xFFFFFFFF),
+      unlockLevel: 1,
+    ),
+    CosmeticItem(
+      id: 'farmer_nusantara',
+      name: 'Petani Nusantara',
+      description: 'Palet hangat terinspirasi panen Nusantara.',
+      color: Color(0xFFFFC66D),
+      unlockLevel: 2,
+    ),
+    CosmeticItem(
+      id: 'forest_keeper',
+      name: 'Penjaga Hutan',
+      description: 'Palet hijau untuk sahabat alam.',
+      color: Color(0xFF8FE39A),
+      unlockLevel: 4,
+    ),
+  ];
+
   int coins = 620;
   int tani = 86;
+  String playerName = 'Petani Baru';
+  int playerXp = 0;
+  String equippedCosmeticId = 'farmer_classic';
+  final Set<String> ownedCosmeticIds = <String>{'farmer_classic'};
+  final Set<String> unlockedAchievements = <String>{};
+  List<DailyQuest> dailyQuests = <DailyQuest>[
+    const DailyQuest(
+      id: 'plant',
+      title: 'Tanam 3 benih',
+      target: 3,
+      progress: 0,
+      xpReward: 30,
+    ),
+    const DailyQuest(
+      id: 'harvest',
+      title: 'Panen 2 kali',
+      target: 2,
+      progress: 0,
+      xpReward: 40,
+    ),
+    const DailyQuest(
+      id: 'sell',
+      title: 'Jual hasil panen',
+      target: 1,
+      progress: 0,
+      xpReward: 30,
+    ),
+  ];
   int ownedLand = 1;
   int shopBundleQuantity = 1;
   int swapAmount = 0;
@@ -544,6 +638,52 @@ class FarmStateController extends ChangeNotifier {
         statusMessage.isNotEmpty;
   }
 
+  int get playerLevel => 1 + playerXp ~/ 100;
+  int get xpInLevel => playerXp % 100;
+  double get levelProgress => xpInLevel / 100;
+  CosmeticItem get equippedCosmetic => cosmeticCatalog.firstWhere(
+    (item) => item.id == equippedCosmeticId,
+    orElse: () => cosmeticCatalog.first,
+  );
+
+  void setPlayerName(String value) {
+    final cleaned = value.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (cleaned.isEmpty) return;
+    playerName = cleaned.substring(0, math.min(24, cleaned.length));
+    _commitState();
+  }
+
+  bool equipCosmetic(String id) {
+    if (!ownedCosmeticIds.contains(id)) return false;
+    equippedCosmeticId = id;
+    _commitState();
+    return true;
+  }
+
+  void _recordProgress(String questId, {int amount = 1}) {
+    for (var i = 0; i < dailyQuests.length; i++) {
+      final quest = dailyQuests[i];
+      if (quest.id != questId || quest.completed) continue;
+      final progress = math.min(quest.target, quest.progress + amount);
+      dailyQuests[i] = quest.copyWith(progress: progress);
+      if (progress >= quest.target) _addXp(quest.xpReward);
+    }
+    _unlockProgressRewards();
+  }
+
+  void _addXp(int amount) {
+    playerXp = math.min(0x7fffffff, playerXp + amount);
+  }
+
+  void _unlockProgressRewards() {
+    for (final item in cosmeticCatalog) {
+      if (playerLevel >= item.unlockLevel) ownedCosmeticIds.add(item.id);
+    }
+    if (playerXp >= 30) unlockedAchievements.add('Langkah Pertama');
+    if (playerLevel >= 2) unlockedAchievements.add('Petani Berkembang');
+    if (ownedLand >= 5) unlockedAchievements.add('Juragan Lahan');
+  }
+
   Future<void> loadSavedState() async {
     if (_persistenceReady) {
       return;
@@ -613,6 +753,19 @@ class FarmStateController extends ChangeNotifier {
       'savedAt': DateTime.now().millisecondsSinceEpoch,
       'coins': coins,
       'tani': tani,
+      'playerName': playerName,
+      'playerXp': playerXp,
+      'equippedCosmeticId': equippedCosmeticId,
+      'ownedCosmeticIds': ownedCosmeticIds.toList(),
+      'unlockedAchievements': unlockedAchievements.toList(),
+      'dailyQuests': dailyQuests
+          .map(
+            (quest) => <String, Object?>{
+              'id': quest.id,
+              'progress': quest.progress,
+            },
+          )
+          .toList(),
       'ownedLand': ownedLand,
       'shopBundleQuantity': shopBundleQuantity,
       'swapAmount': swapAmount,
@@ -660,6 +813,59 @@ class FarmStateController extends ChangeNotifier {
     try {
       coins = _readInt(data['coins'], coins).clamp(0, 0x7fffffff).toInt();
       tani = _readInt(data['tani'], tani).clamp(0, 0x7fffffff).toInt();
+      playerName = _readString(data['playerName'], playerName).trim();
+      if (playerName.isEmpty) playerName = 'Petani Baru';
+      playerXp = _readInt(
+        data['playerXp'],
+        playerXp,
+      ).clamp(0, 0x7fffffff).toInt();
+      final savedOwnedCosmetics = _listValue(data['ownedCosmeticIds']);
+      if (savedOwnedCosmetics != null) {
+        ownedCosmeticIds
+          ..clear()
+          ..add('farmer_classic')
+          ..addAll(
+            savedOwnedCosmetics
+                .map((item) => item.toString())
+                .where((id) => cosmeticCatalog.any((item) => item.id == id)),
+          );
+      }
+      final savedAchievements = _listValue(data['unlockedAchievements']);
+      if (savedAchievements != null) {
+        unlockedAchievements
+          ..clear()
+          ..addAll(savedAchievements.map((item) => item.toString()));
+      }
+      _unlockProgressRewards();
+      final savedEquipped = _readString(
+        data['equippedCosmeticId'],
+        'farmer_classic',
+      );
+      equippedCosmeticId = ownedCosmeticIds.contains(savedEquipped)
+          ? savedEquipped
+          : 'farmer_classic';
+      final savedQuests = _listValue(data['dailyQuests']);
+      if (savedQuests != null) {
+        final progressById = <String, int>{};
+        for (final value in savedQuests) {
+          final quest = _mapValue(value);
+          if (quest != null)
+            progressById[_readString(quest['id'], '')] = _readInt(
+              quest['progress'],
+              0,
+            );
+        }
+        dailyQuests = dailyQuests
+            .map(
+              (quest) => quest.copyWith(
+                progress: (progressById[quest.id] ?? quest.progress).clamp(
+                  0,
+                  quest.target,
+                ),
+              ),
+            )
+            .toList();
+      }
       shopBundleQuantity = _readInt(
         data['shopBundleQuantity'],
         shopBundleQuantity,
@@ -1234,6 +1440,7 @@ class FarmStateController extends ChangeNotifier {
           return false;
         }
         seeds[selectedSeedIndex] = seed.copyWith(quantity: seed.quantity - 1);
+        _recordProgress('plant');
         plot
           ..seedIndex = selectedSeedIndex
           ..status = PlotStatus.growing
@@ -1257,6 +1464,7 @@ class FarmStateController extends ChangeNotifier {
         crops[seedIndex] = crops[seedIndex].copyWith(
           quantity: crops[seedIndex].quantity + amount,
         );
+        _recordProgress('harvest');
         selectedSellCropIndex = seedIndex;
         plot
           ..status = PlotStatus.empty
@@ -1382,6 +1590,7 @@ class FarmStateController extends ChangeNotifier {
     final earned = sold * harvestSellPrice;
     crops[cropIndex] = crop.copyWith(quantity: 0);
     coins += earned;
+    _recordProgress('sell');
     _queueChainAction(
       ChainAction(type: 'SELL_CROP', plotId: cropIndex + 1, amount: sold),
       title: 'Jual panen ${crop.name}',
