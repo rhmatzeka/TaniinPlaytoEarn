@@ -1,6 +1,6 @@
-# Taniin
+ih# Taniin
 
-Taniin is a Flutter/Flame landscape farming game prototype for Android and Web with Web3 hooks for Sepolia. The app renders a pixel farm map, lets the player buy seeds, plant, harvest, sell crops, and sync the in-game coin display with a connected wallet
+Taniin is a Flutter/Flame landscape farming game prototype for Android and Web with Web3 hooks for Sepolia. The app renders a pixel farm map, lets the player buy seeds, plant, harvest, sell crops, and sync the in-game coin display with a connected wallet.
 
 ## Current Features
 
