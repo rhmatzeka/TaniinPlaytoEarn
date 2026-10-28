@@ -59,7 +59,7 @@ Future<String> _sendJsonRequest(
   request.open(method, url, true);
   request.timeout = timeout.inMilliseconds;
   request.setRequestHeader('Accept', 'application/json');
-  headers.forEach(request.setRequestHeader);
+  headers.forEach((name, value) => request.setRequestHeader(name, value));
   if (payload == null) {
     request.send();
   } else {

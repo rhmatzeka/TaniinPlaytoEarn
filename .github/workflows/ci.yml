@@ -42,7 +42,7 @@ jobs:
       - run: flutter test
       - name: Build web
         run: >-
-          flutter build web --release --wasm --base-href /main/
+          flutter build web --release --base-href /main/
           --dart-define=TANIIN_COIN_CONTRACT_ADDRESS=${{ vars.TANIIN_COIN_CONTRACT_ADDRESS }}
           --dart-define=TANIIN_LAND_CONTRACT_ADDRESS=${{ vars.TANIIN_LAND_CONTRACT_ADDRESS }}
           --dart-define=TANIIN_ITEMS_CONTRACT_ADDRESS=${{ vars.TANIIN_ITEMS_CONTRACT_ADDRESS }}
