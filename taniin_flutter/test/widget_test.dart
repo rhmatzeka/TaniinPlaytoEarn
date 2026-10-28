@@ -342,7 +342,7 @@ void main() {
       ),
     );
 
-    expect(find.textContaining('PROFIL PETANI'), findsOneWidget);
+    expect(find.textContaining('Profil Petani'), findsOneWidget);
     expect(find.text('QUEST HARIAN'), findsOneWidget);
     expect(find.text('WARDROBE'), findsOneWidget);
     expect(find.text('Petani Klasik'), findsOneWidget);
