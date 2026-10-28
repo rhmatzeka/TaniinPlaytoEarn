@@ -215,7 +215,7 @@ class FarmStateController extends ChangeNotifier {
       title: 'Game dimulai',
       status: 'lokal tersimpan',
       timeLabel: 'baru saja',
-      valueLabel: '+6 seed',
+      valueLabel: '+6 benih',
     ),
   ];
 
@@ -1439,20 +1439,20 @@ class FarmStateController extends ChangeNotifier {
       return statusMessage;
     }
     return switch (interaction) {
-      GameInteraction.shop => 'Tap toko: beli benih pakai Game Coin.',
+      GameInteraction.shop => 'Toko Benih: beli benih pakai Game Coin.',
       GameInteraction.sellHarvest =>
         harvests > 0
-            ? 'Tap rumah jual: pilih panen untuk dijual jadi Game Coin.'
-            : 'Rumah jual: belum ada hasil panen.',
+            ? 'Rumah Pengepul: jual hasil panen jadi koin.'
+            : 'Rumah Pengepul: belum ada hasil panen untuk dijual.',
       GameInteraction.swapToken =>
-        'Tap rumah swap: tukar Game Coin, TANI Sepolia, dan ETH Sepolia.',
-      GameInteraction.buyLand => 'Tap tanda BELI: beli $landBuyPrice coin.',
-      GameInteraction.plant => 'Tap tanda TANAM: tanam atau jual lahan kosong.',
+        'Rumah Tukar: tukar koin, TANI, dan ETH Sepolia.',
+      GameInteraction.buyLand => 'Lahan kosong: beli seharga $landBuyPrice koin.',
+      GameInteraction.plant => 'Lahanmu: tanam benih di sini.',
       GameInteraction.sellLand =>
-        'Tap lahan kosong: jual +$landSellPrice coin.',
-      GameInteraction.waitCrop => 'Tanaman masih tumbuh.',
-      GameInteraction.harvest => 'Tap lahan: panen tanaman.',
-      _ => 'Dekati lahan atau toko.',
+        'Lahanmu: jual seharga $landSellPrice koin.',
+      GameInteraction.waitCrop => 'Tanaman masih tumbuh, tunggu sebentar.',
+      GameInteraction.harvest => 'Tanaman siap dipanen!',
+      _ => 'Jalan ke toko, lahan, atau rumah untuk mulai bertani.',
     };
   }
 

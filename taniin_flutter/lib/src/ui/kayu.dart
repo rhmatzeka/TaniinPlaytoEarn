@@ -37,6 +37,7 @@ class KayuPanel extends StatelessWidget {
     required this.title,
     required this.child,
     this.icon,
+    this.leading,
     this.subtitle,
     this.trailing,
     this.onClose,
@@ -46,6 +47,9 @@ class KayuPanel extends StatelessWidget {
 
   final String title;
   final IconData? icon;
+
+  /// Pixel art shown before the title; takes precedence over [icon].
+  final Widget? leading;
   final String? subtitle;
   final Widget? trailing;
   final VoidCallback? onClose;
@@ -89,7 +93,10 @@ class KayuPanel extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    if (icon != null) ...[
+                    if (leading != null) ...[
+                      leading!,
+                      SizedBox(width: narrow ? 10 : 14),
+                    ] else if (icon != null) ...[
                       Icon(icon, size: narrow ? 34 : 42, color: Kayu.emas),
                       SizedBox(width: narrow ? 10 : 14),
                     ],

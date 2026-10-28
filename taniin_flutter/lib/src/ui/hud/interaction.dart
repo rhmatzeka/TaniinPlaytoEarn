@@ -51,35 +51,39 @@ class _ContextPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: enabled ? const Color(0xD8221512) : const Color(0xB8171512),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: enabled ? const Color(0xFFFFD75A) : const Color(0x886E5B37),
-            width: 3,
-          ),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x70000000),
-              offset: Offset(0, 5),
-              blurRadius: 0,
-            ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-          child: Text(
-            text,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: Colors.white,
-              fontSize: 20,
-              height: 1.05,
+    return Semantics(
+      button: enabled,
+      label: text,
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Opacity(
+          opacity: enabled ? 1 : 0.82,
+          child: PixelFrame(
+            tone: PixelFrameTone.gelap,
+            padding: const EdgeInsets.fromLTRB(18, 8, 8, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    text,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Kayu.teks(19, color: Kayu.krem),
+                  ),
+                ),
+                if (enabled) ...[
+                  const SizedBox(width: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Kayu.daun,
+                      border: Border.all(color: Kayu.daunTerang, width: 3),
+                    ),
+                    child: Text('Buka', style: Kayu.judul(20, color: Kayu.krem)),
+                  ),
+                ],
+              ],
             ),
           ),
         ),

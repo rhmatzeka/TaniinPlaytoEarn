@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../chain/platform_bridge.dart';
 import '../state/farm_state.dart';
 import 'pixel_panel.dart';
+import 'pixel_art.dart';
 
 enum _SettingsSection { audio, about }
 
@@ -50,7 +51,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
             children: [
               _MenuHeader(
                 title: 'Menu',
-                icon: Icons.menu,
+                ikon: 'menu',
                 onClose: widget.onClose,
               ),
               Expanded(
@@ -194,12 +195,12 @@ class _SettingsPanelState extends State<SettingsPanel> {
 class _MenuHeader extends StatelessWidget {
   const _MenuHeader({
     required this.title,
-    required this.icon,
+    required this.ikon,
     required this.onClose,
   });
 
   final String title;
-  final IconData icon;
+  final String ikon;
   final VoidCallback onClose;
 
   @override
@@ -215,7 +216,7 @@ class _MenuHeader extends StatelessWidget {
         children: [
           const _YellowPixelDot(),
           const SizedBox(width: 24),
-          Icon(icon, size: 48, color: const Color(0xFFFFF0CE)),
+          PixelIcon(ikon, size: 52),
           const SizedBox(width: 22),
           Expanded(
             child: Text(

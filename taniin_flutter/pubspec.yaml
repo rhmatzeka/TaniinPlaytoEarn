@@ -77,6 +77,7 @@ flutter:
     - assets/game/Tileset/Sprout Lands - Sprites - Basic pack/Objects/
     - assets/game/Tileset/pixel_16_woods v2 free/
     - assets/images/
+    - assets/ui/
 
   fonts:
     - family: Pixelify

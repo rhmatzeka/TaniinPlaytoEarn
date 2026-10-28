@@ -13,6 +13,7 @@ import 'web_input_capability.dart'
     as web_input;
 import 'hud/status_strip.dart';
 import 'kayu.dart';
+import 'pixel_art.dart';
 import 'wallet_panel.dart';
 
 part 'hud/top_bar.dart';
@@ -74,7 +75,7 @@ class GameHud extends StatelessWidget {
                 final mobileWebTouchLayout = kIsWeb && showTouchJoystick;
                 const showMiniMap = true;
                 final miniMapWidth = portrait
-                    ? 168.0
+                    ? 150.0
                     : short
                     ? 190.0
                     : compact
@@ -188,58 +189,37 @@ class GameHud extends StatelessWidget {
                       ),
                       Positioned(
                         right: portrait ? edge : 20,
-                        top: portrait
-                            ? 196
-                            : compact
-                            ? 196
-                            : 204,
+                        top: portrait ? edge + 112 : 122,
                         child: Column(
-                          children: [
-                            _HudIconButton(
-                              icon: Icons.person,
-                              tooltip: 'Profil & Wardrobe',
-                              isActive: activePanel == GamePanel.profile,
-                              badge: 'Lv${farmState.playerLevel}',
-                              onPressed: () =>
-                                  onPanelSelected(GamePanel.profile),
-                            ),
-                            const SizedBox(height: 8),
-                            _HudIconButton(
-                              icon: Icons.history,
-                              tooltip: 'Riwayat',
-                              isActive: activePanel == GamePanel.history,
-                              badge: '${farmState.history.length}',
-                              onPressed: () =>
-                                  onPanelSelected(GamePanel.history),
-                            ),
-                            const SizedBox(height: 8),
-                            _HudIconButton(
-                              icon: Icons.backpack,
-                              tooltip: 'Backpack',
-                              isActive: activePanel == GamePanel.backpack,
-                              badge: '${farmState.totalSeeds}',
-                              onPressed: () =>
-                                  onPanelSelected(GamePanel.backpack),
-                            ),
-                          ],
+                          children: _panelButtons(
+                            farmState,
+                            activePanel,
+                            onPanelSelected,
+                            gap: 12,
+                            axis: Axis.vertical,
+                          ),
                         ),
                       ),
                     ],
                     Positioned(
                       top: portrait
                           ? edge + miniMapWidth * game.miniMapAspectRatio + 36
+                          : short
+                          ? 118
                           : 8,
-                      left: portrait ? edge : miniMapWidth + 48,
+                      left: portrait ? edge : short ? 400 : miniMapWidth + 48,
                       right: portrait
                           ? 110
                           : short
-                          ? 560
+                          ? edge
                           : compact
                           ? 300
                           : 420,
                       child: Align(
                         alignment: portrait
                             ? Alignment.topLeft
+                            : short
+                            ? Alignment.topRight
                             : Alignment.topCenter,
                         child: AnimatedBuilder(
                           animation: game.multiplayerClient,
@@ -287,17 +267,22 @@ class GameHud extends StatelessWidget {
                           : compact
                           ? 20
                           : 32,
-                      child: _ContextPill(
-                        text: contextText,
-                        enabled: interaction != GameInteraction.none,
-                        onTap: () {
-                          farmState.playClick();
-                          _openContextDialog(
-                            context,
-                            interaction,
-                            selectedPlot,
-                          );
-                        },
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 820),
+                          child: _ContextPill(
+                            text: contextText,
+                            enabled: interaction != GameInteraction.none,
+                            onTap: () {
+                              farmState.playClick();
+                              _openContextDialog(
+                                context,
+                                interaction,
+                                selectedPlot,
+                              );
+                            },
+                          ),
+                        ),
                       ),
                     ),
                     if (farmState.statusVisible)

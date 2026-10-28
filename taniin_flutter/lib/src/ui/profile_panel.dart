@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../state/farm_state.dart';
 import 'kayu.dart';
 import 'taniin_theme.dart';
+import 'pixel_art.dart';
 
 class ProfilePanel extends StatefulWidget {
   const ProfilePanel({
@@ -126,7 +127,10 @@ class _ProfilePanelState extends State<ProfilePanel> {
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: TaniinColors.darkSoil, width: 2),
           ),
-          child: const Icon(Icons.person, color: TaniinColors.darkSoil),
+          child: const Padding(
+            padding: EdgeInsets.all(2),
+            child: PixelIcon('petani', size: 30),
+          ),
         ),
         const SizedBox(width: 12),
         const Expanded(
