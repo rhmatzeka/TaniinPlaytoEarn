@@ -349,9 +349,9 @@ class MultiplayerClient extends ChangeNotifier {
     if (connected) {
       _socket?.emit('chat', <String, dynamic>{'text': trimmed});
     } else {
-      // Offline mode: Simulate AI locally without posting offline alert messages.
+      // Offline: answer with the local AI. Socket.IO keeps retrying on its own,
+      // so a message must not tear the connection down and start over.
       _simulateLocalAi(trimmed, time);
-      reconnect();
     }
   }
 

@@ -1,5 +1,5 @@
 const { expect } = require("chai");
-const { createChatLimiter, resolvePlayer } = require("../lib/multiplayer-service.cjs");
+const { chatKey, createChatLimiter, resolvePlayer } = require("../lib/multiplayer-service.cjs");
 
 const WALLET = "0x3333333333333333333333333333333333333333";
 
@@ -35,5 +35,11 @@ describe("Multiplayer joins and chat", function () {
     expect(limiter.allow("s1", 1999)).to.equal(false);
     expect(limiter.allow("s2", 1999)).to.equal(true);
     expect(limiter.allow("s1", 3000)).to.equal(true);
+  });
+
+  it("rate limits chat per wallet or per visitor IP, not per socket", function () {
+    expect(chatKey({ verified: true, wallet: WALLET }, { headers: {}, address: "1.1.1.1" })).to.equal(`w:${WALLET}`);
+    expect(chatKey({ verified: false }, { headers: { "cf-connecting-ip": "9.9.9.9" }, address: "127.0.0.1" })).to.equal("ip:9.9.9.9");
+    expect(chatKey(undefined, { headers: {}, address: "8.8.8.8" })).to.equal("ip:8.8.8.8");
   });
 });

@@ -6,7 +6,8 @@ const { interpret } = require("./ai-brain.cjs");
 // Valid checksummed Sepolia address used as the AI Farmer Agent's smart account.
 const AI_WALLET_ADDRESS = "0x000000000000000000000000000000000000dEaD"; // AI Virtual Address
 const CHAT_INTERVAL_MS = 2000;
-const SESSION_CACHE_MS = 5 * 60 * 1000;
+// Short so a logged-out session stops showing as verified within seconds.
+const SESSION_CACHE_MS = 30 * 1000;
 const MAX_AI_QUEUE = 20;
 const MAX_CHAT_LENGTH = 300;
 const MAP_MIN = 0;
@@ -81,6 +82,16 @@ async function cachedSessionLookup(token) {
   return value;
 }
 
+// One limit per wallet (signed in) or per visitor IP, so extra tabs don't help spam.
+function chatKey(player, handshake) {
+  if (player?.verified && player.wallet) return `w:${player.wallet}`;
+  const headers = handshake?.headers || {};
+  const ip = String(headers["cf-connecting-ip"] || headers["x-forwarded-for"] || handshake?.address || "unknown")
+    .split(",")[0]
+    .trim();
+  return `ip:${ip}`;
+}
+
 function createChatLimiter(intervalMs) {
   const lastSent = new Map();
   return {
@@ -88,6 +99,7 @@ function createChatLimiter(intervalMs) {
       const last = lastSent.get(id);
       if (last !== undefined && nowMs - last < intervalMs) return false;
       lastSent.set(id, nowMs);
+      if (lastSent.size > 5000) lastSent.delete(lastSent.keys().next().value);
       return true;
     },
     forget(id) {
@@ -148,7 +160,7 @@ function initMultiplayer(server) {
 
     socket.on("chat", (data) => {
       const text = cleanText(data && data.text, MAX_CHAT_LENGTH);
-      if (!text || !chatLimiter.allow(socket.id, Date.now())) return;
+      if (!text || !chatLimiter.allow(chatKey(players[socket.id], socket.handshake), Date.now())) return;
       const wallet = players[socket.id] ? players[socket.id].wallet : "0x";
       console.log(`[chat] ${players[socket.id]?.name || "Anon"}: ${text}`);
 
@@ -167,7 +179,6 @@ function initMultiplayer(server) {
     });
 
     socket.on("disconnect", () => {
-      chatLimiter.forget(socket.id);
       if (players[socket.id]) {
         console.log(`[multiplayer] Player left: ${players[socket.id].name}`);
         delete players[socket.id];
@@ -414,6 +425,7 @@ function executeAiAction(action) {
 }
 
 module.exports = {
+  chatKey,
   createChatLimiter,
   initMultiplayer,
   normalizeSkin,

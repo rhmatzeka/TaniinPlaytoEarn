@@ -36,6 +36,7 @@ class FarmStateController extends ChangeNotifier {
   static const String _playerSaveKey = 'taniin.farmState.player.v1';
   static const String _sessionKey = 'taniin.session.v1';
   static const String _pkceKey = 'taniin.pkce.v1';
+  static const String _loginStateKey = 'taniin.loginState.v1';
   static const int _saveVersion = 1;
   static const Duration _payoutBalancePollDelay = Duration(seconds: 2);
   static const int _payoutBalancePollAttempts = 8;
@@ -107,6 +108,7 @@ class FarmStateController extends ChangeNotifier {
   ServiceState sepoliaState = ServiceState.unknown;
   ServiceState serverState = ServiceState.unknown;
   final math.Random _random = math.Random.secure();
+  Future<void> _actionQueue = Future<void>.value();
   String walletNativeBalance = '';
   String walletNativeWei = '';
   String ethWeiPerCoin = '';
@@ -997,7 +999,11 @@ class FarmStateController extends ChangeNotifier {
   /// code intercepted from the taniin:// redirect is useless to other apps.
   Future<String> prepareLoginUrl({bool forApp = !kIsWeb}) async {
     if (!forApp) {
-      return PlatformBridge.loginUrl(chainConfig, forApp: false);
+      // Web: remember a nonce so only a redirect we started can sign us in.
+      final state = newCodeVerifier();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_loginStateKey, state);
+      return PlatformBridge.loginUrl(chainConfig, forApp: false, state: state);
     }
     final verifier = newCodeVerifier();
     final prefs = await SharedPreferences.getInstance();
@@ -1031,7 +1037,19 @@ class FarmStateController extends ChangeNotifier {
       await applyAuthSession(redeemed);
       return;
     }
-    final next = AuthSession.fromFragment(fragment, DateTime.now().toUtc());
+    final prefs = await SharedPreferences.getInstance();
+    final expectedState = prefs.getString(_loginStateKey) ?? '';
+    final returnedState = Uri.splitQueryString(
+      fragment.startsWith('#') ? fragment.substring(1) : fragment,
+    )['state'];
+    // A foreign link must not consume the nonce of a login still in progress.
+    final matches = expectedState.isNotEmpty && returnedState == expectedState;
+    if (matches) {
+      await prefs.remove(_loginStateKey);
+    }
+    final next = matches
+        ? AuthSession.fromFragment(fragment, DateTime.now().toUtc())
+        : null;
     if (next == null) {
       showMessage('Login gagal atau kedaluwarsa. Coba masuk lagi.', success: false);
       return;
@@ -1079,6 +1097,25 @@ class FarmStateController extends ChangeNotifier {
 
   /// Server snapshot is the source of truth for a signed-in player's economy.
   void applyServerState(Map<String, Object?> state) {
+    final serverTime = state['serverTime'];
+    final plots = state['plots'];
+    if (serverTime is num && plots is List) {
+      // plantedAt is in server time; shift it into this device's clock.
+      final offset = serverTime.toInt() - DateTime.now().millisecondsSinceEpoch;
+      state = <String, Object?>{
+        ...state,
+        'plots': <Object?>[
+          for (final plot in plots)
+            if (plot is Map && plot['plantedAt'] is num)
+              <String, Object?>{
+                ...Map<String, Object?>.from(plot),
+                'plantedAt': (plot['plantedAt'] as num).toInt() - offset,
+              }
+            else
+              plot,
+        ],
+      };
+    }
     _restoreFromSave(state);
     _readyPlotIndexes.clear();
     ownedLand = _ownedLandCount();
@@ -1943,7 +1980,11 @@ class FarmStateController extends ChangeNotifier {
       chainStatus = _localChainStatus(action);
       return;
     }
-    unawaited(_submitChainAction(entryId, action));
+    // One at a time: each server answer is the full state, so order matters.
+    _actionQueue = _actionQueue
+        .then((_) => _submitChainAction(entryId, action))
+        .catchError((Object _) {});
+    unawaited(_actionQueue);
   }
 
   // Signed-in flow: the local change is optimistic; the server's state wins.

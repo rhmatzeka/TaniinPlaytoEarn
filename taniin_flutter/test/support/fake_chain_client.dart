@@ -30,6 +30,9 @@ class FakeChainClient extends ChainClient {
   String maxEthPayoutWei = '1000000000000';
   int walletLoads = 0;
   int logouts = 0;
+  int inFlight = 0;
+  int maxInFlight = 0;
+  Duration actionDelay = Duration.zero;
   final List<(String, String)> redeemedCodes = <(String, String)>[];
 
   @override
@@ -40,6 +43,10 @@ class FakeChainClient extends ChainClient {
   ) async {
     actions.add(action);
     idempotencyKeys.add(idempotencyKey);
+    inFlight += 1;
+    if (inFlight > maxInFlight) maxInFlight = inFlight;
+    await Future<void>.delayed(actionDelay);
+    inFlight -= 1;
     final custom = actionResult;
     if (custom != null) {
       return custom(action);
