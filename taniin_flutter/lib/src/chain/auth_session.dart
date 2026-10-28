@@ -1,3 +1,8 @@
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:crypto/crypto.dart';
+
 import 'chain_client.dart';
 
 final RegExp _sessionTokenPattern = RegExp(r'^[0-9a-f]{64}$');
@@ -97,5 +102,32 @@ Map<String, String> _fragmentValues(String fragment) {
     return Uri.splitQueryString(cleaned);
   } on FormatException {
     return const <String, String>{};
+  }
+}
+
+/// PKCE verifier kept by the app while the browser login runs (RFC 7636).
+String newCodeVerifier() {
+  final random = Random.secure();
+  final bytes = List<int>.generate(32, (_) => random.nextInt(256));
+  return base64Url.encode(bytes).replaceAll('=', '');
+}
+
+String codeChallengeFor(String verifier) {
+  return base64Url
+      .encode(sha256.convert(ascii.encode(verifier)).bytes)
+      .replaceAll('=', '');
+}
+
+/// One-time code the login page returns to the Android app instead of a session.
+class AuthCodeCallback {
+  const AuthCodeCallback(this.code);
+
+  final String code;
+
+  static final RegExp _pattern = RegExp(r'^[0-9a-f]{64}$');
+
+  static AuthCodeCallback? fromFragment(String fragment) {
+    final code = _fragmentValues(fragment)['code'] ?? '';
+    return _pattern.hasMatch(code) ? AuthCodeCallback(code) : null;
   }
 }

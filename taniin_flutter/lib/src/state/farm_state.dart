@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -34,6 +35,7 @@ class FarmStateController extends ChangeNotifier {
   static const String _saveKey = 'taniin.farmState.v1';
   static const String _playerSaveKey = 'taniin.farmState.player.v1';
   static const String _sessionKey = 'taniin.session.v1';
+  static const String _pkceKey = 'taniin.pkce.v1';
   static const int _saveVersion = 1;
   static const Duration _payoutBalancePollDelay = Duration(seconds: 2);
   static const int _payoutBalancePollAttempts = 8;
@@ -988,11 +990,42 @@ class FarmStateController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Handles the `#session=...` or `#fundTx=...` fragment from the login page.
+  /// Login page URL. The app adds a PKCE challenge and keeps the verifier, so a
+  /// code intercepted from the taniin:// redirect is useless to other apps.
+  Future<String> prepareLoginUrl({bool forApp = !kIsWeb}) async {
+    if (!forApp) {
+      return PlatformBridge.loginUrl(chainConfig, forApp: false);
+    }
+    final verifier = newCodeVerifier();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_pkceKey, verifier);
+    return PlatformBridge.loginUrl(
+      chainConfig,
+      forApp: true,
+      challenge: codeChallengeFor(verifier),
+    );
+  }
+
+  /// Handles the `#session=`, `#code=` or `#fundTx=` fragment from the login page.
   Future<void> handleAuthFragment(String fragment) async {
     final fund = FundCallback.fromFragment(fragment);
     if (fund != null) {
       await handleFundCallback(fund);
+      return;
+    }
+    final codeCallback = AuthCodeCallback.fromFragment(fragment);
+    if (codeCallback != null) {
+      final prefs = await SharedPreferences.getInstance();
+      final verifier = prefs.getString(_pkceKey) ?? '';
+      await prefs.remove(_pkceKey);
+      final redeemed = verifier.isEmpty
+          ? null
+          : await _chainClient.redeemLoginCode(codeCallback.code, verifier);
+      if (redeemed == null) {
+        showMessage('Login gagal atau kedaluwarsa. Coba masuk lagi.', success: false);
+        return;
+      }
+      await applyAuthSession(redeemed);
       return;
     }
     final next = AuthSession.fromFragment(fragment, DateTime.now().toUtc());
@@ -1121,6 +1154,11 @@ class FarmStateController extends ChangeNotifier {
   }
 
   Future<void> _clearSessionAndRestoreGuest() async {
+    // Stop pending saves first: once the session is gone they would write the
+    // player's server economy over the guest farm.
+    _saveDebounce?.cancel();
+    _saveDebounce = null;
+    _restoringPersistence = true;
     session = null;
     walletConnected = false;
     walletAddress = '';
@@ -1142,6 +1180,8 @@ class FarmStateController extends ChangeNotifier {
       }
     } on Object {
       _resetEconomyToGuestDefaults();
+    } finally {
+      _restoringPersistence = false;
     }
     ownedLand = _ownedLandCount();
   }

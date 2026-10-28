@@ -421,6 +421,28 @@ class ChainClient {
     );
   }
 
+  Future<AuthSession?> redeemLoginCode(String code, String verifier) async {
+    if (!config.hasGameApi) {
+      return null;
+    }
+    try {
+      final object = _decodeObject(
+        await _postGameApi(
+          '/auth/code',
+          jsonEncode(<String, String>{'code': code, 'codeVerifier': verifier}),
+        ),
+      );
+      return AuthSession.fromJson(<String, Object?>{
+        'token': object['session'],
+        'wallet': object['wallet'],
+        'expiresAt': object['expiresAt'],
+        'loginMethod': object['loginMethod'],
+      });
+    } on Object {
+      return null;
+    }
+  }
+
   Future<void> logout(AuthSession session) async {
     if (!config.hasGameApi) {
       return;

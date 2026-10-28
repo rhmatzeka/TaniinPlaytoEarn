@@ -174,7 +174,7 @@ class _WalletPanelState extends State<WalletPanel> {
 
   Future<void> _openLogin() async {
     farmState.playClick();
-    final url = PlatformBridge.loginUrl(farmState.chainConfig);
+    final url = await farmState.prepareLoginUrl();
     final opened = url.isNotEmpty && await PlatformBridge.openUrl(url, sameTab: true);
     farmState.showMessage(
       opened ? 'Membuka halaman masuk...' : 'Halaman masuk tidak bisa dibuka.',

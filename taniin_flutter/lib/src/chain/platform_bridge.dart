@@ -86,18 +86,22 @@ class PlatformBridge {
     ChainConfig config, {
     String aksi = 'masuk',
     int? jumlah,
+    String? challenge,
+    bool? forApp,
   }) {
     if (!config.hasGameApi) {
       return '';
     }
-    final returnUrl = kIsWeb
-        ? Uri.base.removeFragment().replace(queryParameters: null).path
-        : 'taniin://auth';
+    final app = forApp ?? !kIsWeb;
+    final returnUrl = app
+        ? 'taniin://auth'
+        : Uri.base.removeFragment().replace(queryParameters: null).path;
     return Uri.parse('${config.gameApiUrl}/masuk/').replace(
       queryParameters: <String, String>{
         'return': returnUrl,
         if (aksi != 'masuk') 'aksi': aksi,
         if (jumlah != null) 'jumlah': '$jumlah',
+        'challenge': ?challenge,
       },
     ).toString();
   }
