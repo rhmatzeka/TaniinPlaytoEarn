@@ -207,9 +207,19 @@ Tabel di `schema.sql`: `sessions(token_hash text pk, privy_user_id text, wallet 
 Workflow `android.yml`: trigger `push` ke `main` pada path `taniin_flutter/**` + `workflow_dispatch`; Java 17, Flutter stable; tulis `.env` publik dari `vars` repo; decode secret `TANIIN_KEYSTORE_B64`; `flutter build apk --release`; salin ke `Taniin.apk`; `gh release upload apk-terbaru Taniin.apk --clobber` (buat release bila belum ada). Tidak ada commit dari CI.
 
 - [ ] **Step 1:** Buat keystore sekali: `keytool -genkeypair -keystore ~/.config/taniin/taniin.keystore -alias taniin -keyalg RSA -keysize 2048 -validity 10000` (pasang JDK headless bila belum ada). Simpan secret `TANIIN_KEYSTORE_B64`, `TANIIN_KEYSTORE_PASSWORD` dengan `gh secret set`, variabel publik dengan `gh variable set`.
+- [ ] **Step 1b: SEO + performa halaman depan:** meta/OG/Twitter/canonical/JSON-LD (`VideoGame` + `SoftwareApplication`), `robots.txt`, `sitemap.xml`, gambar WebP berukuran eksplisit, OG image 1200×630. Build game coba `--wasm`; `vercel.json` cache `public, max-age=31536000, immutable` untuk aset Flutter ber-hash dan gambar. Verifikasi: Lighthouse mobile (`npx lighthouse http://127.0.0.1:4174/ --form-factor=mobile`) ≥ 90 di keempat kategori.
 - [ ] **Step 2:** `./scripts/build-web.sh` sukses; `python3 -m http.server 4174 -d contracts/public` → `/` halaman depan, `/main/` game jalan; e2e web (`npm run e2e:web` dengan base `/main/`) → PASS.
 - [ ] **Step 3:** Push branch, jalankan workflow manual → release `apk-terbaru` berisi `Taniin.apk`; `apksigner verify --print-certs` sertifikat sama di dua build berturut-turut.
 - [ ] **Step 4:** Commit `Add landing page, /main game path and APK release workflow`.
+
+### Task 10b: Kualitas kode Flutter (pecah file besar)
+
+**Files:** `taniin_flutter/lib/src/state/farm_state.dart` → `state/` bagian-bagian (`wallet_session_state.dart`, `inventory_state.dart`, `progression_state.dart`, `swap_state.dart`, dst. sebagai `part`/mixin atau kelas kecil), `lib/src/ui/game_hud.dart` → satu file per panel/overlay di `lib/src/ui/hud/`.
+
+- [ ] **Step 1:** Catat baseline: `flutter test` hijau, `flutter analyze` (jumlah isu).
+- [ ] **Step 2:** Pecah tanpa mengubah API publik `FarmStateController`; hapus kode wallet lama yang tidak terpakai.
+- [ ] **Step 3:** `flutter analyze` → 0 isu; `flutter test` → semua hijau; build web sukses.
+- [ ] **Step 4:** Commit `Split oversized Flutter state and HUD files`.
 
 ### Task 11: Deploy, porto, README
 

@@ -75,12 +75,17 @@ Semua state yang sekarang ada di `Map` memori pindah ke Neon Postgres (paket gra
 - Kartu Taniin di porto Mapporto diperbarui dengan link main dan link unduh APK (repo porto mengikuti aturan push langsung Mapporto).
 - README diperbarui: cara login, arsitektur (Vercel + Neon + srv), link unduh, dan screenshot.
 
+### T8. Kualitas kode, performa, SEO (permintaan pemilik 2026-10-28)
+
+- **SEO halaman depan:** `<title>` dan meta description berbahasa Indonesia, Open Graph + Twitter card dengan gambar 1200×630, `link rel=canonical`, data terstruktur JSON-LD (`VideoGame` + `SoftwareApplication` untuk APK), `robots.txt`, `sitemap.xml`, HTML semantik (satu `h1`, alt text di semua gambar), `lang="id"`. Game Flutter (kanvas) tidak diindeks; halaman depan yang membawa SEO.
+- **Performa:** halaman depan tanpa JS berat (HTML/CSS statis, gambar WebP dengan ukuran eksplisit, `loading=lazy` di bawah lipatan), skor Lighthouse ≥ 90 untuk Performance/SEO/Accessibility/Best Practices di mobile. Game web: coba build `--wasm` (fallback otomatis ke CanvasKit), aset ber-hash di-cache lama (`immutable`), file shell tetap `no-store`. Backend: koneksi DB dipakai ulang antar invocation, query memakai indeks.
+- **Kualitas kode:** `flutter analyze` dan lint tanpa peringatan. `farm_state.dart` (2.466 baris) dan `game_hud.dart` (2.807 baris) dipecah per tanggung jawab (mis. wallet/sesi, inventaris/plot, progresi, swap; HUD per panel) tanpa mengubah perilaku, dengan tes yang ada tetap hijau. Kode mati dari alur wallet lama dihapus.
+
 ## Bukan tujuan
 
 - Migrasi ke Rust, Astro, atau framework lain.
 - Deploy ulang atau mengubah kontrak.
 - Pembayaran sungguhan, mainnet, marketplace, season/battle pass, aset seni baru.
-- Memecah file besar (`game_hud.dart`, `farm_state.dart`) di luar bagian yang memang disentuh fitur di atas.
 - Build iOS.
 
 ## Anti-tujuan (gagal walau jalan)
