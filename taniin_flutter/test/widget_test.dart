@@ -365,7 +365,7 @@ void main() {
 
       expect(farmState.swapFromAsset, SwapAsset.taniSepolia);
       expect(farmState.swapToAsset, SwapAsset.gameCoin);
-      expect(farmState.swapSelectedAssets(), isTrue);
+      expect(await farmState.swapSelectedAssets(), isTrue);
       expect(farmState.coins, 660);
       expect(farmState.tani, 46);
 
