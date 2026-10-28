@@ -103,6 +103,11 @@ describe("Game action API", function () {
     expect(result.status).to.equal(503);
   });
 
+  it("sends the server time with player state so clients can correct their clock", async function () {
+    const result = await call(app, { path: "/player", headers: { authorization: `Bearer ${session}` } });
+    expect(result.json.state.serverTime).to.equal(clock);
+  });
+
   it("creates the default player on first load", async function () {
     const result = await call(app, { path: "/player", headers: { authorization: `Bearer ${session}` } });
     expect(result.status).to.equal(200);

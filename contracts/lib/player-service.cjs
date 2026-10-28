@@ -44,7 +44,7 @@ async function lockPlayer(tx, session, nowMs) {
 
 async function getPlayer(db, session, nowMs) {
   const player = await db.transaction((tx) => lockPlayer(tx, session, nowMs));
-  return { ok: true, state: publicState(player.state), importedGuest: player.importedGuest };
+  return { ok: true, state: withServerTime(player.state, nowMs), importedGuest: player.importedGuest };
 }
 
 async function importGuest(db, session, guestState, nowMs) {
@@ -58,7 +58,7 @@ async function importGuest(db, session, guestState, nowMs) {
       "UPDATE players SET state = $2, imported_guest = true, updated_at = now() WHERE wallet = $1",
       [session.wallet, JSON.stringify(state)]
     );
-    return { ok: true, state: publicState(state), importedGuest: true };
+    return { ok: true, state: withServerTime(state, nowMs), importedGuest: true };
   });
 }
 
@@ -105,7 +105,7 @@ async function runGameAction(db, session, body, idempotencyKey, { ip, nowMs }) {
       txHash: chain.txHash,
       txHashes: chain.txHashes,
       etherscanUrl: chain.txHash ? `https://sepolia.etherscan.io/tx/${chain.txHash}` : "",
-      state: publicState(prepared.state)
+      state: withServerTime(prepared.state, nowMs)
     };
   }, fingerprint);
 }
@@ -158,6 +158,11 @@ function compensate(db, wallet, prepared, reason) {
       [prepared.auditId, untouched ? "error" : "error_state_moved", String(reason).slice(0, 500)]
     );
   });
+}
+
+// Clients use serverTime to read plantedAt in their own clock.
+function withServerTime(state, nowMs) {
+  return { ...publicState(state), serverTime: nowMs };
 }
 
 function mapLockTimeout(error) {

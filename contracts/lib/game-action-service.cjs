@@ -34,8 +34,14 @@ const itemsAbi = [
 ];
 
 let servicePromise;
+let serviceOverride = null;
+
+function setGameServiceForTests(service) {
+  serviceOverride = service;
+}
 
 function getGameService() {
+  if (serviceOverride) return Promise.resolve(serviceOverride);
   if (!servicePromise) {
     servicePromise = createGameService().catch((error) => {
       servicePromise = undefined;
@@ -80,10 +86,14 @@ async function executeChainOps(walletAddress, ops, extra = {}) {
   service.signer.reset();
   const { coin, land, items } = service.contracts;
   const txHashes = [];
+  // Unconfirmed sends are checked together at the end, so a revert still fails
+  // the action (and the server restores the player's state).
+  const pending = [];
   const send = async (label, createTx, confirm = false) => {
     const hash = confirm
       ? await sendConfirmedTransaction(service, label, createTx)
       : await sendTransaction(service, label, createTx);
+    if (!confirm) pending.push(hash);
     txHashes.push(hash);
     return hash;
   };
@@ -167,6 +177,12 @@ async function executeChainOps(walletAddress, ops, extra = {}) {
     }
   }
 
+  const receipts = await Promise.all(pending.map((hash) =>
+    service.provider.waitForTransaction(hash, 1, CONFIRM_TIMEOUT_MS).catch(() => null)));
+  // A missing receipt means Sepolia is slow, not that the transaction failed.
+  if (receipts.some((receipt) => receipt && receipt.status !== 1)) {
+    throw httpError(409, "Transaksi gagal di Sepolia. Coba lagi.");
+  }
   return { txHash: txHashes[txHashes.length - 1] || "", txHashes };
 }
 
@@ -303,6 +319,7 @@ function normalizeError(error) {
 module.exports = {
   ethWeiForCoins,
   executeChainOps,
+  setGameServiceForTests,
   health,
   normalizeError
 };
