@@ -40,7 +40,7 @@ async function interpret(text) {
 }
 
 async function callGroq(apiKey, text) {
-  const model = (process.env.GROQ_MODEL || "llama-3.3-70b-versatile").trim();
+  const model = (process.env.GROQ_MODEL || "openai/gpt-oss-20b").trim();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 12000);
   try {

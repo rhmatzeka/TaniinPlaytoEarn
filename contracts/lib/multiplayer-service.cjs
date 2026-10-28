@@ -1,12 +1,12 @@
 const { Server } = require("socket.io");
+const crypto = require("crypto");
 const { interpret } = require("./ai-brain.cjs");
 
 // AI Agent State
 // Valid checksummed Sepolia address used as the AI Farmer Agent's smart account.
 const AI_WALLET_ADDRESS = "0x000000000000000000000000000000000000dEaD"; // AI Virtual Address
-// Pak Tani AI acts only inside the shared world; it never sends chain transactions.
-const AI_ONCHAIN_ENABLED = false;
-const enqueueGameAction = async () => ({});
+const CHAT_INTERVAL_MS = 2000;
+const SESSION_CACHE_MS = 5 * 60 * 1000;
 const MAX_AI_QUEUE = 20;
 const MAX_CHAT_LENGTH = 300;
 const MAP_MIN = 0;
@@ -46,6 +46,56 @@ const HOTSPOTS = {
   ]
 };
 
+const chatLimiter = createChatLimiter(CHAT_INTERVAL_MS);
+const sessionCache = new Map();
+
+// Wallet and verified flag come only from a server-side session; guests get a random name.
+async function resolvePlayer(payload, lookupSession) {
+  let session = null;
+  const token = String(payload.session || "").trim();
+  if (token) {
+    try {
+      session = await lookupSession(token);
+    } catch (error) {
+      console.log(`[multiplayer] session lookup gagal: ${error.message || error}`);
+    }
+  }
+  if (!session) {
+    return { wallet: "", name: `Tamu-${crypto.randomBytes(2).toString("hex").toUpperCase()}`, verified: false };
+  }
+  return {
+    wallet: session.wallet,
+    name: cleanText(payload.name, 24) || `Petani-${session.wallet.slice(2, 6)}`,
+    verified: true
+  };
+}
+
+async function cachedSessionLookup(token) {
+  const cached = sessionCache.get(token);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const { getReadyDb } = require("./db.cjs");
+  const { sessionWalletForSocket } = require("./session-service.cjs");
+  const value = await sessionWalletForSocket(await getReadyDb(), token);
+  sessionCache.set(token, { value, expiresAt: Date.now() + SESSION_CACHE_MS });
+  if (sessionCache.size > 1000) sessionCache.delete(sessionCache.keys().next().value);
+  return value;
+}
+
+function createChatLimiter(intervalMs) {
+  const lastSent = new Map();
+  return {
+    allow(id, nowMs) {
+      const last = lastSent.get(id);
+      if (last !== undefined && nowMs - last < intervalMs) return false;
+      lastSent.set(id, nowMs);
+      return true;
+    },
+    forget(id) {
+      lastSent.delete(id);
+    }
+  };
+}
+
 function initMultiplayer(server) {
   io = new Server(server, {
     cors: {
@@ -63,11 +113,12 @@ function initMultiplayer(server) {
       ai: aiState
     });
 
-    socket.on("join", (data) => {
+    socket.on("join", async (data) => {
       const payload = data && typeof data === "object" ? data : {};
+      const identity = await resolvePlayer(payload, cachedSessionLookup);
+      if (!socket.connected) return;
       players[socket.id] = {
-        wallet: normalizeWallet(payload.wallet),
-        name: cleanText(payload.name, 32) || "Anon Player",
+        ...identity,
         x: finiteCoordinate(payload.x, 200),
         y: finiteCoordinate(payload.y, 300),
         anim: normalizeAnimation(payload.anim),
@@ -97,7 +148,7 @@ function initMultiplayer(server) {
 
     socket.on("chat", (data) => {
       const text = cleanText(data && data.text, MAX_CHAT_LENGTH);
-      if (!text) return;
+      if (!text || !chatLimiter.allow(socket.id, Date.now())) return;
       const wallet = players[socket.id] ? players[socket.id].wallet : "0x";
       console.log(`[chat] ${players[socket.id]?.name || "Anon"}: ${text}`);
 
@@ -116,6 +167,7 @@ function initMultiplayer(server) {
     });
 
     socket.on("disconnect", () => {
+      chatLimiter.forget(socket.id);
       if (players[socket.id]) {
         console.log(`[multiplayer] Player left: ${players[socket.id].name}`);
         delete players[socket.id];
@@ -215,11 +267,6 @@ function normalizeAnimation(value) {
   return animation === "walk" ? "walk" : "idle";
 }
 
-function normalizeWallet(value) {
-  const wallet = cleanText(value, 42);
-  return /^0x[0-9a-fA-F]{40}$/.test(wallet) ? wallet : "0x";
-}
-
 function normalizeSkin(value) {
   const skin = cleanText(value, 32);
   return ["farmer_classic", "farmer_nusantara", "forest_keeper"].includes(skin)
@@ -307,42 +354,16 @@ function executeAiAction(action) {
       console.log(`[AI] Beli benih ${seedType}`);
       speakAi(`Tiba di toko. Sedang membeli benih ${seedType}...`);
       
-      // Simulate API action (Local fallback or Sepolia transaction)
-      try {
-        const seedIndex = ["Kentang", "Bawang", "Stroberi", "Bit"].indexOf(seedType) + 1;
-        const res = AI_ONCHAIN_ENABLED ? await enqueueGameAction({
-          wallet: aiState.wallet,
-          type: "BUY_SEED",
-          plotId: seedIndex,
-          amount: 3
-        }) : { txHash: "" };
-        
-        aiState.inventory.coins -= 60; // Approximate price
-        aiState.inventory.seeds[seedType] += 3;
-        speakAi(`Selesai! Saya membeli 3 benih ${seedType}. (Tx: ${res.txHash ? res.txHash.substring(0, 8) : "lokal"})`);
-      } catch (err) {
-        speakAi(`Gagal beli benih: ${err.message || err}`);
-      }
+      aiState.inventory.coins -= 60; // Approximate price
+      aiState.inventory.seeds[seedType] += 3;
+      speakAi(`Selesai! Saya membeli 3 benih ${seedType}.`);
     } 
     else if (action.type === "buy_then_plant") {
       const { seedType, plotNum } = action.arg;
       speakAi(`Tiba di toko. Membeli benih ${seedType} dulu...`);
-      try {
-        const seedIndex = ["Kentang", "Bawang", "Stroberi", "Bit"].indexOf(seedType) + 1;
-        if (AI_ONCHAIN_ENABLED) await enqueueGameAction({
-          wallet: aiState.wallet,
-          type: "BUY_SEED",
-          plotId: seedIndex,
-          amount: 3
-        });
-        aiState.inventory.seeds[seedType] += 3;
-        speakAi(`Benih didapat. Sekarang lanjut ke Lahan ${plotNum} untuk menanam.`);
-        
-        // Queue the next action to plant
-        queueAiAction({ type: "plant", target: `plot_${plotNum}`, arg: { seedType, plotNum } });
-      } catch (err) {
-        speakAi(`Gagal beli benih: ${err.message || err}`);
-      }
+      aiState.inventory.seeds[seedType] += 3;
+      speakAi(`Benih didapat. Sekarang lanjut ke Lahan ${plotNum} untuk menanam.`);
+      queueAiAction({ type: "plant", target: `plot_${plotNum}`, arg: { seedType, plotNum } });
     }
     else if (action.type === "plant") {
       const { seedType, plotNum } = action.arg;
@@ -350,18 +371,6 @@ function executeAiAction(action) {
       speakAi(`Tiba di Lahan ${plotNum}. Menanam ${seedType}...`);
 
       const seedIndex = ["Kentang", "Bawang", "Stroberi", "Bit"].indexOf(seedType) + 1;
-      let txLabel = "lokal";
-      try {
-        const res = AI_ONCHAIN_ENABLED ? await enqueueGameAction({
-          wallet: aiState.wallet,
-          type: "PLANT",
-          plotId: plotNum,
-          amount: seedIndex
-        }) : { txHash: "" };
-        if (res && res.txHash) txLabel = res.txHash.substring(0, 8);
-      } catch (err) {
-        console.log(`[AI] plant on-chain gagal (lanjut lokal): ${err.message || err}`);
-      }
 
       if (aiState.inventory.seeds[seedType] > 0) aiState.inventory.seeds[seedType] -= 1;
 
@@ -371,25 +380,12 @@ function executeAiAction(action) {
         seedIndex: seedIndex - 1
       });
 
-      speakAi(`Bagus! Benih ${seedType} ditanam di Lahan ${plotNum}. (Tx: ${txLabel})`);
+      speakAi(`Bagus! Benih ${seedType} ditanam di Lahan ${plotNum}.`);
     }
     else if (action.type === "harvest") {
       const { plotNum } = action.arg;
       console.log(`[AI] Memanen di plot ${plotNum}`);
       speakAi(`Tiba di Lahan ${plotNum}. Memanen tanaman...`);
-
-      let txLabel = "lokal";
-      try {
-        const res = AI_ONCHAIN_ENABLED ? await enqueueGameAction({
-          wallet: aiState.wallet,
-          type: "HARVEST",
-          plotId: plotNum,
-          amount: 3 // Yield amount
-        }) : { txHash: "" };
-        if (res && res.txHash) txLabel = res.txHash.substring(0, 8);
-      } catch (err) {
-        console.log(`[AI] harvest on-chain gagal (lanjut lokal): ${err.message || err}`);
-      }
 
       // Always broadcast harvest so the world stays in sync.
       io.emit("ai_harvested", {
@@ -397,32 +393,20 @@ function executeAiAction(action) {
       });
 
       aiState.inventory.crops.Kentang += 3; // Hardcoded yield
-      speakAi(`Sukses! Hasil panen berhasil diambil. (Tx: ${txLabel})`);
+      speakAi(`Sukses! Hasil panen berhasil diambil.`);
     }
     else if (action.type === "sell") {
       speakAi(`Tiba di pengepul. Menjual seluruh panen...`);
-      try {
-        let cropsToSell = aiState.inventory.crops.Kentang;
-        if (cropsToSell <= 0) {
-          speakAi(`Wah, saya tidak punya hasil panen untuk dijual.`);
-          aiState.status = "idle";
-          return;
-        }
-        
-        const res = AI_ONCHAIN_ENABLED ? await enqueueGameAction({
-          wallet: aiState.wallet,
-          type: "SELL_CROP",
-          plotId: 0,
-          amount: cropsToSell
-        }) : { txHash: "" };
-        
-        const earned = cropsToSell * 35;
-        aiState.inventory.coins += earned;
-        aiState.inventory.crops.Kentang = 0;
-        speakAi(`Hore! Terjual ${cropsToSell} panen seharga ${earned} koin. (Tx: ${res.txHash ? res.txHash.substring(0, 8) : "lokal"})`);
-      } catch (err) {
-        speakAi(`Gagal menjual: ${err.message || err}`);
+      const cropsToSell = aiState.inventory.crops.Kentang;
+      if (cropsToSell <= 0) {
+        speakAi(`Wah, saya tidak punya hasil panen untuk dijual.`);
+        aiState.status = "idle";
+        return;
       }
+      const earned = cropsToSell * 35;
+      aiState.inventory.coins += earned;
+      aiState.inventory.crops.Kentang = 0;
+      speakAi(`Hore! Terjual ${cropsToSell} panen seharga ${earned} koin.`);
     }
 
     aiState.status = "idle";
@@ -430,6 +414,8 @@ function executeAiAction(action) {
 }
 
 module.exports = {
+  createChatLimiter,
+  initMultiplayer,
   normalizeSkin,
-  initMultiplayer
+  resolvePlayer
 };

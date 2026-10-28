@@ -58,6 +58,7 @@ async function main() {
   // --- Player 1 asks AI to harvest ---
   let aiHarvested = false;
   p1.on("ai_harvested", () => { aiHarvested = true; log("P1", "saw AI harvest"); });
+  await wait(2100); // server allows one chat per 2 seconds per player
   log("P1", "Mengirim perintah: 'AI tolong panen lahan 2'");
   p1.emit("chat", { text: "AI tolong panen lahan 2" });
   await waitFor(() => aiHarvested, 25000).catch(() => {});
