@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /masuk/
+
+Sitemap: https://taniin.rahmateka.my.id/sitemap.xml

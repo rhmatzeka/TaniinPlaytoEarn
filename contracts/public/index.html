@@ -1,148 +1,140 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="id">
 <head>
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        registrations.forEach(function(registration) { registration.unregister(); });
-      });
-    }
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Taniin — Game Bertani Pixel dengan Hadiah Web3 di Sepolia</title>
+  <meta name="description" content="Taniin adalah game bertani pixel gratis untuk browser dan Android. Tanam, panen, dan jual hasil kebun, main bareng pemain lain dan Pak Tani AI, lalu catat panenmu di Ethereum Sepolia lewat login Privy.">
+  <link rel="canonical" href="https://taniin.rahmateka.my.id/">
+  <meta name="theme-color" content="#2F7D45">
+  <meta name="color-scheme" content="light">
+  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Taniin">
+  <meta property="og:locale" content="id_ID">
+  <meta property="og:url" content="https://taniin.rahmateka.my.id/">
+  <meta property="og:title" content="Taniin — Game Bertani Pixel dengan Hadiah Web3">
+  <meta property="og:description" content="Tanam, panen, jual, dan main bareng Pak Tani AI. Gratis di browser dan Android, panen tercatat di Ethereum Sepolia.">
+  <meta property="og:image" content="https://taniin.rahmateka.my.id/img/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Logo Taniin di atas kebun bunga matahari pixel">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Taniin — Game Bertani Pixel dengan Hadiah Web3">
+  <meta name="twitter:description" content="Tanam, panen, jual, dan main bareng Pak Tani AI. Gratis di browser dan Android.">
+  <meta name="twitter:image" content="https://taniin.rahmateka.my.id/img/og.png">
+
+  <link rel="preload" as="image" href="/img/hero-736.webp" imagesrcset="/img/hero-736.webp 736w, /img/hero.webp 1472w" imagesizes="100vw">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&display=swap">
+  <link rel="stylesheet" href="/landing.css">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "VideoGame",
+        "@id": "https://taniin.rahmateka.my.id/#game",
+        "name": "Taniin",
+        "url": "https://taniin.rahmateka.my.id/",
+        "image": "https://taniin.rahmateka.my.id/img/og.png",
+        "description": "Game bertani pixel dengan multiplayer, asisten Pak Tani AI, dan hadiah Web3 di Ethereum Sepolia.",
+        "genre": ["Simulasi", "Bertani", "Pixel art"],
+        "gamePlatform": ["Web browser", "Android"],
+        "playMode": ["SinglePlayer", "MultiPlayer"],
+        "inLanguage": "id",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "IDR" },
+        "author": { "@type": "Person", "name": "Rahmat Eka Satria", "url": "https://rahmateka.my.id/" }
+      },
+      {
+        "@type": "SoftwareApplication",
+        "name": "Taniin untuk Android",
+        "operatingSystem": "Android 8.0+",
+        "applicationCategory": "GameApplication",
+        "downloadUrl": "https://taniin.rahmateka.my.id/unduh/Taniin.apk",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "IDR" },
+        "author": { "@type": "Person", "name": "Rahmat Eka Satria" }
+      }
+    ]
+  }
   </script>
-  <base href="/">
-
-  <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="Taniin farming game prototype with Sepolia Web3 hooks.">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Taniin">
-  <meta name="theme-color" content="#17351f">
-
-  <link rel="manifest" href="manifest.json">
-  <link rel="icon" type="image/png" href="assets/assets/images/iconaplikasi.png">
-  <title>Taniin</title>
-
-  <style>
-    html,
-    body {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      overflow: hidden;
-      background: #17351f;
-      color: #fff0cf;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
-
-    body {
-      overscroll-behavior: none;
-      touch-action: none;
-    }
-
-    .boot {
-      position: fixed;
-      inset: 0;
-      display: grid;
-      place-items: center;
-      background:
-        linear-gradient(rgba(10, 28, 16, 0.38), rgba(10, 28, 16, 0.38)),
-        url("assets/assets/images/loadingscreen.jpg") center / cover no-repeat,
-        #17351f;
-    }
-
-    .boot__label {
-      padding: 10px 14px;
-      border: 2px solid #f0ad45;
-      background: rgba(61, 40, 25, 0.92);
-      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
-      font-size: 14px;
-      font-weight: 800;
-      letter-spacing: 0;
-    }
-  </style>
 </head>
 <body>
-  <div class="boot" aria-hidden="true">
-    <div class="boot__label">Loading Taniin...</div>
-  </div>
-  <script>
-    window.taniinLastEthereumError = '';
+  <header class="hero">
+    <img class="hero-bg" src="/img/hero-736.webp" srcset="/img/hero-736.webp 736w, /img/hero.webp 1472w" sizes="100vw" width="1472" height="828" alt="" fetchpriority="high">
+    <nav class="nav" aria-label="Utama">
+      <a class="brand" href="/"><img src="/img/logo.webp" width="40" height="40" alt=""><span>Taniin</span></a>
+      <a class="nav-link" href="https://github.com/rhmatzeka/TaniinPlaytoEarn" rel="noopener">GitHub</a>
+    </nav>
+    <div class="hero-card">
+      <h1>Bertani pixel, panen tercatat di blockchain</h1>
+      <p class="lead">Tanam, panen, dan jual hasil kebun bersama pemain lain dan Pak Tani AI. Gratis di browser dan Android, tanpa harus punya wallet duluan.</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="/main/">Main di browser</a>
+        <a class="btn btn-secondary" href="/unduh/Taniin.apk" download>Unduh APK Android</a>
+      </div>
+      <p class="fine">APK untuk Android 8.0 ke atas. Langsung main sebagai tamu, masuk kapan saja.</p>
+    </div>
+  </header>
 
-    window.taniinHasEthereumProvider = function () {
-      return false;
-    };
+  <main>
+    <section class="section" aria-labelledby="fitur">
+      <h2 id="fitur">Yang bisa kamu lakukan</h2>
+      <ul class="features">
+        <li>
+          <h3>Bertani dari nol</h3>
+          <p>Beli benih kentang, bawang, stroberi, dan bit. Tanam di lahanmu, tunggu matang, panen, lalu jual ke pengepul.</p>
+        </li>
+        <li>
+          <h3>Main bareng</h3>
+          <p>Lihat petani lain bergerak di peta yang sama, ngobrol di chat, dan minta Pak Tani AI menanam atau memanen untukmu.</p>
+        </li>
+        <li>
+          <h3>Naik level</h3>
+          <p>Selesaikan quest harian untuk XP, buka achievement, dan pakai baju petani baru yang bisa dilihat pemain lain.</p>
+        </li>
+        <li>
+          <h3>Hadiah on-chain</h3>
+          <p>Masuk dengan email atau Google lewat Privy. Lahan jadi NFT, panen jadi item, dan Game Coin bisa ditukar ke token TANI atau ETH Sepolia.</p>
+        </li>
+      </ul>
+    </section>
 
-    window.taniinEthereumError = function () {
-      return window.taniinLastEthereumError || '';
-    };
+    <section class="section" aria-labelledby="galeri">
+      <h2 id="galeri">Cuplikan</h2>
+      <div class="gallery">
+        <figure><img src="/img/shot-farm.webp" width="1280" height="720" loading="lazy" decoding="async" alt="Petani berdiri di lahan dengan tanaman kentang yang tumbuh"><figcaption>Kebun dan lahan</figcaption></figure>
+        <figure><img src="/img/shot-shop.webp" width="1280" height="720" loading="lazy" decoding="async" alt="Panel toko benih dengan empat jenis benih"><figcaption>Toko benih</figcaption></figure>
+        <figure><img src="/img/shot-swap.webp" width="1280" height="720" loading="lazy" decoding="async" alt="Rumah swap untuk menukar Game Coin ke TANI atau ETH Sepolia"><figcaption>Rumah swap</figcaption></figure>
+      </div>
+    </section>
 
-    window.taniinRequestEthereumAccount = async function () {
-      window.taniinLastEthereumError = '';
-      const ethereum = window.ethereum;
-      if (!ethereum || typeof ethereum.request !== 'function') {
-        window.taniinLastEthereumError = 'Wallet browser Ethereum tidak terdeteksi di browser ini.';
-        return '';
-      }
+    <section class="section" aria-labelledby="cara">
+      <h2 id="cara">Cara kerja Web3-nya</h2>
+      <ol class="steps">
+        <li><strong>Main sebagai tamu.</strong> Progres tersimpan di perangkatmu, tanpa daftar apa pun.</li>
+        <li><strong>Masuk dengan Privy.</strong> Wallet Sepolia dibuat otomatis dari email atau Google, dan progres tamu ikut dibawa.</li>
+        <li><strong>Server memeriksa tiap aksi.</strong> Harga, waktu tumbuh, dan stok dicek di server sebelum transaksi dikirim, jadi ekonominya tidak bisa diakali dari aplikasi.</li>
+        <li><strong>Tercatat di Sepolia.</strong> Lahan (ERC-721), benih dan panen (ERC-1155), dan token TANI (ERC-20). Setiap transaksi bisa dibuka di Etherscan.</li>
+      </ol>
+      <p class="note">Taniin berjalan di testnet Sepolia. Token dan ETH di dalamnya tidak punya nilai uang sungguhan.</p>
+    </section>
 
-      try {
-        const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
-        const account = accounts && accounts[0] ? String(accounts[0]) : '';
-        if (!account) {
-          window.taniinLastEthereumError = 'Wallet tidak mengirim public address.';
-          return '';
-        }
+    <section class="section" aria-labelledby="teknologi">
+      <h2 id="teknologi">Dibangun dengan</h2>
+      <ul class="tags">
+        <li>Flutter</li><li>Flame</li><li>Node.js</li><li>Postgres</li><li>Socket.IO</li><li>Privy</li><li>Solidity</li><li>Sepolia</li>
+      </ul>
+    </section>
+  </main>
 
-        try {
-          const chainId = await ethereum.request({ method: 'eth_chainId' });
-          if (chainId !== '0xaa36a7') {
-            await ethereum.request({
-              method: 'wallet_switchEthereumChain',
-              params: [{ chainId: '0xaa36a7' }],
-            });
-          }
-        } catch (switchError) {
-          if (switchError && switchError.code === 4902) {
-            try {
-              await ethereum.request({
-                method: 'wallet_addEthereumChain',
-                params: [{
-                  chainId: '0xaa36a7',
-                  chainName: 'Sepolia',
-                  nativeCurrency: { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
-                  rpcUrls: ['https://ethereum-sepolia-rpc.publicnode.com'],
-                  blockExplorerUrls: ['https://sepolia.etherscan.io'],
-                }],
-              });
-            } catch (_) {}
-          }
-        }
-
-        return account;
-      } catch (error) {
-        window.taniinLastEthereumError = error && error.message
-          ? error.message
-          : 'Connect wallet dibatalkan.';
-        return '';
-      }
-    };
-
-    window.taniinSendEthereum = async function (from, to, valueHex) {
-      window.taniinLastEthereumError = '';
-      try {
-        return String(await window.ethereum.request({
-          method: 'eth_sendTransaction',
-          params: [{ from: from, to: to, value: valueHex }],
-        }));
-      } catch (error) {
-        window.taniinLastEthereumError = error && error.message
-          ? error.message
-          : 'Transfer ETH dibatalkan.';
-        return '';
-      }
-    };
-  </script>
-  <script src="flutter_bootstrap.js" async></script>
+  <footer class="footer">
+    <p>Dibuat oleh <a href="https://rahmateka.my.id/">Rahmat Eka Satria</a> · <a href="https://github.com/rhmatzeka/TaniinPlaytoEarn" rel="noopener">Kode sumber</a> · Lisensi MIT</p>
+  </footer>
 </body>
 </html>

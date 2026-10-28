@@ -54,11 +54,27 @@ android {
         buildConfig = true
     }
 
+    // CI writes the fixed release key here so every APK update installs over
+    // the previous one; local builds without it fall back to the debug key.
+    val releaseKeystore = file("taniin.keystore")
+    val releaseKeystorePassword = envValue("TANIIN_KEYSTORE_PASSWORD")
+    signingConfigs {
+        create("tetap") {
+            storeFile = releaseKeystore
+            storeType = "pkcs12"
+            storePassword = releaseKeystorePassword
+            keyAlias = "taniin"
+            keyPassword = releaseKeystorePassword
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (releaseKeystore.exists() && releaseKeystorePassword.isNotEmpty()) {
+                signingConfigs.getByName("tetap")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }

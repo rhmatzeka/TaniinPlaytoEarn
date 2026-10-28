@@ -29,3 +29,4 @@ contracts/typechain-types/
 /taniin_*.png
 contracts/masuk/node_modules/
 contracts/public/masuk/
+*.keystore

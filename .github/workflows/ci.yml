@@ -41,7 +41,12 @@ jobs:
       - run: flutter analyze
       - run: flutter test
       - name: Build web
-        run: flutter build web --release --base-href /main/
+        run: >-
+          flutter build web --release --wasm --base-href /main/
+          --dart-define=TANIIN_COIN_CONTRACT_ADDRESS=${{ vars.TANIIN_COIN_CONTRACT_ADDRESS }}
+          --dart-define=TANIIN_LAND_CONTRACT_ADDRESS=${{ vars.TANIIN_LAND_CONTRACT_ADDRESS }}
+          --dart-define=TANIIN_ITEMS_CONTRACT_ADDRESS=${{ vars.TANIIN_ITEMS_CONTRACT_ADDRESS }}
+          --dart-define=TANIIN_MULTIPLAYER_URL=${{ vars.TANIIN_MULTIPLAYER_URL }}
       - uses: actions/upload-artifact@v4
         with:
           name: flutter-web
