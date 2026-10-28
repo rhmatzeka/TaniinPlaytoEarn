@@ -181,6 +181,24 @@ describe("Game action API", function () {
     expect(second.json.error).to.match(/Batas harian/);
   });
 
+  it("enforces a global daily ETH payout cap across wallets", async function () {
+    process.env.TANIIN_GLOBAL_DAILY_ETH_PAYOUT_WEI = "15000000000000000";
+    process.env.TANIIN_ETH_WEI_PER_COIN = "10000000000000";
+    try {
+      await db.query(
+        "INSERT INTO daily_usage (wallet, day, tani_minted, eth_paid_wei) VALUES ('*', $1, 0, 10000000000000000)",
+        ["2026-10-28"]
+      );
+      await call(app, { path: "/player", headers: { authorization: `Bearer ${session}` } });
+      await db.query("UPDATE players SET state = jsonb_set(state, '{coins}', '100000') WHERE wallet = $1", [WALLET]);
+      const result = await action({ type: "SWAP_COIN_ETH", amount: 600 }, "eth-global");
+      expect(result.status).to.equal(429);
+      expect(result.json.error).to.match(/hari ini/);
+    } finally {
+      delete process.env.TANIIN_GLOBAL_DAILY_ETH_PAYOUT_WEI;
+    }
+  });
+
   it("allows only one guest import per account", async function () {
     const guestState = { coins: 300, seedQuantities: [2, 0, 0, 0] };
     const headers = { authorization: `Bearer ${session}` };
