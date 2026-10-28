@@ -46,7 +46,9 @@ async function ensureSchema(db) {
 
 function getDb() {
   if (sharedDb) return sharedDb;
-  const connectionString = String(process.env.DATABASE_URL || "").trim();
+  // Neon hands out sslmode=require; pg treats it as verify-full anyway, so say so.
+  const connectionString = String(process.env.DATABASE_URL || "").trim()
+    .replace(/sslmode=(require|prefer|verify-ca)/, "sslmode=verify-full");
   if (!connectionString) {
     const error = new Error("DATABASE_URL belum diset.");
     error.statusCode = 503;

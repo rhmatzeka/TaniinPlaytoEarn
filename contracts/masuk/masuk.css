@@ -53,3 +53,4 @@ h1 { margin: 0; font: 700 24px/1.2 "Pixelify Sans", monospace; }
 .status-error { color: var(--red); }
 .status-ok { color: var(--leaf-dark); }
 .back { color: var(--leaf-dark); justify-self: start; }
+#root { width: 100%; display: grid; place-items: center; }

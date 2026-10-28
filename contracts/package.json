@@ -8,7 +8,8 @@
     "deploy:sepolia": "hardhat run scripts/deploy.cjs --network sepolia",
     "game-api": "node scripts/game-api.cjs",
     "mint:tani": "hardhat run scripts/mint-tani.cjs --network sepolia",
-    "build:masuk": "npm --prefix masuk install --no-audit --no-fund && npm --prefix masuk run build"
+    "build:masuk": "npm --prefix masuk install --no-audit --no-fund && npm --prefix masuk run build",
+    "dev": "node scripts/dev-server.cjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.2.17",
