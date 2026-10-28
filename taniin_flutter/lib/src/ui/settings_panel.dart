@@ -60,7 +60,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
                       child: _SettingsSidebar(
                         selectedSection: _selectedSection,
                         onSelected: _selectSection,
-                        showLogout: farmState.walletConnected,
+                        showLogout: farmState.isLoggedIn,
                         onLogout: _logoutWallet,
                       ),
                     ),
@@ -177,8 +177,8 @@ class _SettingsPanelState extends State<SettingsPanel> {
     );
   }
 
-  void _logoutWallet() {
-    farmState.disconnectWallet();
+  Future<void> _logoutWallet() async {
+    await farmState.logout();
     widget.onClose();
   }
 }

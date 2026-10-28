@@ -71,6 +71,12 @@ class FakeChainClient extends ChainClient {
   }
 
   @override
+  Future<ChainResult> checkSepolia() async => ChainResult.ok('Sepolia fake.');
+
+  @override
+  Future<bool> checkGameApi() async => true;
+
+  @override
   Future<ChainReceiptState> waitForTransaction(String txHash) async {
     return receiptState;
   }

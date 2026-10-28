@@ -26,3 +26,14 @@ void removeBrowserQueryParameters(Iterable<String> names) {
   final cleaned = uri.replace(queryParameters: parameters.isEmpty ? null : parameters);
   web.window.history.replaceState(null, '', cleaned.toString());
 }
+
+/// Reads and clears the URL fragment the login page redirected back with.
+String takeBrowserFragment() {
+  final fragment = Uri.base.fragment;
+  if (fragment.isEmpty) {
+    return '';
+  }
+  final cleaned = Uri.base.removeFragment();
+  web.window.history.replaceState(null, '', cleaned.toString());
+  return fragment;
+}

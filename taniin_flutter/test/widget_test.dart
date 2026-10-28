@@ -408,6 +408,7 @@ void main() {
 
     farmState.configureChain(const ChainConfig(gameApiUrl: 'https://api.test'));
     await farmState.applyAuthSession(fakeSession());
+    await pumpEventQueue();
     fakeClient.serverState = <String, Object?>{'coins': 600};
     farmState
       ..walletNativeBalance = '0.001'
@@ -443,6 +444,7 @@ void main() {
 
     farmState.configureChain(const ChainConfig(gameApiUrl: 'https://api.test'));
     await farmState.applyAuthSession(fakeSession());
+    await pumpEventQueue();
     fakeClient.serverState = <String, Object?>{'coins': 520};
     final loadsBefore = fakeClient.walletLoads;
     farmState

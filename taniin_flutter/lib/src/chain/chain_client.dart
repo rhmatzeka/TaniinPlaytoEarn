@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'api_http_exception.dart';
+import 'auth_session.dart';
 import 'chain_http_client.dart';
 
 const String sepoliaExplorerTxBase = 'https://sepolia.etherscan.io/tx/';
@@ -12,7 +14,7 @@ class ChainConfig {
     this.itemsContractAddress = '',
     this.landContractAddress = '',
     this.gameApiUrl = '',
-    this.defaultWalletAddress = '',
+    this.multiplayerUrl = '',
   });
 
   factory ChainConfig.fromMap(Map<Object?, Object?> map) {
@@ -25,7 +27,7 @@ class ChainConfig {
       itemsContractAddress: _cleanAddress(map['itemsContractAddress']),
       landContractAddress: _cleanAddress(map['landContractAddress']),
       gameApiUrl: _trimTrailingSlash(_stringValue(map['gameApiUrl'])),
-      defaultWalletAddress: _cleanAddress(map['defaultWalletAddress']),
+      multiplayerUrl: _trimTrailingSlash(_stringValue(map['multiplayerUrl'])),
     );
   }
 
@@ -34,13 +36,13 @@ class ChainConfig {
   final String itemsContractAddress;
   final String landContractAddress;
   final String gameApiUrl;
-  final String defaultWalletAddress;
+  final String multiplayerUrl;
 
   bool get hasCoinContract => coinContractAddress.isNotEmpty;
 
   bool get hasGameApi => gameApiUrl.isNotEmpty;
 
-  String get walletConnectUrl => hasGameApi ? '$gameApiUrl/wallet-connect' : '';
+  bool get hasMultiplayer => multiplayerUrl.isNotEmpty;
 
   String contractSummary() {
     final coin = hasCoinContract
@@ -57,14 +59,25 @@ class ChainConfig {
 }
 
 class ChainAction {
-  ChainAction({required this.type, required this.plotId, required this.amount, this.paymentTxHash = ''})
-    : createdAtMs = DateTime.now().millisecondsSinceEpoch;
+  ChainAction({
+    required this.type,
+    required this.plotId,
+    required this.amount,
+    this.seedIndex,
+    this.cropIndex,
+    this.quantity,
+    this.paymentTxHash = '',
+  });
 
   final String type;
   final int plotId;
+
+  /// Display amount (crops, coins, seeds); the server recomputes prices itself.
   final int amount;
+  final int? seedIndex;
+  final int? cropIndex;
+  final int? quantity;
   final String paymentTxHash;
-  final int createdAtMs;
 
   String get label {
     return switch (type) {
@@ -83,13 +96,14 @@ class ChainAction {
     };
   }
 
-  Map<String, Object> toGameApiJson(String walletAddress) {
+  Map<String, Object> toGameApiJson() {
     return <String, Object>{
-      'wallet': walletAddress,
       'type': type,
-      'plotId': plotId,
+      if (plotId > 0) 'plotId': plotId,
       'amount': amount,
-      'createdAtMs': createdAtMs,
+      'seedIndex': ?seedIndex,
+      'cropIndex': ?cropIndex,
+      'quantity': ?quantity,
       if (paymentTxHash.isNotEmpty) 'paymentTxHash': paymentTxHash,
     };
   }
@@ -100,19 +114,75 @@ class ChainResult {
     required this.success,
     required this.message,
     this.txHash = '',
+    this.state,
+    this.unauthorized = false,
   });
 
-  factory ChainResult.ok(String message, {String txHash = ''}) {
-    return ChainResult(success: true, message: message, txHash: txHash.trim());
+  factory ChainResult.ok(
+    String message, {
+    String txHash = '',
+    Map<String, Object?>? state,
+  }) {
+    return ChainResult(
+      success: true,
+      message: message,
+      txHash: txHash.trim(),
+      state: state,
+    );
   }
 
   factory ChainResult.error(String message) {
     return ChainResult(success: false, message: message);
   }
 
+  factory ChainResult.unauthorized(String message) {
+    return ChainResult(success: false, message: message, unauthorized: true);
+  }
+
   final bool success;
   final String message;
   final String txHash;
+
+  /// Server-side player snapshot returned with the action, when signed in.
+  final Map<String, Object?>? state;
+  final bool unauthorized;
+}
+
+/// Result of loading or importing the signed-in player's server state.
+class ServerPlayerResult {
+  const ServerPlayerResult({
+    required this.success,
+    required this.message,
+    this.state,
+    this.importedGuest = false,
+    this.unauthorized = false,
+  });
+
+  factory ServerPlayerResult.ok(
+    Map<String, Object?> state, {
+    bool importedGuest = false,
+  }) {
+    return ServerPlayerResult(
+      success: true,
+      message: '',
+      state: state,
+      importedGuest: importedGuest,
+    );
+  }
+
+  factory ServerPlayerResult.error(String message, {bool unauthorized = false}) {
+    return ServerPlayerResult(
+      success: false,
+      message: message,
+      unauthorized: unauthorized,
+    );
+  }
+
+  final bool success;
+  final String message;
+  final Map<String, Object?>? state;
+  final bool importedGuest;
+  final bool unauthorized;
 }
 
 class ChainReceiptState {
@@ -298,38 +368,121 @@ class ChainClient {
   }
 
   Future<ChainResult> submitGameAction(
-    String walletAddress,
+    AuthSession session,
     ChainAction action,
+    String idempotencyKey,
   ) async {
-    try {
-      if (!config.hasGameApi) {
-        return ChainResult.error(
-          'TANIIN_GAME_API_URL belum diset; aksi belum dikirim on-chain.',
-        );
-      }
-      if (!isValidAddress(walletAddress)) {
-        return ChainResult.error(
-          'Wallet belum valid; aksi belum dikirim on-chain.',
-        );
-      }
-      final body = jsonEncode(action.toGameApiJson(walletAddress));
-      final response = await _postGameApi('/game-actions', body);
-      final apiError = extractApiError(response);
-      if (apiError.isNotEmpty) {
-        return ChainResult.error(apiError);
-      }
-      final txHash = extractTransactionHash(response);
-      return txHash.isEmpty
-          ? ChainResult.ok(
-              'Aksi dikirim, tapi backend belum mengembalikan txHash.',
-            )
-          : ChainResult.ok(
-              'Transaksi dikirim ke Sepolia: ${shortTransactionHash(txHash)}.',
-              txHash: txHash,
-            );
-    } on Object catch (error) {
-      return ChainResult.error('Gagal kirim aksi chain: $error');
+    if (!config.hasGameApi) {
+      return ChainResult.error('Server game belum diset; aksi disimpan lokal.');
     }
+    try {
+      final response = await _postGameApi(
+        '/game-actions',
+        jsonEncode(action.toGameApiJson()),
+        headers: <String, String>{
+          ..._authHeaders(session),
+          'Idempotency-Key': idempotencyKey,
+        },
+      );
+      final object = _decodeObject(response);
+      final txHash = extractTransactionHash(response);
+      return ChainResult.ok(
+        txHash.isEmpty
+            ? 'Aksi tersimpan di server.'
+            : 'Transaksi dikirim ke Sepolia: ${shortTransactionHash(txHash)}.',
+        txHash: txHash,
+        state: _mapValue(object['state']),
+      );
+    } on ApiHttpException catch (error) {
+      return error.unauthorized
+          ? ChainResult.unauthorized(error.message)
+          : ChainResult.error(error.message);
+    } on Object catch (error) {
+      return ChainResult.error('Server tidak terjangkau: ${_compactError(error)}');
+    }
+  }
+
+  Future<ServerPlayerResult> fetchPlayer(AuthSession session) {
+    return _playerRequest(
+      () => _getGameApi('/player', headers: _authHeaders(session)),
+    );
+  }
+
+  Future<ServerPlayerResult> importGuest(
+    AuthSession session,
+    Map<String, Object?> guestState,
+  ) {
+    return _playerRequest(
+      () => _postGameApi(
+        '/player/import',
+        jsonEncode(<String, Object?>{'guestState': guestState}),
+        headers: _authHeaders(session),
+      ),
+    );
+  }
+
+  Future<void> logout(AuthSession session) async {
+    if (!config.hasGameApi) {
+      return;
+    }
+    try {
+      await _postGameApi('/auth/logout', '{}', headers: _authHeaders(session));
+    } on Object {
+      // Local logout still succeeds; the server session expires on its own.
+    }
+  }
+
+  Future<bool> checkGameApi() async {
+    if (!config.hasGameApi) {
+      return false;
+    }
+    try {
+      final object = _decodeObject(await _getGameApi('/health'));
+      return object['ok'] == true;
+    } on Object {
+      return false;
+    }
+  }
+
+  Future<ServerPlayerResult> _playerRequest(
+    Future<String> Function() request,
+  ) async {
+    if (!config.hasGameApi) {
+      return ServerPlayerResult.error('Server game belum diset.');
+    }
+    try {
+      final object = _decodeObject(await request());
+      final state = _mapValue(object['state']);
+      if (state == null) {
+        return ServerPlayerResult.error('Server tidak mengirim data pemain.');
+      }
+      return ServerPlayerResult.ok(
+        state,
+        importedGuest: object['importedGuest'] == true,
+      );
+    } on ApiHttpException catch (error) {
+      return ServerPlayerResult.error(
+        error.message,
+        unauthorized: error.unauthorized,
+      );
+    } on Object catch (error) {
+      return ServerPlayerResult.error(
+        'Server tidak terjangkau: ${_compactError(error)}',
+      );
+    }
+  }
+
+  static Map<String, String> _authHeaders(AuthSession session) {
+    return <String, String>{'Authorization': 'Bearer ${session.token}'};
+  }
+
+  static Map<String, Object?> _decodeObject(String response) {
+    final decoded = jsonDecode(response);
+    return decoded is Map<String, dynamic> ? decoded : <String, Object?>{};
+  }
+
+  static Map<String, Object?>? _mapValue(Object? value) {
+    return value is Map ? Map<String, Object?>.from(value) : null;
   }
 
   Future<ChainReceiptState> waitForTransaction(String txHash) async {
@@ -447,11 +600,22 @@ class ChainClient {
     );
   }
 
-  Future<String> _postGameApi(String path, String payload) async {
+  Future<String> _postGameApi(
+    String path,
+    String payload, {
+    Map<String, String> headers = const <String, String>{},
+  }) async {
     Object? lastError;
     for (final baseUrl in _gameApiUrlCandidates()) {
       try {
-        return await _postJson('$baseUrl$path', payload);
+        return await postJson(
+          '$baseUrl$path',
+          payload,
+          timeout: _timeout,
+          headers: headers,
+        );
+      } on ApiHttpException {
+        rethrow;
       } on Object catch (error) {
         lastError = error;
       }
@@ -459,11 +623,16 @@ class ChainClient {
     throw StateError(lastError?.toString() ?? 'Game API tidak valid.');
   }
 
-  Future<String> _getGameApi(String path) async {
+  Future<String> _getGameApi(
+    String path, {
+    Map<String, String> headers = const <String, String>{},
+  }) async {
     Object? lastError;
     for (final baseUrl in _gameApiUrlCandidates()) {
       try {
-        return await _getJson('$baseUrl$path');
+        return await getJson('$baseUrl$path', timeout: _timeout, headers: headers);
+      } on ApiHttpException {
+        rethrow;
       } on Object catch (error) {
         lastError = error;
       }

@@ -5,8 +5,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../chain/auth_session.dart';
 import '../chain/chain_client.dart';
-import '../chain/browser_wallet.dart' as browser_wallet;
 import '../chain/platform_bridge.dart';
 
 enum GamePanel { profile, history, backpack, settings }
@@ -26,6 +26,8 @@ enum GameInteraction {
 }
 
 enum SwapAsset { gameCoin, taniSepolia, ethSepolia }
+
+enum ServiceState { unknown, online, offline }
 
 class CosmeticItem {
   const CosmeticItem({
@@ -229,6 +231,8 @@ class FarmStateController extends ChangeNotifier {
   static const int seedBundleAmount = 3;
   static const int maxShopBundleQuantity = 9;
   static const String _saveKey = 'taniin.farmState.v1';
+  static const String _playerSaveKey = 'taniin.farmState.player.v1';
+  static const String _sessionKey = 'taniin.session.v1';
   static const int _saveVersion = 1;
   static const Duration _payoutBalancePollDelay = Duration(seconds: 2);
   static const int _payoutBalancePollAttempts = 8;
@@ -296,6 +300,10 @@ class FarmStateController extends ChangeNotifier {
   int selectedSellCropIndex = 0;
   bool walletConnected = false;
   String walletAddress = '';
+  AuthSession? session;
+  ServiceState sepoliaState = ServiceState.unknown;
+  ServiceState serverState = ServiceState.unknown;
+  final math.Random _random = math.Random.secure();
   String walletNativeBalance = '';
   String walletNativeWei = '';
   String ethWeiPerCoin = '';
@@ -549,11 +557,8 @@ class FarmStateController extends ChangeNotifier {
   }
 
   String _ethSwapBalanceLabel() {
-    if (!chainConfig.hasGameApi) {
-      return 'Butuh backend Sepolia';
-    }
-    if (!walletConnected) {
-      return 'Connect wallet';
+    if (!onChainMode) {
+      return 'Masuk dulu';
     }
     if (walletNativeWei.isEmpty || walletNativeBalance.isEmpty) {
       return 'Sync wallet ETH';
@@ -619,12 +624,16 @@ class FarmStateController extends ChangeNotifier {
     return plots.where((plot) => plot.isReady(now)).length;
   }
 
-  String get walletLabel =>
-      walletConnected ? _shortAddress(walletAddress) : 'CONNECT WALLET';
+  String get walletLabel => isLoggedIn ? _shortAddress(walletAddress) : 'MASUK';
 
   bool get hasGameApi => chainConfig.hasGameApi;
 
-  bool get hasWalletConnect => chainConfig.walletConnectUrl.isNotEmpty;
+  bool get isLoggedIn => session != null;
+
+  /// Signed-in players send actions to the server; guests play locally.
+  bool get onChainMode => isLoggedIn && chainConfig.hasGameApi;
+
+  bool get canLogin => chainConfig.hasGameApi;
 
   bool get walletIsBackendSigner =>
       isValidAddress(walletAddress) &&
@@ -691,7 +700,12 @@ class FarmStateController extends ChangeNotifier {
     var restored = false;
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_saveKey);
+      final savedSession = _readSavedSession(prefs);
+      if (savedSession != null) {
+        _setSession(savedSession);
+      }
+      final raw = prefs.getString(isLoggedIn ? _playerSaveKey : _saveKey) ??
+          prefs.getString(_saveKey);
       if (raw != null && raw.isNotEmpty) {
         final decoded = jsonDecode(raw);
         final data = _mapValue(decoded);
@@ -741,7 +755,10 @@ class FarmStateController extends ChangeNotifier {
     }
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_saveKey, jsonEncode(_toSaveJson()));
+      await prefs.setString(
+        isLoggedIn ? _playerSaveKey : _saveKey,
+        jsonEncode(_toSaveJson()),
+      );
     } on Object {
       // Keep gameplay responsive even if Android storage is temporarily busy.
     }
@@ -773,8 +790,6 @@ class FarmStateController extends ChangeNotifier {
       'swapToAsset': swapToAsset.name,
       'selectedSeedIndex': selectedSeedIndex,
       'selectedSellCropIndex': selectedSellCropIndex,
-      'walletConnected': walletConnected,
-      'walletAddress': walletAddress,
       'musicVolume': musicVolume,
       'sfxVolume': sfxVolume,
       'musicEnabled': musicEnabled,
@@ -879,19 +894,6 @@ class FarmStateController extends ChangeNotifier {
       swapFromAsset = _readSwapAsset(data['swapFromAsset'], SwapAsset.gameCoin);
       swapToAsset = _readSwapAsset(data['swapToAsset'], SwapAsset.taniSepolia);
       _normalizeSwapAssets();
-
-      final savedWalletAddress = _readString(data['walletAddress'], '');
-      walletConnected =
-          _readBool(data['walletConnected'], false) &&
-          isValidAddress(savedWalletAddress);
-      walletAddress = walletConnected ? savedWalletAddress : '';
-      walletNativeBalance = '';
-      walletNativeWei = '';
-      ethWeiPerCoin = '';
-      maxEthPayoutWei = '';
-      chainSignerAddress = '';
-      walletTaniBalanceAvailable = false;
-      checkingChain = false;
 
       musicVolume = _readDouble(
         data['musicVolume'],
@@ -1128,21 +1130,6 @@ class FarmStateController extends ChangeNotifier {
     }
   }
 
-  /// Exposes direct HTTP POST game actions for Local AI Mode (Vercel serverless compatible).
-  Future<String> submitChainActionDirectly(
-    String wallet,
-    String type,
-    int plotId,
-    int amount,
-  ) async {
-    final action = ChainAction(type: type, plotId: plotId, amount: amount);
-    final result = await _chainClient.submitGameAction(wallet, action);
-    if (!result.success) {
-      throw Exception(result.message);
-    }
-    return result.txHash;
-  }
-
   void selectSeed(int index) {
     if (index == selectedSeedIndex || index < 0 || index >= seeds.length) {
       return;
@@ -1173,64 +1160,245 @@ class FarmStateController extends ChangeNotifier {
     checkingChain = false;
     chainConfig = config;
     _chainClient = _chainClientFactory(config);
-    if (walletConnected) {
-      chainStatus =
-          'Wallet tersambung: ${shortAddress(walletAddress)}. Sync Sepolia...';
-      _commitState();
-      refreshWalletState(revealMessage: false);
+    chainStatus = isLoggedIn
+        ? 'Masuk sebagai ${shortAddress(walletAddress)}. Sync Sepolia...'
+        : config.hasGameApi
+        ? 'Main sebagai tamu. Masuk dengan Privy supaya panenmu tercatat di Sepolia.'
+        : 'Main sebagai tamu. Progres tersimpan di perangkat ini.';
+    _commitState();
+    unawaited(refreshServiceStatus());
+    if (isLoggedIn) {
+      unawaited(_syncServerState());
+      unawaited(refreshWalletState(revealMessage: false));
+    }
+  }
+
+  Future<void> refreshServiceStatus() async {
+    final client = _chainClient;
+    final results = await Future.wait<bool>(<Future<bool>>[
+      client.checkSepolia().then((result) => result.success),
+      client.checkGameApi(),
+    ]);
+    if (!identical(client, _chainClient)) {
       return;
     }
-    final defaultWalletAvailable = isValidAddress(config.defaultWalletAddress);
-    chainStatus = config.hasGameApi
-        ? defaultWalletAvailable
-              ? 'Connect wallet untuk mulai bermain dan sync transaksi Sepolia.'
-              : 'Signer Sepolia siap. Connect wallet supaya aksi punya tx hash.'
-        : 'Connect wallet untuk mulai bermain.';
+    sepoliaState = results[0] ? ServiceState.online : ServiceState.offline;
+    serverState = results[1] ? ServiceState.online : ServiceState.offline;
+    notifyListeners();
+  }
+
+  /// Handles the `#session=...` or `#fundTx=...` fragment from the login page.
+  Future<void> handleAuthFragment(String fragment) async {
+    final fund = FundCallback.fromFragment(fragment);
+    if (fund != null) {
+      await handleFundCallback(fund);
+      return;
+    }
+    final next = AuthSession.fromFragment(fragment, DateTime.now().toUtc());
+    if (next == null) {
+      showMessage('Login gagal atau kedaluwarsa. Coba masuk lagi.', success: false);
+      return;
+    }
+    await applyAuthSession(next);
+  }
+
+  Future<void> applyAuthSession(AuthSession next) async {
+    if (!isLoggedIn) {
+      // Keep the guest farm so logout can return to it.
+      await saveNow();
+    }
+    _setSession(next);
+    await _writeSession();
+    chainStatus = 'Masuk sebagai ${shortAddress(walletAddress)}. Memuat kebun...';
+    notifyListeners();
+    final player = await _chainClient.fetchPlayer(next);
+    if (!identical(session, next)) {
+      return;
+    }
+    if (player.unauthorized) {
+      await _expireSession();
+      return;
+    }
+    var state = player.state;
+    if (player.success && !player.importedGuest) {
+      final imported = await _chainClient.importGuest(next, _guestImportJson());
+      if (imported.success) {
+        state = imported.state;
+      }
+    }
+    if (state != null) {
+      applyServerState(state);
+    }
+    showMessage(
+      player.success
+          ? 'Masuk sebagai ${shortAddress(walletAddress)}.'
+          : 'Masuk, tapi kebun server belum termuat: ${player.message}',
+      success: player.success,
+      notify: false,
+    );
+    _commitState();
+    unawaited(refreshWalletState(revealMessage: false));
+  }
+
+  /// Server snapshot is the source of truth for a signed-in player's economy.
+  void applyServerState(Map<String, Object?> state) {
+    _restoreFromSave(state);
+    _readyPlotIndexes.clear();
+    ownedLand = _ownedLandCount();
+    notifyListeners();
+  }
+
+  Future<void> logout() async {
+    final current = session;
+    playClick();
+    if (current != null) {
+      await saveNow();
+      await _chainClient.logout(current);
+    }
+    await _clearSessionAndRestoreGuest();
+    chainStatus = 'Keluar. Main sebagai tamu.';
+    showMessage('Kamu sudah keluar.', notify: false);
     _commitState();
   }
 
-  Future<void> connectWallet(String address) async {
-    playClick();
-    final cleaned = address.trim();
-    if (!isValidAddress(cleaned)) {
-      showMessage('Wallet address tidak valid.', success: false);
+  Future<void> handleFundCallback(FundCallback fund) async {
+    if (!onChainMode) {
+      showMessage('Masuk dulu supaya pembayaran ETH bisa dicatat.', success: false);
       return;
     }
-    final changed = _storeWalletAddress(cleaned);
-    showMessage(
-      '${changed ? 'Wallet diganti' : 'Wallet tersimpan'}: ${shortAddress(walletAddress)}',
+    final action = ChainAction(
+      type: 'SWAP_ETH_COIN',
+      plotId: 0,
+      amount: fund.amount,
+      paymentTxHash: fund.txHash,
     );
-    await refreshWalletState(revealMessage: true);
+    final entryId = _addHistory(
+      'Beli Game Coin dari ETH',
+      '+${fund.amount} coin',
+      status: 'menunggu konfirmasi',
+      txHash: fund.txHash,
+    );
+    showMessage('Pembayaran ETH diterima. Menunggu server...', notify: false);
+    _commitState();
+    await _submitChainAction(entryId, action);
   }
 
-  Future<void> connectWalletFromDeepLink(String address) async {
-    final cleaned = address.trim();
-    if (!isValidAddress(cleaned)) {
-      showMessage('Wallet dari wallet app tidak valid.', success: false);
+  void _setSession(AuthSession next) {
+    session = next;
+    walletConnected = true;
+    walletAddress = next.wallet;
+    walletNativeBalance = '';
+    walletNativeWei = '';
+    walletTaniBalanceAvailable = false;
+  }
+
+  Future<void> _syncServerState() async {
+    final current = session;
+    if (current == null) {
       return;
     }
-    _storeWalletAddress(cleaned);
-    showMessage('Wallet tersambung: ${shortAddress(walletAddress)}');
-    await refreshWalletState(revealMessage: true);
+    final player = await _chainClient.fetchPlayer(current);
+    if (!identical(session, current)) {
+      return;
+    }
+    if (player.unauthorized) {
+      await _expireSession();
+      return;
+    }
+    final state = player.state;
+    if (player.success && state != null) {
+      applyServerState(state);
+      _commitState();
+    }
   }
 
-  void disconnectWallet() {
-    playClick();
+  Future<void> _expireSession() async {
+    await _clearSessionAndRestoreGuest();
+    chainStatus = 'Sesi habis, masuk lagi.';
+    showMessage('Sesi habis, masuk lagi.', success: false, notify: false);
+    _commitState();
+  }
+
+  Future<void> _clearSessionAndRestoreGuest() async {
+    session = null;
     walletConnected = false;
     walletAddress = '';
     walletNativeBalance = '';
     walletNativeWei = '';
-    ethWeiPerCoin = '';
-    maxEthPayoutWei = '';
-    chainSignerAddress = '';
     walletTaniBalanceAvailable = false;
+    chainSignerAddress = '';
     checkingChain = false;
     _walletRequestGeneration += 1;
-    chainStatus = chainConfig.hasGameApi
-        ? 'Wallet dilepas. Connect lagi supaya aksi terkirim on-chain.'
-        : 'Mode lokal: signer backend belum diset.';
-    showMessage('Wallet dilepas.');
-    _commitState();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_sessionKey);
+      await prefs.remove(_playerSaveKey);
+      final raw = prefs.getString(_saveKey);
+      final data = raw == null ? null : _mapValue(jsonDecode(raw));
+      _resetEconomyToGuestDefaults();
+      if (data != null) {
+        _restoreFromSave(data);
+      }
+    } on Object {
+      _resetEconomyToGuestDefaults();
+    }
+    ownedLand = _ownedLandCount();
+  }
+
+  void _resetEconomyToGuestDefaults() {
+    final defaults = FarmStateController();
+    _restoreFromSave(defaults._toSaveJson());
+    defaults.dispose();
+  }
+
+  Map<String, Object?> _guestImportJson() {
+    final json = _toSaveJson();
+    return <String, Object?>{
+      for (final key in <String>[
+        'coins',
+        'playerXp',
+        'seedQuantities',
+        'cropQuantities',
+        'plots',
+      ])
+        key: json[key],
+    };
+  }
+
+  AuthSession? _readSavedSession(SharedPreferences prefs) {
+    final raw = prefs.getString(_sessionKey);
+    if (raw == null || raw.isEmpty) {
+      return null;
+    }
+    try {
+      final data = _mapValue(jsonDecode(raw));
+      final restored = data == null ? null : AuthSession.fromJson(data);
+      return restored == null || restored.isExpired ? null : restored;
+    } on Object {
+      return null;
+    }
+  }
+
+  Future<void> _writeSession() async {
+    final current = session;
+    if (current == null) {
+      return;
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_sessionKey, jsonEncode(current.toJson()));
+    } on Object {
+      // Session stays in memory for this run.
+    }
+  }
+
+  String _newIdempotencyKey() {
+    final bytes = List<int>.generate(16, (_) => _random.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-'
+        '${hex.substring(16, 20)}-${hex.substring(20)}';
   }
 
   Future<void> refreshWalletState({bool revealMessage = true}) async {
@@ -1238,7 +1406,7 @@ class FarmStateController extends ChangeNotifier {
       return;
     }
     if (!walletConnected || walletAddress.isEmpty) {
-      chainStatus = 'Connect wallet dulu untuk sync saldo.';
+      chainStatus = 'Masuk dengan Privy dulu untuk sync saldo.';
       if (revealMessage) {
         showMessage(chainStatus, success: false);
       } else {
@@ -1451,7 +1619,8 @@ class FarmStateController extends ChangeNotifier {
           ChainAction(
             type: 'PLANT',
             plotId: plotIndex + 1,
-            amount: selectedSeedIndex + 1,
+            amount: 1,
+            seedIndex: selectedSeedIndex,
           ),
           title: 'Tanam ${seed.name}',
           valueLabel: 'plot ${plotIndex + 1}',
@@ -1527,24 +1696,15 @@ class FarmStateController extends ChangeNotifier {
     if (seedIndex < 0 || seedIndex >= seeds.length) {
       return false;
     }
-    if (chainConfig.hasGameApi && !walletConnected) {
-      showMessage(
-        'Connect wallet dulu supaya pembelian benih punya tx hash.',
-        success: false,
-      );
-      return false;
-    }
     final price = seedTotalPrice(seedIndex);
-    if (!walletTaniBalanceAvailable) {
-      showMessage(
-        'Sync saldo wallet dulu sebelum membeli benih on-chain.',
-        success: false,
-      );
+    if (onChainMode && !walletTaniBalanceAvailable) {
+      showMessage('Saldo TANI belum kebaca. Tunggu sync wallet sebentar.', success: false);
+      unawaited(refreshWalletState(revealMessage: false));
       return false;
     }
     if (tani < price) {
       showMessage(
-        'TANI Sepolia belum cukup. Swap Game Coin ke TANI terlebih dahulu.',
+        'TANI belum cukup. Swap Game Coin ke TANI dulu.',
         success: false,
       );
       return false;
@@ -1556,16 +1716,20 @@ class FarmStateController extends ChangeNotifier {
       quantity: seeds[seedIndex].quantity + total,
     );
     _queueChainAction(
-      ChainAction(type: 'BUY_SEED', plotId: seedIndex + 1, amount: total),
+      ChainAction(
+        type: 'BUY_SEED',
+        plotId: 0,
+        amount: total,
+        seedIndex: seedIndex,
+        quantity: shopBundleQuantity,
+      ),
       title: 'Beli ${seeds[seedIndex].name}',
       valueLabel: '-$price TANI',
-      refundTaniOnFailure: price,
-      refundSeedIndexOnFailure: seedIndex,
-      refundSeedAmountOnFailure: total,
-      requiresTxHash: true,
     );
     showMessage(
-      'Pembelian $total benih ${seeds[seedIndex].name} dikirim ke Sepolia.',
+      onChainMode
+          ? 'Pembelian $total benih ${seeds[seedIndex].name} dikirim ke Sepolia.'
+          : 'Kamu membeli $total benih ${seeds[seedIndex].name}.',
     );
     _commitState();
     return true;
@@ -1575,10 +1739,6 @@ class FarmStateController extends ChangeNotifier {
     playClick();
     if (harvests <= 0) {
       showMessage('Belum ada hasil panen untuk dijual.', success: false);
-      return false;
-    }
-    if (chainConfig.hasGameApi && !walletConnected) {
-      showMessage('Connect wallet dulu sebelum jual panen.', success: false);
       return false;
     }
     final cropIndex = selectedSellCropIndex.clamp(0, crops.length - 1);
@@ -1593,7 +1753,12 @@ class FarmStateController extends ChangeNotifier {
     coins += earned;
     _recordProgress('sell');
     _queueChainAction(
-      ChainAction(type: 'SELL_CROP', plotId: cropIndex + 1, amount: sold),
+      ChainAction(
+        type: 'SELL_CROP',
+        plotId: 0,
+        amount: sold,
+        cropIndex: cropIndex,
+      ),
       title: 'Jual panen ${crop.name}',
       valueLabel: '+$earned coin',
     );
@@ -1620,10 +1785,6 @@ class FarmStateController extends ChangeNotifier {
       );
       return false;
     }
-    if (chainConfig.hasGameApi && !walletConnected) {
-      showMessage('Connect wallet dulu sebelum swap Sepolia.', success: false);
-      return false;
-    }
     if (swappingGameCoinToTani) {
       return _swapGameCoinToTani(amount);
     }
@@ -1644,7 +1805,7 @@ class FarmStateController extends ChangeNotifier {
 
   bool _swapGameCoinToTani(int amount) {
     coins -= amount;
-    if (!chainConfig.hasGameApi) {
+    if (!onChainMode) {
       tani += amount;
     }
     _clampSwapAmountToSource();
@@ -1652,11 +1813,9 @@ class FarmStateController extends ChangeNotifier {
       ChainAction(type: 'SWAP_COIN', plotId: 0, amount: amount),
       title: 'Swap Game Coin ke TANI',
       valueLabel: '-$amount coin',
-      refundCoinsOnFailure: amount,
-      requiresTxHash: true,
     );
     showMessage(
-      chainConfig.hasGameApi
+      onChainMode
           ? 'Mengirim swap $amount coin ke Sepolia.'
           : 'Swap $amount coin ke TANI tersimpan lokal.',
     );
@@ -1666,7 +1825,7 @@ class FarmStateController extends ChangeNotifier {
 
   bool _swapTaniToGameCoin(int amount) {
     tani -= amount;
-    if (!chainConfig.hasGameApi) {
+    if (!onChainMode) {
       coins += amount;
     }
     _clampSwapAmountToSource();
@@ -1674,11 +1833,9 @@ class FarmStateController extends ChangeNotifier {
       ChainAction(type: 'SWAP_TANI_COIN', plotId: 0, amount: amount),
       title: 'Deposit TANI ke Game Coin',
       valueLabel: '+$amount coin',
-      refundTaniOnFailure: amount,
-      requiresTxHash: true,
     );
     showMessage(
-      chainConfig.hasGameApi
+      onChainMode
           ? 'Mengirim deposit $amount TANI ke Game Coin.'
           : 'Deposit $amount TANI jadi Game Coin tersimpan lokal.',
     );
@@ -1686,95 +1843,32 @@ class FarmStateController extends ChangeNotifier {
     return true;
   }
 
+  // Paying ETH needs the player's own Privy wallet, so it happens on the web
+  // `/masuk?aksi=isi-eth` page; the game resumes in handleFundCallback.
   Future<bool> _swapEthToGameCoin(int amount) async {
-    if (!chainConfig.hasGameApi) {
-      showMessage(
-        'Backend Sepolia belum aktif untuk beli coin dari ETH.',
-        success: false,
-      );
-      return false;
-    }
-    if (!walletConnected) {
-      showMessage(
-        'Connect wallet dulu untuk pakai ETH Sepolia.',
-        success: false,
-      );
-      return false;
-    }
-    if (walletNativeWei.isEmpty || ethWeiPerCoin.isEmpty) {
-      showMessage('Sync wallet dulu supaya saldo ETH kebaca.', success: false);
-      return false;
-    }
-    if (amount > ethCoinCapacity) {
-      showMessage(
-        'Saldo ETH Sepolia belum cukup untuk $amount coin.',
-        success: false,
-      );
+    if (!onChainMode) {
+      showMessage('Masuk dengan Privy dulu untuk pakai ETH Sepolia.', success: false);
       return false;
     }
     if (amount < minEthSwapAmount) {
       showMessage(
-        'Deposit ETH minimal $minEthSwapAmount coin supaya saldo wallet terlihat berubah.',
+        'Isi ETH minimal $minEthSwapAmount coin supaya saldo wallet terlihat berubah.',
         success: false,
       );
       return false;
     }
-    if (!isValidAddress(chainSignerAddress)) {
-      showMessage(
-        'Sync wallet dulu supaya alamat pembayaran tersedia.',
-        success: false,
-      );
-      return false;
-    }
-    final paymentWei = _ethWeiForCoinAmount(amount);
-    final paymentTxHash = await browser_wallet.sendBrowserWalletEthereum(
-      walletAddress,
-      chainSignerAddress,
-      paymentWei,
+    final url = PlatformBridge.loginUrl(chainConfig, aksi: 'isi-eth', jumlah: amount);
+    final opened = await PlatformBridge.openUrl(url, sameTab: true);
+    showMessage(
+      opened ? 'Lanjutkan pembayaran ETH di halaman Privy.' : 'Halaman pembayaran gagal dibuka.',
+      success: opened,
     );
-    if (!isValidTransactionHash(paymentTxHash)) {
-      final error = PlatformBridge.browserWalletConnectError();
-      showMessage(
-        error.isEmpty ? 'Transfer ETH dibatalkan.' : error,
-        success: false,
-      );
-      return false;
-    }
-    showMessage('Pembayaran ETH terkirim. Menunggu konfirmasi Sepolia...');
-    final paymentReceipt = await _chainClient.waitForTransaction(paymentTxHash);
-    if (!paymentReceipt.confirmed || !paymentReceipt.success) {
-      showMessage(paymentReceipt.message, success: false);
-      return false;
-    }
-    _queueChainAction(
-      ChainAction(
-        type: 'SWAP_ETH_COIN',
-        plotId: 0,
-        amount: amount,
-        paymentTxHash: paymentTxHash,
-      ),
-      title: 'Beli Game Coin dari ETH',
-      valueLabel: '+$amount coin',
-      requiresTxHash: true,
-    );
-    showMessage('Mengirim beli $amount Game Coin memakai ETH Sepolia.');
-    _commitState();
-    return true;
+    return opened;
   }
 
   bool _swapGameCoinToEth(int amount) {
-    if (!chainConfig.hasGameApi) {
-      showMessage(
-        'Backend Sepolia belum aktif untuk payout ETH.',
-        success: false,
-      );
-      return false;
-    }
-    if (!walletConnected) {
-      showMessage(
-        'Connect wallet dulu untuk payout ETH Sepolia.',
-        success: false,
-      );
+    if (!onChainMode) {
+      showMessage('Masuk dengan Privy dulu untuk payout ETH Sepolia.', success: false);
       return false;
     }
     if (walletNativeWei.isEmpty || walletNativeBalance.isEmpty) {
@@ -1811,8 +1905,6 @@ class FarmStateController extends ChangeNotifier {
       ChainAction(type: 'SWAP_COIN_ETH', plotId: 0, amount: amount),
       title: 'Payout Game Coin ke ETH',
       valueLabel: payoutEth.isEmpty ? '-$amount coin' : '+$payoutEth ETH',
-      refundCoinsOnFailure: amount,
-      requiresTxHash: true,
     );
     showMessage(
       payoutEth.isEmpty
@@ -2004,158 +2096,105 @@ class FarmStateController extends ChangeNotifier {
     ChainAction action, {
     required String valueLabel,
     String? title,
-    int refundCoinsOnFailure = 0,
-    int refundTaniOnFailure = 0,
-    int refundSeedIndexOnFailure = -1,
-    int refundSeedAmountOnFailure = 0,
-    bool requiresTxHash = false,
   }) {
     final entryId = _addHistory(
       title ?? action.label,
       valueLabel,
       status: _initialChainHistoryStatus(),
     );
-    if (!walletConnected || !chainConfig.hasGameApi) {
+    if (!onChainMode) {
       chainStatus = _localChainStatus(action);
       return;
     }
-    unawaited(
-      _submitChainAction(
-        entryId,
-        action,
-        refundCoinsOnFailure: refundCoinsOnFailure,
-        refundTaniOnFailure: refundTaniOnFailure,
-        refundSeedIndexOnFailure: refundSeedIndexOnFailure,
-        refundSeedAmountOnFailure: refundSeedAmountOnFailure,
-        requiresTxHash: requiresTxHash,
-      ),
-    );
+    unawaited(_submitChainAction(entryId, action));
   }
 
-  Future<void> _submitChainAction(
-    int entryId,
-    ChainAction action, {
-    required int refundCoinsOnFailure,
-    required int refundTaniOnFailure,
-    required int refundSeedIndexOnFailure,
-    required int refundSeedAmountOnFailure,
-    required bool requiresTxHash,
-  }) async {
+  // Signed-in flow: the local change is optimistic; the server's state wins.
+  Future<void> _submitChainAction(int entryId, ChainAction action) async {
+    final current = session;
+    if (current == null) {
+      return;
+    }
     final nativeWeiBeforeAction = action.type == 'SWAP_COIN_ETH'
         ? _readWei(walletNativeWei)
         : BigInt.zero;
-    final result = await _chainClient.submitGameAction(walletAddress, action);
-    if (result.success) {
-      final hasValidHash = isValidTransactionHash(result.txHash);
-      if (requiresTxHash && !hasValidHash) {
-        _handleChainActionFailure(
-          entryId,
-          action,
-          refundCoinsOnFailure,
-          refundTaniOnFailure,
-          refundSeedIndexOnFailure,
-          refundSeedAmountOnFailure,
-          'Backend tidak mengembalikan tx hash.',
-        );
-        return;
-      }
-      if (hasValidHash) {
-        updateHistoryStatus(
-          entryId,
-          status: 'menunggu konfirmasi',
-          txHash: result.txHash,
-        );
-        chainStatus =
-            'Transaksi ${shortTransactionHash(result.txHash)} terkirim. Menunggu konfirmasi Sepolia...';
-        _commitState();
-        final receipt = await _chainClient.waitForTransaction(result.txHash);
-        if (!receipt.confirmed) {
-          updateHistoryStatus(
-            entryId,
-            status: 'menunggu konfirmasi',
-            txHash: result.txHash,
-          );
-          chainStatus = receipt.message;
-          showMessage(
-            'Transaksi masih menunggu konfirmasi Sepolia.',
-            success: false,
-            notify: false,
-          );
-          _commitState();
-          return;
-        }
-        if (!receipt.success) {
-          if (refundCoinsOnFailure > 0 || refundTaniOnFailure > 0) {
-            _handleChainActionFailure(
-              entryId,
-              action,
-              refundCoinsOnFailure,
-              refundTaniOnFailure,
-              refundSeedIndexOnFailure,
-              refundSeedAmountOnFailure,
-              receipt.message,
-            );
-          } else {
-            _handleConfirmedChainFailure(entryId, action, receipt.message);
-          }
-          return;
-        }
-        chainStatus = receipt.message;
-        if (action.type == 'SWAP_COIN_ETH') {
-          final payoutVisible = await _confirmEthPayoutBalance(
-            entryId,
-            action,
-            result.txHash,
-            nativeWeiBeforeAction,
-          );
-          if (!payoutVisible) {
-            _commitState();
-            return;
-          }
-        }
-      }
+    final result = await _chainClient.submitGameAction(
+      current,
+      action,
+      _newIdempotencyKey(),
+    );
+    if (!identical(session, current)) {
+      return;
+    }
+    if (result.unauthorized) {
+      updateHistoryStatus(entryId, status: 'gagal', errorMessage: result.message);
+      await _expireSession();
+      return;
+    }
+    if (!result.success) {
+      _handleChainActionFailure(entryId, action, result.message);
+      await _syncServerState();
+      return;
+    }
+    final state = result.state;
+    if (state != null) {
+      applyServerState(state);
+    }
+    if (!isValidTransactionHash(result.txHash)) {
+      updateHistoryStatus(entryId, status: 'tersimpan server');
+      chainStatus = result.message;
+      _commitState();
+      return;
+    }
+    updateHistoryStatus(
+      entryId,
+      status: 'menunggu konfirmasi',
+      txHash: result.txHash,
+    );
+    chainStatus =
+        'Transaksi ${shortTransactionHash(result.txHash)} terkirim. Menunggu konfirmasi Sepolia...';
+    _commitState();
+    final receipt = await _chainClient.waitForTransaction(result.txHash);
+    if (!receipt.confirmed) {
+      chainStatus = receipt.message;
+      showMessage(
+        'Transaksi masih menunggu konfirmasi Sepolia.',
+        success: false,
+        notify: false,
+      );
+      _commitState();
+      return;
+    }
+    if (!receipt.success) {
       updateHistoryStatus(
         entryId,
-        status: hasValidHash ? 'on-chain' : 'dikirim',
-        txHash: result.txHash,
+        status: 'gagal on-chain',
+        errorMessage: _conciseChainError(receipt.message),
       );
-      if (!hasValidHash) {
-        chainStatus = result.message;
-      }
-      if (action.type == 'SWAP_COIN' && hasValidHash) {
-        tani += action.amount;
-      }
-      if (action.type == 'SWAP_TANI_COIN' && hasValidHash) {
-        coins = math.min(0x7fffffff, coins + action.amount);
-      }
-      if (action.type == 'SWAP_ETH_COIN' && hasValidHash) {
-        coins = math.min(0x7fffffff, coins + action.amount);
-      }
-      if (_actionUpdatesCoinBalance(action) && action.type != 'SWAP_COIN_ETH') {
-        await refreshWalletState(revealMessage: false);
-        if (action.type == 'SWAP_ETH_COIN') {
-          chainStatus =
-              'Pembelian confirmed. Saldo ETH terbaru $walletNativeBalance ETH.';
-          showMessage(
-            'Game Coin masuk. Saldo ETH: $walletNativeBalance ETH.',
-            notify: false,
-          );
-        } else if (action.type == 'SWAP_TANI_COIN') {
-          chainStatus = 'Deposit confirmed. Saldo TANI terbaru $tani.';
-        }
+      chainStatus = '${action.label} gagal on-chain.';
+      showMessage('Transaksi Sepolia gagal.', success: false, notify: false);
+      _commitState();
+      return;
+    }
+    chainStatus = receipt.message;
+    if (action.type == 'SWAP_COIN_ETH') {
+      final payoutVisible = await _confirmEthPayoutBalance(
+        entryId,
+        action,
+        result.txHash,
+        nativeWeiBeforeAction,
+      );
+      if (payoutVisible) {
+        updateHistoryStatus(entryId, status: 'on-chain', txHash: result.txHash);
       }
       _commitState();
       return;
     }
-    _handleChainActionFailure(
-      entryId,
-      action,
-      refundCoinsOnFailure,
-      refundTaniOnFailure,
-      refundSeedIndexOnFailure,
-      refundSeedAmountOnFailure,
-      result.message,
-    );
+    updateHistoryStatus(entryId, status: 'on-chain', txHash: result.txHash);
+    if (_actionUpdatesCoinBalance(action)) {
+      await refreshWalletState(revealMessage: false);
+    }
+    _commitState();
   }
 
   Future<bool> _confirmEthPayoutBalance(
@@ -2209,81 +2248,15 @@ class FarmStateController extends ChangeNotifier {
     return false;
   }
 
-  void _handleConfirmedChainFailure(
-    int entryId,
-    ChainAction action,
-    String reason,
-  ) {
-    final cleanReason = _conciseChainError(reason);
-    updateHistoryStatus(
-      entryId,
-      status: 'gagal on-chain',
-      errorMessage: cleanReason,
-    );
-    chainStatus = '${action.label} gagal on-chain: $cleanReason';
-    showMessage('Transaksi Sepolia gagal.', success: false, notify: false);
-    _commitState();
-  }
-
   void _handleChainActionFailure(
     int entryId,
     ChainAction action,
-    int refundCoinsOnFailure,
-    int refundTaniOnFailure,
-    int refundSeedIndexOnFailure,
-    int refundSeedAmountOnFailure,
     String reason,
   ) {
     final cleanReason = _conciseChainError(reason);
-    if (refundCoinsOnFailure > 0 ||
-        refundTaniOnFailure > 0 ||
-        refundSeedAmountOnFailure > 0) {
-      if (refundCoinsOnFailure > 0) {
-        coins = math.min(0x7fffffff, coins + refundCoinsOnFailure);
-      }
-      if (refundTaniOnFailure > 0) {
-        tani = math.min(0x7fffffff, tani + refundTaniOnFailure);
-      }
-      if (refundSeedIndexOnFailure >= 0 &&
-          refundSeedIndexOnFailure < seeds.length &&
-          refundSeedAmountOnFailure > 0) {
-        final seed = seeds[refundSeedIndexOnFailure];
-        seeds[refundSeedIndexOnFailure] = seed.copyWith(
-          quantity: math.max(0, seed.quantity - refundSeedAmountOnFailure),
-        );
-      }
-      _clampSwapAmountToSource();
-      updateHistoryStatus(
-        entryId,
-        status: 'gagal; saldo kembali',
-        errorMessage: cleanReason,
-      );
-      final returned = refundCoinsOnFailure > 0
-          ? '+$refundCoinsOnFailure coin'
-          : '+$refundTaniOnFailure TANI';
-      chainStatus =
-          '${action.label} gagal; saldo dikembalikan $returned: $cleanReason';
-      showMessage(
-        action.type == 'BUY_SEED'
-            ? 'Pembelian benih gagal. TANI dan stok sudah dikembalikan.'
-            : 'Swap gagal, saldo dikembalikan.',
-        success: false,
-        notify: false,
-      );
-      _commitState();
-      return;
-    }
-    updateHistoryStatus(
-      entryId,
-      status: 'gagal sync',
-      errorMessage: cleanReason,
-    );
-    chainStatus = '${action.label} gagal sync: $cleanReason';
-    showMessage(
-      'Sync Sepolia gagal. Coba lagi.',
-      success: false,
-      notify: false,
-    );
+    updateHistoryStatus(entryId, status: 'gagal', errorMessage: cleanReason);
+    chainStatus = '${action.label} gagal: $cleanReason';
+    showMessage(cleanReason, success: false, notify: false);
     _commitState();
   }
 
@@ -2324,7 +2297,12 @@ class FarmStateController extends ChangeNotifier {
     _commitState();
   }
 
-  int _addHistory(String title, String valueLabel, {required String status}) {
+  int _addHistory(
+    String title,
+    String valueLabel, {
+    required String status,
+    String txHash = '',
+  }) {
     final now = DateTime.now();
     final id = _nextHistoryId++;
     history.insert(
@@ -2336,6 +2314,7 @@ class FarmStateController extends ChangeNotifier {
         timeLabel:
             '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
         valueLabel: valueLabel,
+        txHash: txHash,
       ),
     );
     if (history.length > 8) {
@@ -2362,27 +2341,12 @@ class FarmStateController extends ChangeNotifier {
     _commitState();
   }
 
-  String _initialChainHistoryStatus() {
-    if (!walletConnected) {
-      return 'butuh wallet';
-    }
-    if (chainConfig.hasGameApi) {
-      return 'mengirim';
-    }
-    if (chainConfig.hasCoinContract) {
-      return 'belum on-chain';
-    }
-    return 'lokal tersimpan';
-  }
+  String _initialChainHistoryStatus() => onChainMode ? 'dikirim' : 'lokal tersimpan';
 
   String _localChainStatus(ChainAction action) {
-    if (!walletConnected) {
-      return '${action.label} tersimpan lokal. Connect wallet untuk sync chain.';
-    }
-    if (!chainConfig.hasGameApi) {
-      return 'Signer backend belum diset; ${action.label} baru tersimpan lokal.';
-    }
-    return '${action.label} tersimpan lokal.';
+    return chainConfig.hasGameApi
+        ? '${action.label} tersimpan lokal. Masuk dengan Privy supaya tercatat di Sepolia.'
+        : '${action.label} tersimpan lokal.';
   }
 
   bool _actionUpdatesCoinBalance(ChainAction action) {
@@ -2418,26 +2382,6 @@ class FarmStateController extends ChangeNotifier {
     return status.trim();
   }
 
-  bool _storeWalletAddress(String address) {
-    final cleaned = address.trim();
-    final changed = cleaned.toLowerCase() != walletAddress.toLowerCase();
-    walletConnected = true;
-    walletAddress = cleaned;
-    if (changed) {
-      _walletRequestGeneration += 1;
-      checkingChain = false;
-      walletNativeBalance = '';
-      walletNativeWei = '';
-      ethWeiPerCoin = '';
-      maxEthPayoutWei = '';
-      chainSignerAddress = '';
-      walletTaniBalanceAvailable = false;
-      chainStatus =
-          'Wallet pemain diganti: ${shortAddress(walletAddress)}. Sync Sepolia...';
-    }
-    return changed;
-  }
-
   String _conciseChainError(String message) {
     var cleaned = message.trim();
     const prefix = 'Gagal kirim aksi chain:';
@@ -2449,14 +2393,12 @@ class FarmStateController extends ChangeNotifier {
         .replaceFirst(RegExp(r'^Bad state:\s*', caseSensitive: false), '')
         .trim();
     final lower = cleaned.toLowerCase();
-    if (lower.contains('wallet penerima eth sama dengan signer backend')) {
-      cleaned = 'wallet sama signer; ganti wallet pemain';
-    } else if (lower.contains('saldo eth signer backend tidak cukup')) {
-      cleaned = 'saldo ETH signer backend kurang';
-    } else if (lower.contains('tipe aksi tidak dikenal')) {
-      cleaned = 'backend belum support aksi ini';
-    } else if (lower.contains('tidak mengembalikan tx hash')) {
-      cleaned = 'backend belum mengembalikan tx hash';
+    if (lower.contains('timeout') ||
+        lower.contains('network error') ||
+        lower.contains('tidak terjangkau')) {
+      cleaned = 'Server lambat atau offline. Coba lagi sebentar.';
+    } else if (lower.contains('wallet penerima sama dengan signer')) {
+      cleaned = 'Wallet ini milik server; pakai akun pemain lain.';
     }
     return cleaned.length > 96 ? '${cleaned.substring(0, 93)}...' : cleaned;
   }

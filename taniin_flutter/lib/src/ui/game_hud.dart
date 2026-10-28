@@ -11,6 +11,7 @@ import 'pixel_panel.dart';
 import 'web_input_capability.dart'
     if (dart.library.js_interop) 'web_input_capability_web.dart'
     as web_input;
+import 'hud/status_strip.dart';
 import 'wallet_panel.dart';
 
 class GameHud extends StatelessWidget {
@@ -181,6 +182,23 @@ class GameHud extends StatelessWidget {
                                 onPanelSelected(GamePanel.backpack),
                           ),
                         ],
+                      ),
+                    ),
+                    Positioned(
+                      top: 8,
+                      left: (showMiniMap ? miniMapWidth + 48 : 16),
+                      right: compact ? 300 : 420,
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: AnimatedBuilder(
+                          animation: game.multiplayerClient,
+                          builder: (context, _) => StatusStrip(
+                            farmState: farmState,
+                            multiplayerOnline: game.multiplayerClient.connected,
+                            aiOnline: game.multiplayerClient.connected &&
+                                game.multiplayerClient.aiAgent != null,
+                          ),
+                        ),
                       ),
                     ),
                     if (showTouchJoystick)
@@ -547,7 +565,7 @@ class _WalletButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final connected = farmState.walletConnected;
     return Tooltip(
-      message: connected ? 'Wallet tersambung' : 'Connect wallet',
+      message: connected ? 'Akun Privy' : 'Masuk dengan Privy',
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onPressed,
@@ -583,8 +601,8 @@ class _WalletButton extends StatelessWidget {
                       connected && farmState.walletNativeBalance.isNotEmpty
                           ? '${farmState.walletNativeBalance} ETH - tap untuk sync'
                           : connected
-                          ? 'tap untuk ganti/sync'
-                          : 'mode lokal aktif',
+                          ? 'tap untuk akun & sync'
+                          : 'main sebagai tamu',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -1474,17 +1492,15 @@ class _SwapControl extends StatelessWidget {
                       onTap: () => farmState.setSwapAmount(sourceBalance),
                     ),
                     _SwapPresetButton(
-                      label: farmState.walletConnected
-                          ? 'WALLET AKTIF'
-                          : 'MODE LOKAL',
+                      label: farmState.isLoggedIn ? 'ON-CHAIN' : 'MODE TAMU',
                       enabled: true,
                       onTap: () => farmState.showMessage(
-                        farmState.walletConnected
-                            ? 'Wallet aktif: ${farmState.walletLabel}'
-                            : 'Buka tombol Connect Wallet di kanan atas.',
-                        success: farmState.walletConnected,
+                        farmState.isLoggedIn
+                            ? 'Swap tercatat di Sepolia: ${farmState.walletLabel}'
+                            : 'Mode tamu: swap tersimpan lokal. Tap MASUK di kanan atas.',
+                        success: farmState.isLoggedIn,
                       ),
-                      highlighted: farmState.walletConnected,
+                      highlighted: farmState.isLoggedIn,
                     ),
                   ],
                 ),
