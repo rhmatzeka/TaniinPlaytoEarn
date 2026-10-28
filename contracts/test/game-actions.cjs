@@ -122,6 +122,39 @@ describe("Game action API", function () {
     expect(rows.map((row) => row.result)).to.deep.equal(["error"]);
   });
 
+  it("commits the player debit before any chain transaction is sent", async function () {
+    await call(app, { path: "/player", headers: { authorization: `Bearer ${session}` } });
+    await db.query("UPDATE players SET state = jsonb_set(state, '{coins}', '1000') WHERE wallet = $1", [WALLET]);
+    let coinsSeenByChain;
+    chainBehavior = async (wallet, ops, extra) => {
+      chainCalls += 1;
+      const { rows } = await extra.db.query("SELECT state FROM players WHERE wallet = $1", [WALLET]);
+      coinsSeenByChain = rows[0].state.coins;
+      return { txHash: `0x${"b".repeat(64)}`, txHashes: [`0x${"b".repeat(64)}`] };
+    };
+    const result = await action({ type: "SWAP_COIN", amount: 300 }, "swap-1");
+    expect(result.status).to.equal(200);
+    expect(coinsSeenByChain).to.equal(700);
+    const { rows } = await db.query("SELECT result, tx_hashes FROM audit_log WHERE action = 'SWAP_COIN'");
+    expect(rows).to.have.length(1);
+    expect(rows[0].result).to.equal("ok");
+  });
+
+  it("releases the daily allowance when the chain call fails", async function () {
+    await call(app, { path: "/player", headers: { authorization: `Bearer ${session}` } });
+    await db.query("UPDATE players SET state = jsonb_set(state, '{coins}', '5000') WHERE wallet = $1", [WALLET]);
+    chainBehavior = async () => {
+      const error = new Error("RPC down");
+      error.statusCode = 502;
+      throw error;
+    };
+    expect((await action({ type: "SWAP_COIN", amount: 1500 }, "swap-fail")).status).to.equal(502);
+    const { rows } = await db.query("SELECT tani_minted::int AS n FROM daily_usage WHERE wallet = $1", [WALLET]);
+    expect(rows[0].n).to.equal(0);
+    const player = await call(app, { path: "/player", headers: { authorization: `Bearer ${session}` } });
+    expect(player.json.state.coins).to.equal(5000);
+  });
+
   it("enforces the daily ETH payout limit", async function () {
     await db.query("UPDATE players SET state = jsonb_set(state, '{coins}', '100000') WHERE wallet = $1", [WALLET])
       .catch(() => undefined);

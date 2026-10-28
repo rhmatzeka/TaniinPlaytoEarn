@@ -144,6 +144,16 @@ describe("Server economy rules", function () {
     expect(state.plots.every((plot) => plot.plantedAtMs === null)).to.equal(true);
   });
 
+  it("refuses to sell plots that came from a guest import", function () {
+    const state = importGuestState({ plots: [{ owned: true }, { owned: true }, { owned: true }] }, NOW);
+    expect(state.plots[1].owned).to.equal(true);
+    expectHttpError(
+      () => applyAction(state, { type: "SELL_LAND", plotId: 2 }, NOW),
+      409,
+      /mode tamu/
+    );
+  });
+
   it("unlocks the level 2 skin and achievement when XP reaches 100", function () {
     const state = newPlayerState(NOW);
     state.xp = 90;

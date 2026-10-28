@@ -119,6 +119,22 @@ describe("Privy sessions", function () {
     expect(second.txHash).to.equal("0xabc");
   });
 
+  it("lets a pending claim from a dead request expire within minutes", async function () {
+    let pendingTtlSeconds;
+    await withIdempotency(db, WALLET, "key-3", async () => {
+      const { rows } = await db.query(
+        "SELECT extract(epoch FROM expires_at - now())::int AS ttl FROM idempotency WHERE status = 'pending'"
+      );
+      pendingTtlSeconds = rows[0].ttl;
+      return { ok: true };
+    });
+    expect(pendingTtlSeconds).to.be.at.most(180);
+    const { rows } = await db.query(
+      "SELECT extract(epoch FROM expires_at - now())::int AS ttl FROM idempotency WHERE status = 'done'"
+    );
+    expect(rows[0].ttl).to.be.greaterThan(3600);
+  });
+
   it("forgets a key whose run failed so the client can retry", async function () {
     await rejects(withIdempotency(db, WALLET, "key-2", async () => {
       const error = new Error("chain down");

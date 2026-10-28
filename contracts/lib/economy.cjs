@@ -126,6 +126,10 @@ function applyAction(previous, action, nowMs) {
       if (!plot.owned || plot.plantedAtMs !== null || ownedPlotCount(state) <= 1) {
         throw httpError(409, "Lahan terakhir atau lahan berisi tanaman tidak bisa dijual.");
       }
+      if (plot.fromGuest) {
+        // Guest saves are unverified, so imported plots must never turn into coins.
+        throw httpError(409, "Lahan bawaan dari mode tamu tidak bisa dijual.");
+      }
       plot.owned = false;
       plot.seedIndex = 0;
       state.coins += CATALOG.landSellPrice;
@@ -231,11 +235,15 @@ function importGuestState(raw, nowMs) {
   state.crops = state.crops.map((_, index) =>
     clampInt(source.cropQuantities?.[index], 0, GUEST_IMPORT_LIMITS.stackPerType, 0));
   const guestPlots = Array.isArray(source.plots) ? source.plots.slice(0, CATALOG.plotCount) : [];
-  state.plots = state.plots.map((plot, index) => ({
-    owned: index === 0 || guestPlots[index]?.owned === true,
-    seedIndex: 0,
-    plantedAtMs: null
-  }));
+  state.plots = state.plots.map((plot, index) => {
+    const imported = index > 0 && guestPlots[index]?.owned === true;
+    return {
+      owned: index === 0 || imported,
+      seedIndex: 0,
+      plantedAtMs: null,
+      ...(imported ? { fromGuest: true } : {})
+    };
+  });
   unlockRewards(state);
   return state;
 }

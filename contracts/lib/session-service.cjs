@@ -7,6 +7,8 @@ const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const AUTH_RATE_LIMIT = 20;
 const RATE_WINDOW_MS = 60_000;
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
+// A claim whose request died (e.g. a killed serverless function) frees up quickly.
+const IDEMPOTENCY_PENDING_TTL_MS = 120_000;
 const IDEMPOTENCY_WAIT_MS = 20_000;
 const EXPIRED_SESSION = "Sesi habis, masuk lagi.";
 
@@ -84,7 +86,7 @@ async function withIdempotency(db, wallet, key, run) {
     const claimed = await db.query(
       `INSERT INTO idempotency (scoped_key, status, expires_at)
        VALUES ($1, 'pending', $2) ON CONFLICT (scoped_key) DO NOTHING RETURNING scoped_key`,
-      [scopedKey, new Date(Date.now() + IDEMPOTENCY_TTL_MS).toISOString()]
+      [scopedKey, new Date(Date.now() + IDEMPOTENCY_PENDING_TTL_MS).toISOString()]
     );
     if (claimed.rows.length) {
       let result;
@@ -95,8 +97,8 @@ async function withIdempotency(db, wallet, key, run) {
         throw error;
       }
       await db.query(
-        "UPDATE idempotency SET status = 'done', response = $2 WHERE scoped_key = $1",
-        [scopedKey, JSON.stringify(result)]
+        "UPDATE idempotency SET status = 'done', response = $2, expires_at = $3 WHERE scoped_key = $1",
+        [scopedKey, JSON.stringify(result), new Date(Date.now() + IDEMPOTENCY_TTL_MS).toISOString()]
       );
       return result;
     }
