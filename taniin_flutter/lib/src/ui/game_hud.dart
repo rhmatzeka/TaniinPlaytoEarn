@@ -186,7 +186,7 @@ class GameHud extends StatelessWidget {
                     ),
                     Positioned(
                       top: 8,
-                      left: (showMiniMap ? miniMapWidth + 48 : 16),
+                      left: miniMapWidth + 48,
                       right: compact ? 300 : 420,
                       child: Align(
                         alignment: Alignment.topCenter,

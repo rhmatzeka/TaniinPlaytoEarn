@@ -652,10 +652,6 @@ class ChainClient {
     return postJson(url, payload, timeout: _timeout);
   }
 
-  static Future<String> _getJson(String url) async {
-    return getJson(url, timeout: _timeout);
-  }
-
   static String _erc20BalanceOfData(String walletAddress) {
     final clean = walletAddress.substring(2).toLowerCase();
     return '0x70a08231${clean.padLeft(64, '0')}';
