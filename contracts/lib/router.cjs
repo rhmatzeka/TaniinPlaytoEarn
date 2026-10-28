@@ -1,5 +1,5 @@
 const { clientIp, httpError, readJson, sendJson, setCors } = require("./http.cjs");
-const { exchangePrivyToken, requireSession, revokeSession } = require("./session-service.cjs");
+const { exchangePrivyToken, redeemAuthCode, requireSession, revokeSession } = require("./session-service.cjs");
 const { getPlayer, importGuest, runGameAction } = require("./player-service.cjs");
 
 // One handler for every API path, so Vercel deploys a single function.
@@ -9,7 +9,11 @@ function createApp({ getDb, now = Date.now, multiplayerOnly = false }) {
     "GET /health": async () => ({ ok: true, multiplayer: true })
   } : {
     "GET /health": async () => health(),
-    "POST /auth/privy": async (req, db, body) => ({ ok: true, ...await exchangePrivyToken(db, body.accessToken, clientIp(req)) }),
+    "POST /auth/privy": async (req, db, body) => ({
+      ok: true,
+      ...await exchangePrivyToken(db, body.accessToken, clientIp(req), { codeChallenge: body.codeChallenge })
+    }),
+    "POST /auth/code": async (req, db, body) => ({ ok: true, ...await redeemAuthCode(db, body.code, body.codeVerifier) }),
     "POST /auth/logout": async (req, db) => {
       await revokeSession(db, req);
       return { ok: true };

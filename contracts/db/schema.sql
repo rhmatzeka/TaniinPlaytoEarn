@@ -56,3 +56,12 @@ CREATE TABLE IF NOT EXISTS audit_log (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS audit_log_wallet_idx ON audit_log (wallet, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS auth_codes (
+  code_hash text PRIMARY KEY,
+  challenge text NOT NULL,
+  privy_user_id text NOT NULL,
+  wallet text NOT NULL,
+  login_method text NOT NULL DEFAULT '',
+  expires_at timestamptz NOT NULL
+);

@@ -83,6 +83,10 @@
       "destination": "/api/auth/privy"
     },
     {
+      "source": "/auth/code",
+      "destination": "/api/auth/code"
+    },
+    {
       "source": "/auth/logout",
       "destination": "/api/auth/logout"
     },

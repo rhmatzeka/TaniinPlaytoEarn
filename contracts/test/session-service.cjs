@@ -4,6 +4,7 @@ const { setPrivyForTests } = require("../lib/privy.cjs");
 const {
   checkRateLimit,
   exchangePrivyToken,
+  redeemAuthCode,
   requireSession,
   revokeSession,
   sessionWalletForSocket,
@@ -60,6 +61,34 @@ describe("Privy sessions", function () {
     expect(rows).to.have.length(1);
     expect(rows[0].token_hash).to.not.equal(result.session);
     expect(rows[0].token_hash).to.equal(crypto.createHash("sha256").update(result.session).digest("hex"));
+  });
+
+  describe("app login with a one-time code (PKCE)", function () {
+    const verifier = "v".repeat(43);
+    const challenge = crypto.createHash("sha256").update(verifier).digest("base64url");
+
+    it("returns a code instead of a session when a challenge is given", async function () {
+      const result = await exchangePrivyToken(db, "privy-ok", "1.2.3.4", { codeChallenge: challenge });
+      expect(result.session).to.equal(undefined);
+      expect(result.code).to.match(/^[0-9a-f]{64}$/);
+      const { rows } = await db.query("SELECT count(*)::int AS n FROM sessions");
+      expect(rows[0].n).to.equal(0);
+    });
+
+    it("redeems the code once with the matching verifier", async function () {
+      const { code } = await exchangePrivyToken(db, "privy-ok", "1.2.3.4", { codeChallenge: challenge });
+      await rejects(redeemAuthCode(db, code, "x".repeat(43)), 401);
+      const result = await redeemAuthCode(db, code, verifier);
+      expect(result.wallet).to.equal(WALLET);
+      expect(result.session).to.match(/^[0-9a-f]{64}$/);
+      await rejects(redeemAuthCode(db, code, verifier), 401);
+    });
+
+    it("rejects an expired code", async function () {
+      const { code } = await exchangePrivyToken(db, "privy-ok", "1.2.3.4", { codeChallenge: challenge });
+      await db.query("UPDATE auth_codes SET expires_at = now() - interval '1 second'");
+      await rejects(redeemAuthCode(db, code, verifier), 401);
+    });
   });
 
   it("rejects an invalid Privy token", async function () {

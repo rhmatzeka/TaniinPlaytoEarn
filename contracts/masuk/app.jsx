@@ -9,6 +9,8 @@ const params = new URLSearchParams(window.location.search);
 const returnUrl = safeReturnUrl(params.get("return"));
 const mode = params.get("aksi") === "isi-eth" ? "isi-eth" : "masuk";
 const coinAmount = Number.parseInt(params.get("jumlah") || "0", 10);
+// The Android app sends a PKCE challenge; it then receives a one-time code, not a session.
+const codeChallenge = /^[A-Za-z0-9_-]{43}$/.test(params.get("challenge") || "") ? params.get("challenge") : undefined;
 const WALLET_WAIT_MS = 15_000;
 
 function Card({ children }) {
@@ -46,6 +48,8 @@ function LoginFlow() {
   const { ready, authenticated, login, logout, getAccessToken, user } = usePrivy();
   const [status, setStatus] = useState({ text: "", tone: "info" });
   const exchanging = useRef(false);
+  const latestUser = useRef(user);
+  latestUser.current = user;
 
   useEffect(() => {
     if (!ready || !authenticated || exchanging.current) return;
@@ -54,12 +58,16 @@ function LoginFlow() {
       setStatus({ text: "Menyiapkan wallet kamu...", tone: "info" });
       const started = Date.now();
       // The embedded wallet is created right after the first login; give it a moment.
-      while (!user?.wallet?.address && Date.now() - started < WALLET_WAIT_MS) {
+      while (!latestUser.current?.wallet?.address && Date.now() - started < WALLET_WAIT_MS) {
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
       const accessToken = await getAccessToken();
-      const result = await postJson("/auth/privy", { accessToken });
+      const result = await postJson("/auth/privy", { accessToken, codeChallenge });
       setStatus({ text: "Berhasil! Kembali ke game...", tone: "ok" });
+      if (result.code) {
+        goBack({ code: result.code });
+        return;
+      }
       goBack({
         session: result.session,
         wallet: result.wallet,
@@ -70,7 +78,7 @@ function LoginFlow() {
       exchanging.current = false;
       setStatus({ text: error.message || "Gagal masuk. Coba lagi.", tone: "error" });
     });
-  }, [ready, authenticated, user, getAccessToken]);
+  }, [ready, authenticated, getAccessToken]);
 
   return (
     <Card>

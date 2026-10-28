@@ -11,25 +11,60 @@ const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 const IDEMPOTENCY_PENDING_TTL_MS = 120_000;
 const IDEMPOTENCY_WAIT_MS = 20_000;
 const EXPIRED_SESSION = "Sesi habis, masuk lagi.";
+const AUTH_CODE_TTL_MS = 2 * 60 * 1000;
+const CODE_CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
+const CODE_VERIFIER = /^[A-Za-z0-9._~-]{43,128}$/;
 
 function hashToken(token) {
   return crypto.createHash("sha256").update(String(token)).digest("hex");
 }
 
-async function exchangePrivyToken(db, accessToken, ip) {
+// Web logins get a session directly (same-origin redirect). The Android app
+// passes a PKCE challenge and gets a one-time code instead, because any app can
+// register the taniin:// scheme and read what the login page hands back.
+async function exchangePrivyToken(db, accessToken, ip, { codeChallenge } = {}) {
   await checkRateLimit(db, `auth:${ip || "unknown"}`, AUTH_RATE_LIMIT, RATE_WINDOW_MS);
   const { privyUserId } = await verifyPrivyAccessToken(accessToken);
   const found = await fetchPrivyWallet(privyUserId);
   const wallet = ethers.getAddress(found.wallet);
+  if (codeChallenge !== undefined) {
+    if (!CODE_CHALLENGE.test(String(codeChallenge))) throw httpError(400, "codeChallenge tidak valid.");
+    const code = crypto.randomBytes(32).toString("hex");
+    await db.query("DELETE FROM auth_codes WHERE expires_at < now()");
+    await db.query(
+      `INSERT INTO auth_codes (code_hash, challenge, privy_user_id, wallet, login_method, expires_at)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [hashToken(code), codeChallenge, privyUserId, wallet, found.loginMethod,
+        new Date(Date.now() + AUTH_CODE_TTL_MS).toISOString()]
+    );
+    return { code };
+  }
+  return createSession(db, privyUserId, wallet, found.loginMethod);
+}
+
+async function redeemAuthCode(db, code, codeVerifier) {
+  const verifier = String(codeVerifier || "");
+  if (!CODE_VERIFIER.test(verifier)) throw httpError(401, "Kode masuk tidak valid.");
+  const challenge = crypto.createHash("sha256").update(verifier).digest("base64url");
+  const { rows } = await db.query(
+    `DELETE FROM auth_codes WHERE code_hash = $1 AND challenge = $2 AND expires_at > now()
+     RETURNING privy_user_id, wallet, login_method`,
+    [hashToken(String(code || "")), challenge]
+  );
+  if (!rows.length) throw httpError(401, "Kode masuk tidak valid atau kedaluwarsa. Coba masuk lagi.");
+  return createSession(db, rows[0].privy_user_id, rows[0].wallet, rows[0].login_method);
+}
+
+async function createSession(db, privyUserId, wallet, loginMethod) {
   const session = crypto.randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
   await db.query("DELETE FROM sessions WHERE expires_at < now() - interval '1 day'");
   await db.query(
     `INSERT INTO sessions (token_hash, privy_user_id, wallet, login_method, expires_at)
      VALUES ($1, $2, $3, $4, $5)`,
-    [hashToken(session), privyUserId, wallet, found.loginMethod, expiresAt.toISOString()]
+    [hashToken(session), privyUserId, wallet, loginMethod, expiresAt.toISOString()]
   );
-  return { session, wallet, expiresAt: expiresAt.toISOString(), loginMethod: found.loginMethod };
+  return { session, wallet, expiresAt: expiresAt.toISOString(), loginMethod };
 }
 
 async function findSession(db, token) {
@@ -121,6 +156,7 @@ function bearerToken(req) {
 module.exports = {
   checkRateLimit,
   exchangePrivyToken,
+  redeemAuthCode,
   requireSession,
   revokeSession,
   sessionWalletForSocket,

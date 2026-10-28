@@ -9,7 +9,7 @@ const { getReadyDb } = require("../lib/db.cjs");
 
 const PORT = Number(process.env.PORT || 4174);
 const PUBLIC_DIR = path.resolve(__dirname, "../public");
-const API_PATHS = new Set(["/health", "/auth/privy", "/auth/logout", "/player", "/player/import", "/game-actions"]);
+const API_PATHS = new Set(["/health", "/auth/privy", "/auth/code", "/auth/logout", "/player", "/player/import", "/game-actions"]);
 const TYPES = {
   ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript",
   ".css": "text/css", ".json": "application/json", ".png": "image/png", ".webp": "image/webp",

@@ -69,6 +69,19 @@ describe("Game action API", function () {
     });
   }
 
+  it("logs the app in through a one-time code exchange", async function () {
+    const crypto = require("crypto");
+    const verifier = "w".repeat(50);
+    const codeChallenge = crypto.createHash("sha256").update(verifier).digest("base64url");
+    const first = await call(app, { method: "POST", path: "/auth/privy", body: { accessToken: "ok", codeChallenge } });
+    expect(first.status).to.equal(200);
+    expect(first.json).to.not.have.property("session");
+    const second = await call(app, { method: "POST", path: "/auth/code", body: { code: first.json.code, codeVerifier: verifier } });
+    expect(second.status).to.equal(200);
+    expect(second.json.wallet).to.equal(WALLET);
+    expect(second.json.session).to.match(/^[0-9a-f]{64}$/);
+  });
+
   it("rejects actions without a session", async function () {
     const result = await call(app, { method: "POST", path: "/game-actions", body: { type: "PLANT", plotId: 1 } });
     expect(result.status).to.equal(401);
