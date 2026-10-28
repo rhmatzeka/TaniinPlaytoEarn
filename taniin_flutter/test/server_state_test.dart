@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:taniin_flutter/src/chain/auth_session.dart';
 import 'package:taniin_flutter/src/chain/chain_client.dart';
 import 'package:taniin_flutter/src/state/farm_state.dart';
 
@@ -97,4 +98,34 @@ void main() {
     expect(farmState.isLoggedIn, isFalse);
     expect(farmState.coins, 123);
   });
+
+  test('the app redeems a one-time code with its stored verifier', () async {
+    final url = await farmState.prepareLoginUrl(forApp: true);
+    final challenge = Uri.parse(url).queryParameters['challenge'];
+    expect(challenge, matches(RegExp(r'^[A-Za-z0-9_-]{43}$')));
+
+    await farmState.handleAuthFragment('code=${'d' * 64}');
+
+    expect(fake.redeemedCodes.single.$1, 'd' * 64);
+    expect(codeChallengeFor(fake.redeemedCodes.single.$2), challenge);
+    expect(farmState.isLoggedIn, isTrue);
+  });
+
+  test('an expired session does not overwrite the saved guest farm', () async {
+    farmState.coins = 123;
+    await farmState.saveNow();
+    fake.serverState = <String, Object?>{'coins': 5000};
+    await farmState.applyAuthSession(fakeSession());
+    fake.actionResult = (_) => ChainResult.unauthorized('Sesi habis, masuk lagi.');
+
+    farmState.performPlotAction(0);
+    await pumpEventQueue();
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+
+    expect(farmState.isLoggedIn, isFalse);
+    expect(farmState.coins, 123);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('taniin.farmState.v1'), contains('"coins":123'));
+  });
 }
+

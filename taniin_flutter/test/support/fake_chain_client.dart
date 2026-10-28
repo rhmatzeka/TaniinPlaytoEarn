@@ -30,6 +30,7 @@ class FakeChainClient extends ChainClient {
   String maxEthPayoutWei = '1000000000000';
   int walletLoads = 0;
   int logouts = 0;
+  final List<(String, String)> redeemedCodes = <(String, String)>[];
 
   @override
   Future<ChainResult> submitGameAction(
@@ -63,6 +64,12 @@ class FakeChainClient extends ChainClient {
     imports.add(guestState);
     importedGuest = true;
     return ServerPlayerResult.ok(serverState, importedGuest: true);
+  }
+
+  @override
+  Future<AuthSession?> redeemLoginCode(String code, String verifier) async {
+    redeemedCodes.add((code, verifier));
+    return fakeSession();
   }
 
   @override

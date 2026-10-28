@@ -71,4 +71,21 @@ void main() {
     expect(FundCallback.fromFragment('fundTx=0x12&jumlah=200'), isNull);
     expect(FundCallback.fromFragment(fragment()), isNull);
   });
+
+  test('derives the PKCE challenge from the verifier (RFC 7636 example)', () {
+    expect(
+      codeChallengeFor('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'),
+      'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+    );
+    final verifier = newCodeVerifier();
+    expect(verifier, matches(RegExp(r'^[A-Za-z0-9_-]{43,128}$')));
+    expect(newCodeVerifier(), isNot(verifier));
+  });
+
+  test('parses a one-time login code fragment', () {
+    final code = 'c' * 64;
+    expect(AuthCodeCallback.fromFragment('code=$code')?.code, code);
+    expect(AuthCodeCallback.fromFragment('code=short'), isNull);
+    expect(AuthCodeCallback.fromFragment(fragment()), isNull);
+  });
 }
