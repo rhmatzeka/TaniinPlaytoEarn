@@ -199,6 +199,17 @@ describe("Game action API", function () {
     }
   });
 
+  it("keeps working when a Privy user's wallet changes", async function () {
+    await call(app, { path: "/player", headers: { authorization: `Bearer ${session}` } });
+    setPrivyForTests({
+      verify: async () => ({ privyUserId: "did:privy:user2" }),
+      fetchWallet: async () => ({ wallet: "0x5555555555555555555555555555555555555555", loginMethod: "google" })
+    });
+    const login = await call(app, { method: "POST", path: "/auth/privy", body: { accessToken: "ok" } });
+    const player = await call(app, { path: "/player", headers: { authorization: `Bearer ${login.json.session}` } });
+    expect(player.status).to.equal(200);
+  });
+
   it("allows only one guest import per account", async function () {
     const guestState = { coins: 300, seedQuantities: [2, 0, 0, 0] };
     const headers = { authorization: `Bearer ${session}` };

@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS idempotency (
 
 CREATE TABLE IF NOT EXISTS players (
   wallet text PRIMARY KEY,
-  privy_user_id text UNIQUE,
+  privy_user_id text,
   state jsonb NOT NULL,
   imported_guest boolean NOT NULL DEFAULT false,
   updated_at timestamptz NOT NULL DEFAULT now()
@@ -65,3 +65,7 @@ CREATE TABLE IF NOT EXISTS auth_codes (
   login_method text NOT NULL DEFAULT '',
   expires_at timestamptz NOT NULL
 );
+
+-- A Privy user can change wallets; one player row per wallet, not per user.
+ALTER TABLE players DROP CONSTRAINT IF EXISTS players_privy_user_id_key;
+CREATE INDEX IF NOT EXISTS players_privy_user_idx ON players (privy_user_id);
