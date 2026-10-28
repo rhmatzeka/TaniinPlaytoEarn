@@ -3,8 +3,11 @@ const { exchangePrivyToken, requireSession, revokeSession } = require("./session
 const { getPlayer, importGuest, runGameAction } = require("./player-service.cjs");
 
 // One handler for every API path, so Vercel deploys a single function.
-function createApp({ getDb, now = Date.now }) {
-  const routes = {
+function createApp({ getDb, now = Date.now, multiplayerOnly = false }) {
+  const routes = multiplayerOnly ? {
+    // srv runs only Socket.IO; the economy API lives on Vercel.
+    "GET /health": async () => ({ ok: true, multiplayer: true })
+  } : {
     "GET /health": async () => health(),
     "POST /auth/privy": async (req, db, body) => ({ ok: true, ...await exchangePrivyToken(db, body.accessToken, clientIp(req)) }),
     "POST /auth/logout": async (req, db) => {

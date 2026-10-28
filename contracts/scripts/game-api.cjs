@@ -15,7 +15,8 @@ if (!Number.isInteger(PORT) || PORT <= 0 || PORT > 65535) {
   process.exit(1);
 }
 
-const app = createApp({ getDb: getReadyDb });
+const multiplayerOnly = String(process.env.TANIIN_MULTIPLAYER_ONLY || "").trim().toLowerCase() === "true";
+const app = createApp({ getDb: getReadyDb, multiplayerOnly });
 const server = http.createServer((req, res) => {
   app(req, res);
 });

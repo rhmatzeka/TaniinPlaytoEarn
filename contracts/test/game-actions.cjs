@@ -156,6 +156,15 @@ describe("Game action API", function () {
     expect(second.json.state.seedQuantities[0]).to.equal(5);
   });
 
+  it("exposes only health in multiplayer-only mode", async function () {
+    const mpApp = createApp({ getDb: () => db, now: () => clock, multiplayerOnly: true });
+    expect((await call(mpApp, { method: "POST", path: "/game-actions", body: {} })).status).to.equal(404);
+    expect((await call(mpApp, { method: "POST", path: "/auth/privy", body: {} })).status).to.equal(404);
+    const health = await call(mpApp, { path: "/health" });
+    expect(health.status).to.equal(200);
+    expect(health.json).to.deep.equal({ ok: true, multiplayer: true });
+  });
+
   it("reports health with the economy switch", async function () {
     const result = await call(app, { path: "/health" });
     expect(result.status).to.equal(200);
