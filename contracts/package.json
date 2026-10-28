@@ -12,19 +12,19 @@
     "test:auth": "node scripts/test-auth.cjs"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.2.17",
     "@nomicfoundation/hardhat-toolbox": "^6.1.2",
     "esbuild": "^0.25.6",
     "hardhat": "^2.28.6"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.6.1",
-    "@tanstack/react-query": "5.28.9",
-    "connectkit": "1.8.2",
     "dotenv": "^17.2.3",
+    "ethers": "^6.13.4",
+    "jose": "^5.9.6",
+    "pg": "^8.13.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "viem": "2.13.5",
-    "wagmi": "2.10.4",
     "socket.io": "^4.8.3"
   }
 }
