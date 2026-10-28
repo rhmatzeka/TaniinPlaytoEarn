@@ -47,18 +47,34 @@ android {
         buildConfigField("String", "TANIIN_ITEMS_CONTRACT_ADDRESS", escapedBuildConfig(envValue("TANIIN_ITEMS_CONTRACT_ADDRESS")))
         buildConfigField("String", "TANIIN_LAND_CONTRACT_ADDRESS", escapedBuildConfig(envValue("TANIIN_LAND_CONTRACT_ADDRESS")))
         buildConfigField("String", "TANIIN_GAME_API_URL", escapedBuildConfig(envValue("TANIIN_GAME_API_URL")))
-        buildConfigField("String", "TANIIN_DEFAULT_WALLET_ADDRESS", escapedBuildConfig(envValue("TANIIN_DEFAULT_WALLET_ADDRESS")))
+        buildConfigField("String", "TANIIN_MULTIPLAYER_URL", escapedBuildConfig(envValue("TANIIN_MULTIPLAYER_URL")))
     }
 
     buildFeatures {
         buildConfig = true
     }
 
+    // CI writes the fixed release key here so every APK update installs over
+    // the previous one; local builds without it fall back to the debug key.
+    val releaseKeystore = file("taniin.keystore")
+    val releaseKeystorePassword = envValue("TANIIN_KEYSTORE_PASSWORD")
+    signingConfigs {
+        create("tetap") {
+            storeFile = releaseKeystore
+            storeType = "pkcs12"
+            storePassword = releaseKeystorePassword
+            keyAlias = "taniin"
+            keyPassword = releaseKeystorePassword
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (releaseKeystore.exists() && releaseKeystorePassword.isNotEmpty()) {
+                signingConfigs.getByName("tetap")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }

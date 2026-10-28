@@ -3,3 +3,5 @@ bool openBrowserUrl(String url, {bool sameTab = false}) {
 }
 
 void removeBrowserQueryParameters(Iterable<String> names) {}
+
+String takeBrowserFragment() => '';

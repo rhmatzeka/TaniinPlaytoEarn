@@ -1,0 +1,8 @@
+# Taniin multiplayer (deploy/srv/deploy.sh). Socket.IO WebSocket upgrades pass through.
+http://taniin-mp.rahmateka.my.id {
+	request_body {
+		max_size 16KB
+	}
+	reverse_proxy 127.0.0.1:7690
+	header -Server
+}

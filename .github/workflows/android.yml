@@ -1,0 +1,58 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+    paths: ["taniin_flutter/**", ".github/workflows/android.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: taniin_flutter
+    env:
+      TANIIN_COIN_CONTRACT_ADDRESS: ${{ vars.TANIIN_COIN_CONTRACT_ADDRESS }}
+      TANIIN_LAND_CONTRACT_ADDRESS: ${{ vars.TANIIN_LAND_CONTRACT_ADDRESS }}
+      TANIIN_ITEMS_CONTRACT_ADDRESS: ${{ vars.TANIIN_ITEMS_CONTRACT_ADDRESS }}
+      TANIIN_GAME_API_URL: ${{ vars.TANIIN_GAME_API_URL }}
+      TANIIN_MULTIPLAYER_URL: ${{ vars.TANIIN_MULTIPLAYER_URL }}
+      TANIIN_KEYSTORE_PASSWORD: ${{ secrets.TANIIN_KEYSTORE_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Restore release key
+        env:
+          KEYSTORE_B64: ${{ secrets.TANIIN_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::Secret TANIIN_KEYSTORE_B64 belum diset"; exit 1
+          fi
+          echo "$KEYSTORE_B64" | base64 -d > android/app/taniin.keystore
+      - run: flutter pub get
+      - run: flutter build apk --release
+      - name: Publish to the apk-terbaru release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk Taniin.apk
+          gh release view apk-terbaru >/dev/null 2>&1 || gh release create apk-terbaru \
+            --title "Taniin APK terbaru" \
+            --notes "APK Android terbaru, dibangun otomatis dari branch main. Unduh juga lewat https://taniin.rahmateka.my.id/unduh" \
+            --latest
+          gh release upload apk-terbaru Taniin.apk --clobber

@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-import 'browser_wallet.dart' as browser_wallet;
 import 'browser_url.dart';
 import 'chain_client.dart';
 
@@ -25,24 +24,28 @@ class PlatformBridge {
   static const String _envGameApiUrl = String.fromEnvironment(
     'TANIIN_GAME_API_URL',
   );
-  static const String _envDefaultWalletAddress = String.fromEnvironment(
-    'TANIIN_DEFAULT_WALLET_ADDRESS',
+  static const String _envMultiplayerUrl = String.fromEnvironment(
+    'TANIIN_MULTIPLAYER_URL',
   );
 
-  static void setWalletAddressHandler(void Function(String address)? handler) {
+  /// Android delivers `taniin://auth#...` fragments through this handler.
+  static void setAuthCallbackHandler(void Function(String fragment)? handler) {
     if (handler == null) {
       _channel.setMethodCallHandler(null);
       return;
     }
     _channel.setMethodCallHandler((MethodCall call) async {
-      if (call.method == 'walletAddress') {
-        final address = call.arguments?.toString().trim() ?? '';
-        if (address.isNotEmpty) {
-          handler(address);
+      if (call.method == 'authCallback') {
+        final fragment = call.arguments?.toString().trim() ?? '';
+        if (fragment.isNotEmpty) {
+          handler(fragment);
         }
       }
     });
   }
+
+  /// On web, the login page redirects back to the game with a URL fragment.
+  static String launchAuthFragment() => kIsWeb ? takeBrowserFragment() : '';
 
   static Future<ChainConfig> loadChainConfig() async {
     if (kIsWeb) {
@@ -50,10 +53,7 @@ class PlatformBridge {
     }
     try {
       final raw = await _channel.invokeMethod<Object?>('getChainConfig');
-      if (raw is Map<Object?, Object?>) {
-        return ChainConfig.fromMap(raw);
-      }
-      if (raw is Map<dynamic, dynamic>) {
+      if (raw is Map) {
         return ChainConfig.fromMap(Map<Object?, Object?>.from(raw));
       }
     } on MissingPluginException {
@@ -64,9 +64,9 @@ class PlatformBridge {
     return _environmentChainConfig();
   }
 
-  static Future<bool> openUrl(String url) async {
+  static Future<bool> openUrl(String url, {bool sameTab = false}) async {
     if (kIsWeb) {
-      return openBrowserUrl(url, sameTab: _isWalletConnectUrl(url));
+      return openBrowserUrl(url, sameTab: sameTab);
     }
     try {
       final opened = await _channel.invokeMethod<bool>(
@@ -81,72 +81,29 @@ class PlatformBridge {
     }
   }
 
-  static Future<String> clipboardWalletAddress() async {
-    final data = await Clipboard.getData(Clipboard.kTextPlain);
-    final text = data?.text ?? '';
-    return firstWalletAddressInText(text);
-  }
-
-  static String launchWalletAddress() {
-    if (!kIsWeb) {
+  /// `/masuk` page URL; web returns to the game path, Android to `taniin://auth`.
+  static String loginUrl(
+    ChainConfig config, {
+    String aksi = 'masuk',
+    int? jumlah,
+    String? challenge,
+    bool? forApp,
+  }) {
+    if (!config.hasGameApi) {
       return '';
     }
-    final address = Uri.base.queryParameters['address']?.trim() ?? '';
-    removeBrowserQueryParameters(const <String>['address', 'chainId']);
-    return isValidAddress(address) ? address : '';
-  }
-
-  static bool hasBrowserWalletProvider() {
-    if (!kIsWeb) {
-      return false;
-    }
-    return browser_wallet.hasBrowserWalletProvider();
-  }
-
-  static String browserWalletConnectError() {
-    if (!kIsWeb) {
-      return '';
-    }
-    return browser_wallet.browserWalletError();
-  }
-
-  static Future<String> requestBrowserWalletAddress() async {
-    if (!kIsWeb) {
-      return '';
-    }
-    final address = await browser_wallet.requestBrowserWalletAddress();
-    return isValidAddress(address) ? address : '';
-  }
-
-  static String firstWalletAddressInText(String text) {
-    final lower = text.toLowerCase();
-    var from = 0;
-    while (from < lower.length) {
-      final start = lower.indexOf('0x', from);
-      if (start < 0) {
-        return '';
-      }
-      final end = start + 42;
-      if (end <= text.length) {
-        final candidate = text.substring(start, end);
-        if (isValidAddress(candidate)) {
-          return candidate;
-        }
-      }
-      from = start + 2;
-    }
-    return '';
-  }
-
-  static String walletConnectUrl(ChainConfig config) {
-    final baseUrl = config.walletConnectUrl;
-    if (baseUrl.isEmpty) {
-      return '';
-    }
-    final uri = Uri.parse(baseUrl);
-    final nextParams = Map<String, String>.from(uri.queryParameters);
-    nextParams['return'] = _walletReturnUrl();
-    return uri.replace(queryParameters: nextParams).toString();
+    final app = forApp ?? !kIsWeb;
+    final returnUrl = app
+        ? 'taniin://auth'
+        : Uri.base.removeFragment().replace(queryParameters: null).path;
+    return Uri.parse('${config.gameApiUrl}/masuk/').replace(
+      queryParameters: <String, String>{
+        'return': returnUrl,
+        if (aksi != 'masuk') 'aksi': aksi,
+        if (jumlah != null) 'jumlah': '$jumlah',
+        'challenge': ?challenge,
+      },
+    ).toString();
   }
 
   static ChainConfig _environmentChainConfig() {
@@ -156,7 +113,7 @@ class PlatformBridge {
       'itemsContractAddress': _envItemsContractAddress,
       'landContractAddress': _envLandContractAddress,
       'gameApiUrl': _environmentGameApiUrl(),
-      'defaultWalletAddress': _envDefaultWalletAddress,
+      'multiplayerUrl': _envMultiplayerUrl,
     });
   }
 
@@ -172,20 +129,5 @@ class PlatformBridge {
     }
     final port = base.hasPort ? ':${base.port}' : '';
     return '${base.scheme}://${base.host}$port';
-  }
-
-  static String _walletReturnUrl() {
-    if (!kIsWeb) {
-      return 'taniin://wallet';
-    }
-    return Uri.base.replace(queryParameters: <String, String>{}).toString();
-  }
-
-  static bool _isWalletConnectUrl(String url) {
-    try {
-      return Uri.parse(url).path.endsWith('/wallet-connect');
-    } on FormatException {
-      return false;
-    }
   }
 }

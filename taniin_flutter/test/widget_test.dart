@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:taniin_flutter/src/app/taniin_app.dart';
+import 'package:taniin_flutter/src/chain/auth_session.dart';
 import 'package:taniin_flutter/src/chain/chain_client.dart';
 import 'package:taniin_flutter/src/game/tmx_map.dart';
 import 'package:taniin_flutter/src/state/farm_state.dart';
@@ -11,51 +12,10 @@ import 'package:taniin_flutter/src/ui/game_hud.dart';
 import 'package:taniin_flutter/src/ui/profile_panel.dart';
 import 'package:taniin_flutter/src/ui/settings_panel.dart';
 import 'package:taniin_flutter/src/ui/taniin_theme.dart';
+import 'package:taniin_flutter/src/ui/hud/status_strip.dart';
 import 'package:taniin_flutter/src/ui/wallet_panel.dart';
 
-const String _validTxHash =
-    '0x1111111111111111111111111111111111111111111111111111111111111111';
-
-class _FakeChainClient extends ChainClient {
-  _FakeChainClient(super.config);
-
-  final List<ChainAction> actions = <ChainAction>[];
-  ChainReceiptState receiptState = ChainReceiptState.ok('Confirmed fake.');
-  String nativeEth = '0.001';
-  String nativeWei = '1000000000000000';
-  String ethWeiPerCoin = '10000000000';
-  String maxEthPayoutWei = '1000000000000';
-  int walletLoads = 0;
-
-  @override
-  Future<ChainResult> submitGameAction(
-    String walletAddress,
-    ChainAction action,
-  ) async {
-    actions.add(action);
-    return ChainResult.ok('Transaksi fake terkirim.', txHash: _validTxHash);
-  }
-
-  @override
-  Future<ChainReceiptState> waitForTransaction(String txHash) async {
-    return receiptState;
-  }
-
-  @override
-  Future<ChainWalletState> loadWalletState(String walletAddress) async {
-    walletLoads += 1;
-    return ChainWalletState.ok(
-      message: 'Wallet fake tersync Sepolia.',
-      coinBalance: 0,
-      coinBalanceAvailable: false,
-      nativeEth: nativeEth,
-      nativeWei: nativeWei,
-      signerAddress: '0x0000000000000000000000000000000000000002',
-      ethWeiPerCoin: ethWeiPerCoin,
-      maxEthPayoutWei: maxEthPayoutWei,
-    );
-  }
-}
+import 'support/fake_chain_client.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -212,48 +172,26 @@ void main() {
     expect(find.text('Login Wallet'), findsNothing);
   });
 
-  testWidgets('renders wallet login panel copy', (WidgetTester tester) async {
+  testWidgets('guest wallet panel offers Privy login without address input', (
+    WidgetTester tester,
+  ) async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final farmState = FarmStateController();
-    farmState.configureChain(
-      const ChainConfig(
-        gameApiUrl: 'https://example.com',
-        defaultWalletAddress: '0x0000000000000000000000000000000000000001',
-      ),
-    );
+    farmState.configureChain(const ChainConfig(gameApiUrl: 'https://example.com'));
     addTearDown(farmState.dispose);
 
     await tester.pumpWidget(
       MaterialApp(
         theme: buildTaniinTheme(),
         home: Scaffold(
-          body: WalletPanel(
-            farmState: farmState,
-            onClose: () {},
-            showCloseButton: false,
-            prominent: true,
-            showFacts: false,
-            title: 'Login Wallet',
-            subtitle: 'Connect wallet dulu untuk mulai bermain',
-          ),
+          body: WalletPanel(farmState: farmState, onClose: () {}),
         ),
       ),
     );
 
-    expect(find.text('Login Wallet'), findsOneWidget);
-    expect(
-      find.text('Connect wallet dulu untuk mulai bermain'),
-      findsOneWidget,
-    );
-    expect(
-      find.text(
-        'Connect wallet untuk mulai bermain dan sync transaksi Sepolia.',
-      ),
-      findsOneWidget,
-    );
-    expect(find.text('Wallet: '), findsNothing);
-    expect(find.text('API: '), findsNothing);
-    expect(farmState.chainStatus, isNot(contains('backend/testing')));
+    expect(find.text('Masuk dengan Privy'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+    expect(find.text('Keluar'), findsNothing);
   });
 
   testWidgets('settings about tab shows creator and github link', (
@@ -279,14 +217,14 @@ void main() {
     expect(find.text('rhmatzeka'), findsOneWidget);
   });
 
-  testWidgets('wallet panel logout disconnects the active wallet', (
+  testWidgets('signed-in wallet panel shows the account and logs out', (
     WidgetTester tester,
   ) async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
-    final farmState = FarmStateController()
-      ..walletConnected = true
-      ..walletAddress = '0x0000000000000000000000000000000000000001';
+    final farmState = FarmStateController(chainClientFactory: FakeChainClient.new);
+    farmState.configureChain(const ChainConfig(gameApiUrl: 'https://example.com'));
     addTearDown(farmState.dispose);
+    await tester.runAsync(() => farmState.applyAuthSession(fakeSession()));
 
     await tester.pumpWidget(
       MaterialApp(
@@ -297,16 +235,38 @@ void main() {
       ),
     );
 
-    await tester.drag(
-      find.byType(SingleChildScrollView).first,
-      const Offset(0, -220),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Logout'));
+    expect(find.text(shortAddress(fakeWallet)), findsWidgets);
+    await tester.ensureVisible(find.text('Keluar'));
+    await tester.tap(find.text('Keluar'));
+    await tester.runAsync(pumpEventQueue);
     await tester.pump();
 
-    expect(farmState.walletConnected, isFalse);
+    expect(farmState.isLoggedIn, isFalse);
     expect(farmState.walletAddress, isEmpty);
+  });
+
+  testWidgets('status strip labels every service', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final farmState = FarmStateController();
+    addTearDown(farmState.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTaniinTheme(),
+        home: Scaffold(
+          body: StatusStrip(
+            farmState: farmState,
+            multiplayerOnline: false,
+            aiOnline: false,
+          ),
+        ),
+      ),
+    );
+
+    for (final label in <String>['Akun', 'Sepolia', 'Server', 'Multiplayer', 'AI']) {
+      expect(find.text(label), findsOneWidget);
+    }
+    expect(find.bySemanticsLabel(RegExp('Multiplayer: offline')), findsOneWidget);
   });
 
   test('persists planted plot state locally', () async {
@@ -405,7 +365,7 @@ void main() {
 
       expect(farmState.swapFromAsset, SwapAsset.taniSepolia);
       expect(farmState.swapToAsset, SwapAsset.gameCoin);
-      expect(farmState.swapSelectedAssets(), isTrue);
+      expect(await farmState.swapSelectedAssets(), isTrue);
       expect(farmState.coins, 660);
       expect(farmState.tani, 46);
 
@@ -413,60 +373,44 @@ void main() {
     },
   );
 
-  test('adds Game Coin after successful ETH Sepolia funding tx', () async {
+  test('ETH funding callback submits the payment hash to the server', () async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
-    _FakeChainClient? fakeClient;
+    late FakeChainClient fakeClient;
     final farmState = FarmStateController(
-      chainClientFactory: (config) {
-        fakeClient = _FakeChainClient(config);
-        return fakeClient!;
-      },
+      chainClientFactory: (config) => fakeClient = FakeChainClient(config),
     );
     addTearDown(farmState.dispose);
-
     farmState.configureChain(const ChainConfig(gameApiUrl: 'https://api.test'));
-    farmState
-      ..walletConnected = true
-      ..walletAddress = '0x0000000000000000000000000000000000000001'
-      ..walletNativeBalance = '0.001'
-      ..walletNativeWei = '1000000000000000'
-      ..ethWeiPerCoin = '10000000000'
-      ..maxEthPayoutWei = '1000000000000';
+    await farmState.applyAuthSession(fakeSession());
+    fakeClient.serverState = <String, Object?>{'coins': 820};
 
-    farmState.setSwapFromAsset(SwapAsset.ethSepolia);
-    farmState.setSwapToAsset(SwapAsset.gameCoin);
-    farmState.setSwapAmount(25);
+    await farmState.handleFundCallback(
+      const FundCallback(txHash: fakeTxHash, amount: 200),
+    );
 
-    expect(farmState.ethCoinCapacity, 100);
-    expect(farmState.swapSelectedAssets(), isTrue);
-    expect(farmState.coins, 620);
-
-    await Future<void>.delayed(Duration.zero);
-
-    expect(fakeClient?.actions.single.type, 'SWAP_ETH_COIN');
-    expect(farmState.coins, 645);
-    expect(farmState.history.first.txHash, _validTxHash);
-    expect(farmState.history.first.status, 'on-chain');
+    expect(fakeClient.actions.single.type, 'SWAP_ETH_COIN');
+    expect(fakeClient.actions.single.paymentTxHash, fakeTxHash);
+    expect(fakeClient.actions.single.amount, 200);
+    expect(farmState.coins, 820);
+    expect(farmState.history.first.txHash, fakeTxHash);
   });
 
   test('keeps ETH payout pending until Sepolia receipt confirms', () async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
-    _FakeChainClient? fakeClient;
+    late FakeChainClient fakeClient;
     final farmState = FarmStateController(
-      chainClientFactory: (config) {
-        fakeClient = _FakeChainClient(config)
-          ..receiptState = ChainReceiptState.pending(
-            'Transaksi fake belum confirmed.',
-          );
-        return fakeClient!;
-      },
+      chainClientFactory: (config) => fakeClient = FakeChainClient(config)
+        ..receiptState = ChainReceiptState.pending(
+          'Transaksi fake belum confirmed.',
+        ),
     );
     addTearDown(farmState.dispose);
 
     farmState.configureChain(const ChainConfig(gameApiUrl: 'https://api.test'));
+    await farmState.applyAuthSession(fakeSession());
+    await pumpEventQueue();
+    fakeClient.serverState = <String, Object?>{'coins': 600};
     farmState
-      ..walletConnected = true
-      ..walletAddress = '0x0000000000000000000000000000000000000001'
       ..walletNativeBalance = '0.001'
       ..walletNativeWei = '1000000000000000'
       ..ethWeiPerCoin = '10000000000'
@@ -474,39 +418,36 @@ void main() {
 
     farmState.setSwapFromAsset(SwapAsset.gameCoin);
     farmState.setSwapToAsset(SwapAsset.ethSepolia);
-    farmState.setSwapAmount(20);
+    farmState.setSwapAmount(100);
 
-    expect(farmState.swapSelectedAssets(), isTrue);
+    expect(await farmState.swapSelectedAssets(), isTrue);
+    await pumpEventQueue();
+
+    expect(fakeClient.actions.single.type, 'SWAP_COIN_ETH');
     expect(farmState.coins, 600);
-
-    await Future<void>.delayed(Duration.zero);
-
-    expect(fakeClient?.actions.single.type, 'SWAP_COIN_ETH');
-    expect(farmState.coins, 600);
-    expect(farmState.history.first.txHash, _validTxHash);
+    expect(farmState.history.first.txHash, fakeTxHash);
     expect(farmState.history.first.status, 'menunggu konfirmasi');
     expect(farmState.chainStatus, contains('belum confirmed'));
   });
 
   test('confirms ETH payout after wallet Sepolia balance increases', () async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
-    _FakeChainClient? fakeClient;
+    late FakeChainClient fakeClient;
     final farmState = FarmStateController(
-      chainClientFactory: (config) {
-        fakeClient = _FakeChainClient(config)
-          ..nativeEth = '0.003'
-          ..nativeWei = '3000000000000000'
-          ..ethWeiPerCoin = '100000000000000'
-          ..maxEthPayoutWei = '100000000000000000';
-        return fakeClient!;
-      },
+      chainClientFactory: (config) => fakeClient = FakeChainClient(config)
+        ..nativeEth = '0.011'
+        ..nativeWei = '11000000000000000'
+        ..ethWeiPerCoin = '100000000000000'
+        ..maxEthPayoutWei = '100000000000000000',
     );
     addTearDown(farmState.dispose);
 
     farmState.configureChain(const ChainConfig(gameApiUrl: 'https://api.test'));
+    await farmState.applyAuthSession(fakeSession());
+    await pumpEventQueue();
+    fakeClient.serverState = <String, Object?>{'coins': 520};
+    final loadsBefore = fakeClient.walletLoads;
     farmState
-      ..walletConnected = true
-      ..walletAddress = '0x0000000000000000000000000000000000000001'
       ..walletNativeBalance = '0.001'
       ..walletNativeWei = '1000000000000000'
       ..ethWeiPerCoin = '100000000000000'
@@ -514,22 +455,19 @@ void main() {
 
     farmState.setSwapFromAsset(SwapAsset.gameCoin);
     farmState.setSwapToAsset(SwapAsset.ethSepolia);
-    farmState.setSwapAmount(20);
+    farmState.setSwapAmount(100);
 
     expect(
-      farmState.swapCardAmountLabel(SwapAsset.ethSepolia, 20, to: true),
-      '+0.002 ETH',
+      farmState.swapCardAmountLabel(SwapAsset.ethSepolia, 100, to: true),
+      '+0.01 ETH',
     );
-    expect(farmState.swapSelectedAssets(), isTrue);
-    expect(farmState.coins, 600);
-
+    expect(await farmState.swapSelectedAssets(), isTrue);
     await pumpEventQueue();
 
-    expect(fakeClient?.actions.single.type, 'SWAP_COIN_ETH');
-    expect(fakeClient?.walletLoads, 1);
-    expect(farmState.walletNativeBalance, '0.003');
-    expect(farmState.history.first.txHash, _validTxHash);
+    expect(fakeClient.actions.single.type, 'SWAP_COIN_ETH');
+    expect(fakeClient.walletLoads, greaterThan(loadsBefore));
+    expect(farmState.walletNativeBalance, '0.011');
     expect(farmState.history.first.status, 'on-chain');
-    expect(farmState.chainStatus, contains('Payout +0.002 ETH confirmed'));
+    expect(farmState.chainStatus, contains('Payout +0.01 ETH confirmed'));
   });
 }

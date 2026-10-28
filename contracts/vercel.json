@@ -1,66 +1,128 @@
 {
+  "buildCommand": "npm run build:masuk",
+  "outputDirectory": "public",
   "headers": [
-    {
-      "source": "/",
-      "headers": [
-        { "key": "Cache-Control", "value": "no-store, max-age=0" },
-        { "key": "CDN-Cache-Control", "value": "no-store" },
-        { "key": "Cloudflare-CDN-Cache-Control", "value": "no-store" }
-      ]
-    },
-    {
-      "source": "/index.html",
-      "headers": [
-        { "key": "Cache-Control", "value": "no-store, max-age=0" },
-        { "key": "CDN-Cache-Control", "value": "no-store" },
-        { "key": "Cloudflare-CDN-Cache-Control", "value": "no-store" }
-      ]
-    },
-    {
-      "source": "/flutter_bootstrap.js",
-      "headers": [
-        { "key": "Cache-Control", "value": "no-store, max-age=0" },
-        { "key": "CDN-Cache-Control", "value": "no-store" },
-        { "key": "Cloudflare-CDN-Cache-Control", "value": "no-store" }
-      ]
-    },
-    {
-      "source": "/main.dart.js",
-      "headers": [
-        { "key": "Cache-Control", "value": "no-store, max-age=0" },
-        { "key": "CDN-Cache-Control", "value": "no-store" },
-        { "key": "Cloudflare-CDN-Cache-Control", "value": "no-store" }
-      ]
-    },
     {
       "source": "/flutter_service_worker.js",
       "headers": [
-        { "key": "Cache-Control", "value": "no-store, max-age=0" },
-        { "key": "CDN-Cache-Control", "value": "no-store" },
-        { "key": "Cloudflare-CDN-Cache-Control", "value": "no-store" }
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
+      ]
+    },
+    {
+      "source": "/main/(index.html|flutter_bootstrap.js|flutter_service_worker.js|main.dart.js|main.dart.wasm|main.dart.mjs|version.json)?",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "CDN-Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "Cloudflare-CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/main/(assets|canvaskit)/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400"
+        }
+      ]
+    },
+    {
+      "source": "/img/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=2592000"
+        }
+      ]
+    },
+    {
+      "source": "/masuk/(chunk|masuk)-(.*).js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        }
       ]
     }
   ],
   "rewrites": [
     {
-      "source": "/game-actions",
-      "destination": "/api/game-actions"
-    },
-    {
       "source": "/health",
       "destination": "/api/health"
     },
     {
-      "source": "/auth/nonce",
-      "destination": "/api/auth-nonce"
+      "source": "/auth/privy",
+      "destination": "/api/auth/privy"
     },
     {
-      "source": "/auth/verify",
-      "destination": "/api/auth-verify"
+      "source": "/auth/code",
+      "destination": "/api/auth/code"
     },
     {
-      "source": "/wallet-connect",
-      "destination": "/api/wallet-connect"
+      "source": "/auth/logout",
+      "destination": "/api/auth/logout"
+    },
+    {
+      "source": "/player",
+      "destination": "/api/player"
+    },
+    {
+      "source": "/player/import",
+      "destination": "/api/player/import"
+    },
+    {
+      "source": "/game-actions",
+      "destination": "/api/game-actions"
+    }
+  ],
+  "functions": {
+    "api/[...path].js": {
+      "maxDuration": 60
+    }
+  },
+  "redirects": [
+    {
+      "source": "/main",
+      "destination": "/main/",
+      "permanent": true
+    },
+    {
+      "source": "/unduh",
+      "destination": "https://github.com/rhmatzeka/TaniinPlaytoEarn/releases/download/apk-terbaru/Taniin.apk",
+      "permanent": false
+    },
+    {
+      "source": "/unduh/Taniin.apk",
+      "destination": "https://github.com/rhmatzeka/TaniinPlaytoEarn/releases/download/apk-terbaru/Taniin.apk",
+      "permanent": false
     }
   ]
 }

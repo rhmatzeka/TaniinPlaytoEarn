@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -42,14 +41,14 @@ class _WalletPanelState extends State<WalletPanel> {
     final contentProminent = widget.prominent && !compact;
     final title =
         widget.title ??
-        (farmState.walletConnected ? 'Ganti Wallet' : 'Connect Wallet');
+        (farmState.isLoggedIn ? 'Akun Taniin' : 'Masuk');
     final subtitle =
         widget.subtitle ??
         (farmState.walletIsBackendSigner
             ? 'Wallet signer backend'
-            : farmState.walletConnected
-            ? 'Sepolia wallet aktif'
-            : 'Sepolia network');
+            : farmState.isLoggedIn
+            ? 'Wallet Sepolia ${shortAddress(farmState.walletAddress)}'
+            : 'Simpan panen di Sepolia');
     final margin = compact ? 28.0 : (widget.prominent ? 56.0 : 72.0);
     final maxWidth = math.min(
       math.max(292.0, media.width - margin),
@@ -71,7 +70,7 @@ class _WalletPanelState extends State<WalletPanel> {
             _WalletPanelHeader(
               title: title,
               subtitle: subtitle,
-              connected: farmState.walletConnected,
+              connected: farmState.isLoggedIn,
               backendSigner: farmState.walletIsBackendSigner,
               prominent: contentProminent,
               compact: compact,
@@ -103,32 +102,30 @@ class _WalletPanelState extends State<WalletPanel> {
                       children: [
                         _StatusBox(
                           text: farmState.chainStatus,
-                          connected: farmState.walletConnected,
+                          connected: farmState.isLoggedIn,
                           prominent: contentProminent,
                         ),
                         SizedBox(height: contentProminent ? 24 : 14),
-                        SizedBox(
-                          width: double.infinity,
-                          child: _WalletActionButton(
-                            label: 'Pilih Wallet',
-                            icon: Icons.account_balance_wallet,
-                            color: const Color(0xFFB85B1E),
+                        if (!farmState.isLoggedIn) ...[
+                          _WalletActionButton(
+                            label: 'Masuk dengan Privy',
+                            icon: Icons.login,
+                            color: const Color(0xFFD68127),
                             prominent: contentProminent,
-                            onPressed: _openWalletConnect,
+                            onPressed: farmState.canLogin ? _openLogin : null,
                           ),
-                        ),
-                        const SizedBox(height: 14),
-                        Text(
-                          'Pilih wallet yang kamu miliki. Taniin tidak meminta seed phrase atau private key.',
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: const Color(0xFFE9C692)),
-                        ),
-                        if (widget.showFacts) ...[
-                          const SizedBox(height: 16),
-                          _WalletFacts(farmState: farmState),
-                        ],
-                        if (farmState.walletConnected) ...[
+                          const SizedBox(height: 14),
+                          Text(
+                            farmState.canLogin
+                                ? 'Masuk pakai email, Google, atau wallet. Wallet Sepolia dibuat otomatis, '
+                                      'dan progres tamumu ikut dibawa.'
+                                : 'Server login belum tersedia di build ini. Kamu tetap bisa main sebagai tamu.',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: const Color(0xFFE9C692)),
+                          ),
+                        ] else ...[
+                          _AccountRow(farmState: farmState),
                           const SizedBox(height: 14),
                           Wrap(
                             spacing: 12,
@@ -143,64 +140,26 @@ class _WalletPanelState extends State<WalletPanel> {
                                 onPressed: _syncBalance,
                               ),
                               _WalletActionButton(
-                                label: 'Buka Etherscan',
+                                label: 'Etherscan',
                                 icon: Icons.open_in_new,
                                 color: const Color(0xFF496A8A),
                                 prominent: contentProminent,
                                 onPressed: _openExplorer,
                               ),
+                              _WalletActionButton(
+                                label: 'Keluar',
+                                icon: Icons.logout,
+                                color: const Color(0xFF8B2F23),
+                                prominent: contentProminent,
+                                onPressed: _logout,
+                              ),
                             ],
                           ),
                         ],
-                        SizedBox(height: contentProminent ? 26 : 18),
-                        if (compact || widget.prominent)
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              if (farmState.walletConnected) ...[
-                                _WalletActionButton(
-                                  label: 'Logout',
-                                  icon: Icons.logout,
-                                  color: const Color(0xFF8B2F23),
-                                  prominent: contentProminent,
-                                  onPressed: _logoutWallet,
-                                ),
-                                const SizedBox(height: 12),
-                              ],
-                              if (!farmState.walletConnected)
-                                _WalletActionButton(
-                                  label: 'Pilih Wallet',
-                                  icon: Icons.account_balance_wallet,
-                                  color: const Color(0xFFD68127),
-                                  prominent: contentProminent,
-                                  onPressed: _openWalletConnect,
-                                ),
-                            ],
-                          )
-                        else
-                          Wrap(
-                            alignment: WrapAlignment.end,
-                            spacing: 14,
-                            runSpacing: 12,
-                            children: [
-                              if (farmState.walletConnected)
-                                _WalletActionButton(
-                                  label: 'Logout',
-                                  icon: Icons.logout,
-                                  color: const Color(0xFF8B2F23),
-                                  prominent: contentProminent,
-                                  onPressed: _logoutWallet,
-                                ),
-                              if (!farmState.walletConnected)
-                                _WalletActionButton(
-                                  label: 'Pilih Wallet',
-                                  icon: Icons.account_balance_wallet,
-                                  color: const Color(0xFFD68127),
-                                  prominent: contentProminent,
-                                  onPressed: _openWalletConnect,
-                                ),
-                            ],
-                          ),
+                        if (widget.showFacts) ...[
+                          const SizedBox(height: 16),
+                          _WalletFacts(farmState: farmState),
+                        ],
                       ],
                     ),
                   ),
@@ -213,32 +172,21 @@ class _WalletPanelState extends State<WalletPanel> {
     );
   }
 
-  Future<void> _openWalletConnect() async {
+  Future<void> _openLogin() async {
     farmState.playClick();
-    final url = PlatformBridge.walletConnectUrl(farmState.chainConfig);
-    if (url.isEmpty) {
-      farmState.showMessage(
-        'TANIIN_GAME_API_URL belum diset untuk connect wallet app.',
-        success: false,
-      );
-      return;
-    }
-    final opened = await PlatformBridge.openUrl(url);
+    final url = await farmState.prepareLoginUrl();
+    final opened = url.isNotEmpty && await PlatformBridge.openUrl(url, sameTab: true);
     farmState.showMessage(
-      opened
-          ? 'Membuka halaman connect wallet...'
-          : 'Tidak bisa membuka wallet connect di perangkat ini.',
+      opened ? 'Membuka halaman masuk...' : 'Halaman masuk tidak bisa dibuka.',
       success: opened,
     );
-    if (opened) {
-      if (widget.showCloseButton) {
-        widget.onClose();
-      }
+    if (opened && widget.showCloseButton) {
+      widget.onClose();
     }
   }
 
-  void _logoutWallet() {
-    farmState.disconnectWallet();
+  Future<void> _logout() async {
+    await farmState.logout();
     if (widget.showCloseButton) {
       widget.onClose();
     }
@@ -425,6 +373,48 @@ class _StatusBox extends StatelessWidget {
   }
 }
 
+class _AccountRow extends StatelessWidget {
+  const _AccountRow({required this.farmState});
+
+  final FarmStateController farmState;
+
+  @override
+  Widget build(BuildContext context) {
+    final method = switch (farmState.session?.loginMethod) {
+      'google' => 'Google',
+      'email' => 'Email',
+      'wallet' => 'Wallet',
+      _ => 'Privy',
+    };
+    return Semantics(
+      label: 'Masuk lewat $method dengan wallet ${farmState.walletAddress}',
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.verified_user, color: Color(0xFF9BE58F), size: 22),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              shortAddress(farmState.walletAddress),
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: const Color(0xFFFFF0D4),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'via $method',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: const Color(0xFFE9C692),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _WalletFacts extends StatelessWidget {
   const _WalletFacts({required this.farmState});
 
@@ -439,9 +429,9 @@ class _WalletFacts extends StatelessWidget {
         _FactChip(
           icon: Icons.account_balance_wallet,
           label: 'Wallet',
-          value: farmState.walletConnected
+          value: farmState.isLoggedIn
               ? shortAddress(farmState.walletAddress)
-              : 'belum connect',
+              : 'tamu',
         ),
         _FactChip(
           icon: Icons.bolt,

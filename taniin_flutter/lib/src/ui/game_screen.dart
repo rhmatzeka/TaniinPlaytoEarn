@@ -16,7 +16,6 @@ import 'loading_overlay.dart';
 import 'physical_viewport.dart';
 import 'profile_panel.dart';
 import 'settings_panel.dart';
-import 'wallet_panel.dart';
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
@@ -48,8 +47,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _farmState = FarmStateController(onSfx: () => _audio.playClick());
     _farmState.addListener(_syncAudio);
     _multiplayerClient = MultiplayerClient(_farmState);
-    PlatformBridge.setWalletAddressHandler(
-      _farmState.connectWalletFromDeepLink,
+    PlatformBridge.setAuthCallbackHandler(
+      (fragment) => unawaited(_farmState.handleAuthFragment(fragment)),
     );
     _game = TaniinGame(_farmState, _multiplayerClient);
     _game.walkingNotifier.addListener(_syncWalkAudio);
@@ -60,7 +59,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    PlatformBridge.setWalletAddressHandler(null);
+    PlatformBridge.setAuthCallbackHandler(null);
     _farmState.removeListener(_syncAudio);
     _game.walkingNotifier.removeListener(_syncWalkAudio);
     _game.loadingComplete.dispose();
@@ -91,9 +90,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     }
     _farmState.configureChain(config);
     _multiplayerClient.start();
-    final launchWalletAddress = PlatformBridge.launchWalletAddress();
-    if (launchWalletAddress.isNotEmpty) {
-      unawaited(_farmState.connectWalletFromDeepLink(launchWalletAddress));
+    final launchFragment = PlatformBridge.launchAuthFragment();
+    if (launchFragment.isNotEmpty) {
+      unawaited(_farmState.handleAuthFragment(launchFragment));
     }
   }
 
@@ -182,7 +181,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       _gameMounted &&
       _loadingFinished &&
       _appInForeground &&
-      _farmState.walletConnected &&
       _activePanel == null &&
       !_chatTyping;
 
@@ -282,10 +280,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           child: AnimatedBuilder(
             animation: _farmState,
             builder: (context, _) {
-              final startupReady = _gameMounted && _loadingFinished;
-              final needsWalletLogin =
-                  startupReady && !_farmState.walletConnected;
-              final canShowGameHud = startupReady && _farmState.walletConnected;
+              // Guests play right away; logging in is optional (wallet button).
+              final canShowGameHud = _gameMounted && _loadingFinished;
               return Stack(
                 children: [
                   if (_gameMounted) ...[
@@ -312,10 +308,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                               ),
                       ),
                     ],
-                    if (needsWalletLogin)
-                      Positioned.fill(
-                        child: _WalletLoginGate(farmState: _farmState),
-                      ),
                   ] else
                     const Positioned.fill(child: _LoadingBackdrop()),
                   Positioned.fill(
@@ -382,37 +374,6 @@ bool _isMovementKey(LogicalKeyboardKey key) =>
     _rightMovementKeys.contains(key) ||
     _upMovementKeys.contains(key) ||
     _downMovementKeys.contains(key);
-
-class _WalletLoginGate extends StatelessWidget {
-  const _WalletLoginGate({required this.farmState});
-
-  final FarmStateController farmState;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        const _LoadingBackdrop(),
-        const ColoredBox(color: Color(0x7A102015)),
-        PhysicalViewport(
-          alignment: Alignment.center,
-          child: Center(
-            child: WalletPanel(
-              farmState: farmState,
-              onClose: () {},
-              showCloseButton: false,
-              prominent: true,
-              showFacts: false,
-              title: 'Login Wallet',
-              subtitle: 'Connect wallet dulu untuk mulai bermain',
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 class _LoadingBackdrop extends StatelessWidget {
   const _LoadingBackdrop();

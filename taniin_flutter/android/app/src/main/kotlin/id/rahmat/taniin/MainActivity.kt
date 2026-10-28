@@ -34,7 +34,7 @@ class MainActivity : FlutterActivity() {
     private var audioBridge: AndroidAudioBridge? = null
     private var platformChannel: MethodChannel? = null
     private var splashOverlay: View? = null
-    private var pendingWalletAddress = ""
+    private var pendingAuthFragment = ""
     private val flutterUiDisplayListener = object : FlutterUiDisplayListener {
         override fun onFlutterUiDisplayed() {
             window.decorView.postDelayed({ removeNativeSplashOverlay() }, 120L)
@@ -48,14 +48,14 @@ class MainActivity : FlutterActivity() {
         configureFullscreenWindow()
         super.onCreate(savedInstanceState)
         installNativeSplashOverlay()
-        handleWalletIntent(intent)
+        handleAuthIntent(intent)
         scheduleHideSystemUi()
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        handleWalletIntent(intent)
+        handleAuthIntent(intent)
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -76,7 +76,7 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
-        deliverPendingWalletAddress()
+        deliverPendingAuthFragment()
     }
 
     override fun onResume() {
@@ -153,27 +153,28 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun handleWalletIntent(intent: Intent?) {
+    // The login page returns with taniin://auth#session=...; Dart validates the fragment.
+    private fun handleAuthIntent(intent: Intent?) {
         val data: Uri = intent?.data ?: return
-        if (data.scheme != "taniin" || data.host != "wallet") {
+        if (data.scheme != "taniin" || data.host != "auth") {
             return
         }
-        val address = data.getQueryParameter("address")?.trim().orEmpty()
-        if (address.isEmpty()) {
+        val fragment = data.encodedFragment?.trim().orEmpty()
+        if (fragment.isEmpty()) {
             return
         }
-        pendingWalletAddress = address
-        deliverPendingWalletAddress()
+        pendingAuthFragment = fragment
+        deliverPendingAuthFragment()
     }
 
-    private fun deliverPendingWalletAddress() {
-        val address = pendingWalletAddress
+    private fun deliverPendingAuthFragment() {
+        val fragment = pendingAuthFragment
         val channel = platformChannel
-        if (address.isEmpty() || channel == null) {
+        if (fragment.isEmpty() || channel == null) {
             return
         }
-        pendingWalletAddress = ""
-        channel.invokeMethod("walletAddress", address)
+        pendingAuthFragment = ""
+        channel.invokeMethod("authCallback", fragment)
     }
 
     private fun chainConfig(): Map<String, String> = mapOf(
@@ -182,7 +183,7 @@ class MainActivity : FlutterActivity() {
         "itemsContractAddress" to BuildConfig.TANIIN_ITEMS_CONTRACT_ADDRESS,
         "landContractAddress" to BuildConfig.TANIIN_LAND_CONTRACT_ADDRESS,
         "gameApiUrl" to BuildConfig.TANIIN_GAME_API_URL,
-        "defaultWalletAddress" to BuildConfig.TANIIN_DEFAULT_WALLET_ADDRESS,
+        "multiplayerUrl" to BuildConfig.TANIIN_MULTIPLAYER_URL,
     )
 
     private fun openUrl(url: String): Boolean {

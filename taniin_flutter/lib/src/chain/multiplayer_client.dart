@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../state/farm_state.dart';
@@ -122,24 +121,22 @@ class MultiplayerClient extends ChangeNotifier {
     }
   }
 
-  String _resolveHost() {
-    final configured = farmState.chainConfig.gameApiUrl.trim();
-    if (configured.isNotEmpty) {
-      return configured;
-    }
-    // On web with no explicit API URL, use the current site origin.
-    if (kIsWeb) {
-      final origin = Uri.base.origin;
-      if (origin.isNotEmpty && !origin.startsWith('file')) {
-        return origin;
-      }
-    }
-    return 'http://127.0.0.1:8787';
-  }
+  // Multiplayer runs on its own always-on server (srv), not on Vercel.
+  String _resolveHost() => farmState.chainConfig.multiplayerUrl.trim();
 
   /// Reconnects using the latest chain config (call after chain config loads).
   void start() {
     final host = _resolveHost();
+    if (host.isEmpty) {
+      _socket?.dispose();
+      _socket = null;
+      _connectedHost = '';
+      if (connected) {
+        connected = false;
+        notifyListeners();
+      }
+      return;
+    }
     if (connected && host == _connectedHost) {
       return;
     }
@@ -162,6 +159,9 @@ class MultiplayerClient extends ChangeNotifier {
             .setTransports(<String>['websocket'])
             .disableAutoConnect()
             .enableForceNew()
+            .enableReconnection()
+            .setReconnectionDelay(2000)
+            .setReconnectionDelayMax(30000)
             .build(),
       );
 
@@ -306,14 +306,10 @@ class MultiplayerClient extends ChangeNotifier {
   }
 
   void _joinGame() {
-    final wallet = farmState.walletAddress.isNotEmpty
-        ? farmState.walletAddress
-        : 'local-wallet';
-    final name = farmState.playerName;
-
+    // The server derives the wallet from the session; guests get a Tamu name.
     _socket?.emit('join', <String, dynamic>{
-      'wallet': wallet,
-      'name': name,
+      'session': ?farmState.session?.token,
+      'name': farmState.playerName,
       'x': 18.5 * 128,
       'y': 28.5 * 128,
       'anim': 'idle',
@@ -625,32 +621,8 @@ class MultiplayerClient extends ChangeNotifier {
         ),
       );
 
-      // Call API serverless Vercel directly via HTTP POST
+      // Offline AI helper only changes the local farm; chain actions go through the server.
       try {
-        final hasApi = farmState.chainConfig.hasGameApi;
-        String actionType = '';
-        int amount = 1;
-
-        if (action.intent == 'buy') {
-          actionType = 'BUY_SEED';
-          amount = 3;
-        } else if (action.intent == 'sell') {
-          actionType = 'SELL_CROP';
-          amount = 3;
-        } else if (action.intent == 'withdraw') {
-          actionType = 'SWAP_COIN_ETH';
-          // Withdraw 50 game coin or current coin balance if lower
-          amount = math.min(50, farmState.coins);
-        } else if (action.intent == 'plant') {
-          actionType = 'PLANT';
-          amount =
-              (['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(action.seed) +
-              1);
-        } else if (action.intent == 'harvest') {
-          actionType = 'HARVEST';
-          amount = 1;
-        }
-
         if (!_isLocalAiActionStillValid(action)) {
           _appendMessage(
             ChatMessage(
@@ -668,18 +640,6 @@ class MultiplayerClient extends ChangeNotifier {
           return;
         }
 
-        final res = hasApi
-            ? await _submitChainActionWithRetry(
-                aiAgent!.wallet,
-                actionType,
-                action.plotNum,
-                amount,
-              )
-            : null;
-
-        final tx = (res != null && res.isNotEmpty)
-            ? res.substring(0, 8)
-            : 'lokal';
 
         if (action.intent == 'plant') {
           onAiPlanted?.call(
@@ -691,173 +651,71 @@ class MultiplayerClient extends ChangeNotifier {
               sender: aiAgent!.name,
               wallet: aiAgent!.wallet,
               text:
-                  'Bagus! Benih ${action.seed} ditanam di Lahan ${action.plotNum}. (Tx: $tx)',
+                  'Bagus! Benih ${action.seed} ditanam di Lahan ${action.plotNum}.',
               time: time,
             ),
           );
-          final entryId = farmState.addExternalHistory(
+          farmState.addExternalHistory(
             'Tanam ${action.seed}',
             'plot ${action.plotNum}',
-            tx != 'lokal' ? 'menunggu konfirmasi' : 'lokal tersimpan',
-            txHash: tx != 'lokal' ? res ?? '' : '',
+            'lokal tersimpan',
+            txHash: '',
           );
-          if (tx != 'lokal') {
-            unawaited(() async {
-              try {
-                final receipt = await farmState.chainClient.waitForTransaction(
-                  res!,
-                );
-                if (receipt.confirmed && receipt.success) {
-                  farmState.updateHistoryStatus(entryId, status: 'on-chain');
-                } else {
-                  farmState.updateHistoryStatus(
-                    entryId,
-                    status: 'gagal on-chain',
-                    errorMessage: receipt.message,
-                  );
-                }
-              } catch (_) {}
-            }());
-          }
         } else if (action.intent == 'harvest') {
           onAiHarvested?.call(action.plotNum - 1);
           _appendMessage(
             ChatMessage(
               sender: aiAgent!.name,
               wallet: aiAgent!.wallet,
-              text: 'Sukses! Hasil panen berhasil diambil. (Tx: $tx)',
+              text: 'Sukses! Hasil panen berhasil diambil.',
               time: time,
             ),
           );
-          final entryId = farmState.addExternalHistory(
-            'Panen ${['Kentang', 'Bawang', 'Stroberi', 'Bit'][['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(action.seed) != -1 ? ['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(action.seed) : 0]}',
+          farmState.addExternalHistory(
+            'Panen ${const <String>['Kentang', 'Bawang', 'Stroberi', 'Bit'].contains(action.seed) ? action.seed : 'Kentang'}',
             '+3 panen',
-            tx != 'lokal' ? 'menunggu konfirmasi' : 'lokal tersimpan',
-            txHash: tx != 'lokal' ? res ?? '' : '',
+            'lokal tersimpan',
+            txHash: '',
           );
-          if (tx != 'lokal') {
-            unawaited(() async {
-              try {
-                final receipt = await farmState.chainClient.waitForTransaction(
-                  res!,
-                );
-                if (receipt.confirmed && receipt.success) {
-                  farmState.updateHistoryStatus(entryId, status: 'on-chain');
-                } else {
-                  farmState.updateHistoryStatus(
-                    entryId,
-                    status: 'gagal on-chain',
-                    errorMessage: receipt.message,
-                  );
-                }
-              } catch (_) {}
-            }());
-          }
         } else if (action.intent == 'buy') {
           _appendMessage(
             ChatMessage(
               sender: aiAgent!.name,
               wallet: aiAgent!.wallet,
-              text: 'Selesai! Saya membeli 3 benih ${action.seed}. (Tx: $tx)',
+              text: 'Selesai! Saya membeli 3 benih ${action.seed}.',
               time: time,
             ),
           );
-          final entryId = farmState.addExternalHistory(
+          farmState.addExternalHistory(
             'Beli ${action.seed}',
             '-60 coin',
-            tx != 'lokal' ? 'menunggu konfirmasi' : 'lokal tersimpan',
-            txHash: tx != 'lokal' ? res ?? '' : '',
+            'lokal tersimpan',
+            txHash: '',
           );
-          if (tx != 'lokal') {
-            unawaited(() async {
-              try {
-                final receipt = await farmState.chainClient.waitForTransaction(
-                  res!,
-                );
-                if (receipt.confirmed && receipt.success) {
-                  farmState.updateHistoryStatus(entryId, status: 'on-chain');
-                } else {
-                  farmState.updateHistoryStatus(
-                    entryId,
-                    status: 'gagal on-chain',
-                    errorMessage: receipt.message,
-                  );
-                }
-              } catch (_) {}
-            }());
-          }
         } else if (action.intent == 'sell') {
           _appendMessage(
             ChatMessage(
               sender: aiAgent!.name,
               wallet: aiAgent!.wallet,
-              text: 'Hore! Seluruh hasil panen terjual. (Tx: $tx)',
+              text: 'Hore! Seluruh hasil panen terjual.',
               time: time,
             ),
           );
-          final entryId = farmState.addExternalHistory(
+          farmState.addExternalHistory(
             'Jual panen Kentang',
             '+105 coin',
-            tx != 'lokal' ? 'menunggu konfirmasi' : 'lokal tersimpan',
-            txHash: tx != 'lokal' ? res ?? '' : '',
+            'lokal tersimpan',
+            txHash: '',
           );
-          if (tx != 'lokal') {
-            unawaited(() async {
-              try {
-                final receipt = await farmState.chainClient.waitForTransaction(
-                  res!,
-                );
-                if (receipt.confirmed && receipt.success) {
-                  farmState.updateHistoryStatus(entryId, status: 'on-chain');
-                } else {
-                  farmState.updateHistoryStatus(
-                    entryId,
-                    status: 'gagal on-chain',
-                    errorMessage: receipt.message,
-                  );
-                }
-              } catch (_) {}
-            }());
-          }
         } else if (action.intent == 'withdraw') {
-          // Subtract coins locally since it's simulated in Local AI Mode
-          if (farmState.coins >= amount) {
-            farmState.coins -= amount;
-            farmState.notifyExternalChange();
-          }
           _appendMessage(
             ChatMessage(
               sender: aiAgent!.name,
               wallet: aiAgent!.wallet,
-              text:
-                  'Withdraw $amount Game Coin ke ETH Sepolia berhasil! (Tx: $tx)',
+              text: 'Payout ETH hanya bisa lewat Rumah Swap setelah kamu masuk dengan Privy.',
               time: time,
             ),
           );
-          final entryId = farmState.addExternalHistory(
-            'Payout Game Coin ke ETH',
-            '-$amount coin',
-            tx != 'lokal' ? 'menunggu konfirmasi' : 'lokal tersimpan',
-            txHash: tx != 'lokal' ? res ?? '' : '',
-          );
-          if (tx != 'lokal') {
-            unawaited(() async {
-              try {
-                final receipt = await farmState.chainClient.waitForTransaction(
-                  res!,
-                );
-                if (receipt.confirmed && receipt.success) {
-                  farmState.updateHistoryStatus(entryId, status: 'on-chain');
-                } else {
-                  farmState.updateHistoryStatus(
-                    entryId,
-                    status: 'gagal on-chain',
-                    errorMessage: receipt.message,
-                  );
-                }
-              } catch (_) {}
-            }());
-          }
         }
       } catch (e) {
         _appendMessage(
@@ -891,17 +749,6 @@ class MultiplayerClient extends ChangeNotifier {
               'lokal tersimpan',
             );
           }
-        } else if (action.intent == 'withdraw') {
-          final amount = math.min(50, farmState.coins);
-          if (farmState.coins >= amount) {
-            farmState.coins -= amount;
-            farmState.notifyExternalChange();
-          }
-          farmState.addExternalHistory(
-            'Payout Game Coin ke ETH',
-            '-$amount coin',
-            'lokal tersimpan',
-          );
         }
       }
 
@@ -912,33 +759,6 @@ class MultiplayerClient extends ChangeNotifier {
         () => _processNextLocalAiAction(time),
       );
     });
-  }
-
-  Future<String> _submitChainActionWithRetry(
-    String wallet,
-    String actionType,
-    int plotNum,
-    int amount,
-  ) async {
-    try {
-      return await farmState.submitChainActionDirectly(
-        wallet,
-        actionType,
-        plotNum,
-        amount,
-      );
-    } catch (e) {
-      if (!e.toString().toLowerCase().contains('replacement fee too low')) {
-        rethrow;
-      }
-      await Future<void>.delayed(const Duration(milliseconds: 1800));
-      return farmState.submitChainActionDirectly(
-        wallet,
-        actionType,
-        plotNum,
-        amount,
-      );
-    }
   }
 
   bool _isLocalAiActionStillValid(LocalAiAction action) {

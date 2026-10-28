@@ -1,0 +1,28 @@
+[Unit]
+Description=Taniin multiplayer + Pak Tani AI (Socket.IO)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+DynamicUser=yes
+EnvironmentFile=/etc/taniin/mp.env
+WorkingDirectory=/opt/taniin-mp
+ExecStart=/usr/bin/node /opt/taniin-mp/scripts/game-api.cjs
+Restart=always
+RestartSec=5
+MemoryMax=192M
+CPUQuota=40%
+TasksMax=64
+LimitNOFILE=2048
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

@@ -1,15 +1,19 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'api_http_exception.dart';
+
 Future<String> postJson(
   String url,
   String payload, {
   required Duration timeout,
+  Map<String, String> headers = const <String, String>{},
 }) async {
   final client = HttpClient()..connectionTimeout = timeout;
   try {
     final request = await client.postUrl(Uri.parse(url)).timeout(timeout);
     request.headers.contentType = ContentType.json;
+    headers.forEach(request.headers.set);
     final body = utf8.encode(payload);
     request.contentLength = body.length;
     request.add(body);
@@ -20,11 +24,16 @@ Future<String> postJson(
   }
 }
 
-Future<String> getJson(String url, {required Duration timeout}) async {
+Future<String> getJson(
+  String url, {
+  required Duration timeout,
+  Map<String, String> headers = const <String, String>{},
+}) async {
   final client = HttpClient()..connectionTimeout = timeout;
   try {
     final request = await client.getUrl(Uri.parse(url)).timeout(timeout);
     request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+    headers.forEach(request.headers.set);
     final response = await request.close().timeout(timeout);
     return await _readHttpResponse(response, timeout: timeout);
   } finally {
@@ -39,9 +48,7 @@ Future<String> _readHttpResponse(
   final body = await response.transform(utf8.decoder).join().timeout(timeout);
   if (response.statusCode < 200 || response.statusCode >= 300) {
     final apiError = _extractApiError(body);
-    throw StateError(
-      'HTTP ${response.statusCode}${apiError.isEmpty ? ' $body' : ' $apiError'}',
-    );
+    throw ApiHttpException(response.statusCode, apiError.isEmpty ? body : apiError);
   }
   return body;
 }
