@@ -35,7 +35,12 @@ function createApp({ getDb, now = Date.now, multiplayerOnly = false }) {
       return;
     }
     try {
-      const pathname = new URL(req.url, "http://localhost").pathname.replace(/^\/api(?=\/)/, "").replace(/\/+$/, "");
+      // Vercel rewrites every public path to /api/router?route=<path>; locally the
+      // path arrives as-is.
+      const url = new URL(req.url, "http://localhost");
+      const pathname = (url.searchParams.get("route") || url.pathname)
+        .replace(/^\/api(?=\/)/, "")
+        .replace(/\/+$/, "");
       const route = routes[`${req.method} ${pathname || "/"}`];
       if (!route) throw httpError(404, "Endpoint tidak ditemukan.");
       const needsDb = pathname !== "/health";

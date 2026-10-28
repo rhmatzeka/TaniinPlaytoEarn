@@ -76,35 +76,35 @@
   "rewrites": [
     {
       "source": "/health",
-      "destination": "/api/health"
+      "destination": "/api/router?route=/health"
     },
     {
       "source": "/auth/privy",
-      "destination": "/api/auth/privy"
+      "destination": "/api/router?route=/auth/privy"
     },
     {
       "source": "/auth/code",
-      "destination": "/api/auth/code"
+      "destination": "/api/router?route=/auth/code"
     },
     {
       "source": "/auth/logout",
-      "destination": "/api/auth/logout"
+      "destination": "/api/router?route=/auth/logout"
     },
     {
       "source": "/player",
-      "destination": "/api/player"
+      "destination": "/api/router?route=/player"
     },
     {
       "source": "/player/import",
-      "destination": "/api/player/import"
+      "destination": "/api/router?route=/player/import"
     },
     {
       "source": "/game-actions",
-      "destination": "/api/game-actions"
+      "destination": "/api/router?route=/game-actions"
     }
   ],
   "functions": {
-    "api/[...path].js": {
+    "api/router.js": {
       "maxDuration": 60
     }
   },

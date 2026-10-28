@@ -211,6 +211,17 @@ describe("Game action API", function () {
     expect(health.json).to.deep.equal({ ok: true, multiplayer: true });
   });
 
+  it("routes by the route query that Vercel rewrites pass along", async function () {
+    const result = await call(app, {
+      method: "POST",
+      path: "/api/router?route=/auth/logout",
+      headers: { authorization: `Bearer ${session}` },
+      body: {}
+    });
+    expect(result.status).to.equal(200);
+    expect(result.json).to.deep.equal({ ok: true });
+  });
+
   it("reports health with the economy switch", async function () {
     const result = await call(app, { path: "/health" });
     expect(result.status).to.equal(200);
