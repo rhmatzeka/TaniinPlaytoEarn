@@ -151,5 +151,47 @@ void main() {
     farmState.prepareSwapAmount();
     expect(farmState.selectedSwapAmount, 40);
   });
+
+  test('web login only accepts a session fragment carrying our own state', () async {
+    final url = await farmState.prepareLoginUrl(forApp: false);
+    final state = Uri.parse(url).queryParameters['state']!;
+    String fragment(String s) => Uri(
+      queryParameters: <String, String>{
+        'session': 'a' * 64,
+        'wallet': fakeWallet,
+        'expires': DateTime.now().toUtc().add(const Duration(days: 1)).toIso8601String(),
+        'method': 'email',
+        'state': s,
+      },
+    ).query;
+
+    await farmState.handleAuthFragment(fragment('bukan-punya-kita-12345'));
+    expect(farmState.isLoggedIn, isFalse);
+
+    await farmState.handleAuthFragment(fragment(state));
+    expect(farmState.isLoggedIn, isTrue);
+  });
+
+  test('server plant times are read in the device clock', () {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final serverNow = now + 60000; // device clock runs a minute behind
+    farmState.applyServerState(<String, Object?>{
+      'serverTime': serverNow,
+      'plots': <Object?>[
+        <String, Object?>{'owned': true, 'seedIndex': 0, 'status': 'growing', 'plantedAt': serverNow - 13000},
+      ],
+    });
+    expect(farmState.plots.first.isReady(DateTime.now()), isTrue);
+  });
+
+  test('signed-in actions reach the server one at a time, in order', () async {
+    await farmState.applyAuthSession(fakeSession());
+    fake.actionDelay = const Duration(milliseconds: 20);
+    expect(farmState.buySeeds(0), isTrue);
+    expect(farmState.buySeeds(0), isTrue);
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    expect(fake.actions, hasLength(2));
+    expect(fake.maxInFlight, 1);
+  });
 }
 

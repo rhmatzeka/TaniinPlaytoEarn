@@ -9,6 +9,9 @@ const params = new URLSearchParams(window.location.search);
 const returnUrl = safeReturnUrl(params.get("return"));
 const mode = params.get("aksi") === "isi-eth" ? "isi-eth" : "masuk";
 const coinAmount = Number.parseInt(params.get("jumlah") || "0", 10);
+// Web logins carry a nonce the game stored before redirecting, so a crafted
+// link cannot sign someone into another account.
+const loginState = /^[A-Za-z0-9_-]{16,64}$/.test(params.get("state") || "") ? params.get("state") : "";
 // The Android app sends a PKCE challenge; it then receives a one-time code, not a session.
 const codeChallenge = /^[A-Za-z0-9_-]{43}$/.test(params.get("challenge") || "") ? params.get("challenge") : undefined;
 const WALLET_WAIT_MS = 15_000;
@@ -72,7 +75,8 @@ function LoginFlow() {
         session: result.session,
         wallet: result.wallet,
         expires: result.expiresAt,
-        method: result.loginMethod
+        method: result.loginMethod,
+        state: loginState
       });
     })().catch((error) => {
       exchanging.current = false;

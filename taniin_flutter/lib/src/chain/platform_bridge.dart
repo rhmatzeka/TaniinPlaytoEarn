@@ -87,6 +87,7 @@ class PlatformBridge {
     String aksi = 'masuk',
     int? jumlah,
     String? challenge,
+    String? state,
     bool? forApp,
   }) {
     if (!config.hasGameApi) {
@@ -102,6 +103,7 @@ class PlatformBridge {
         if (aksi != 'masuk') 'aksi': aksi,
         if (jumlah != null) 'jumlah': '$jumlah',
         'challenge': ?challenge,
+        'state': ?state,
       },
     ).toString();
   }
