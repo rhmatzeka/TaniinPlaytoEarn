@@ -1,4 +1,6 @@
 {
+  "buildCommand": "npm run build:masuk",
+  "outputDirectory": "public",
   "headers": [
     {
       "source": "/",

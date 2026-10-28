@@ -7,7 +7,8 @@
     "compile": "hardhat compile",
     "deploy:sepolia": "hardhat run scripts/deploy.cjs --network sepolia",
     "game-api": "node scripts/game-api.cjs",
-    "mint:tani": "hardhat run scripts/mint-tani.cjs --network sepolia"
+    "mint:tani": "hardhat run scripts/mint-tani.cjs --network sepolia",
+    "build:masuk": "npm --prefix masuk install --no-audit --no-fund && npm --prefix masuk run build"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.2.17",
@@ -21,8 +22,6 @@
     "ethers": "^6.13.4",
     "jose": "^5.9.6",
     "pg": "^8.13.1",
-    "react": "18.3.1",
-    "react-dom": "18.3.1",
     "socket.io": "^4.8.3"
   }
 }

@@ -27,3 +27,5 @@ contracts/cache/
 contracts/typechain-types/
 /idle_scaled.png
 /taniin_*.png
+contracts/masuk/node_modules/
+contracts/public/masuk/
