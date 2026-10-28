@@ -14,6 +14,9 @@ class PhysicalViewport extends StatelessWidget {
   });
 
   static const double landscapeMinWidth = 1280;
+  // Phones held sideways are short; a narrower canvas keeps the HUD large.
+  static const double shortLandscapeMinWidth = 1024;
+  static const double shortLandscapeMaxHeight = 520;
   static const double portraitWidth = 600;
 
   final Widget child;
@@ -33,7 +36,12 @@ class PhysicalViewport extends StatelessWidget {
         }
         final canvasWidth = isPortrait(logical)
             ? portraitWidth
-            : math.max(logical.width, landscapeMinWidth);
+            : math.max(
+                logical.width,
+                logical.height < shortLandscapeMaxHeight
+                    ? shortLandscapeMinWidth
+                    : landscapeMinWidth,
+              );
         final scale = logical.width / canvasWidth;
         final canvas = Size(canvasWidth, logical.height / scale);
         return FittedBox(

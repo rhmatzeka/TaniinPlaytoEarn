@@ -84,17 +84,17 @@ class _StatusChip extends StatelessWidget {
             border: Border.all(color: const Color(0x66FFFFFF)),
           ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 12, color: color),
+                Icon(icon, size: 16, color: color),
                 const SizedBox(width: 4),
                 Text(
                   item.label,
                   style: const TextStyle(
                     color: Color(0xFFF4F1E0),
-                    fontSize: 11,
+                    fontSize: 15,
                     fontWeight: FontWeight.w800,
                     height: 1,
                   ),

@@ -166,6 +166,9 @@ class FarmStateController extends ChangeNotifier {
 
   final List<int> cropRows = <int>[5, 3, 1, 7];
 
+  /// Row in spring_crops.png (16x32 cells) for the shop and inventory sprites.
+  int cropSpriteRow(int seedIndex) => cropRows[seedIndex] ~/ 2;
+
   final List<FarmPlotData> plots = <FarmPlotData>[
     FarmPlotData(tileX: 4, tileY: 19, tileWidth: 2, tileHeight: 4, owned: true),
     FarmPlotData(

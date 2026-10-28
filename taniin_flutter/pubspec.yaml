@@ -78,6 +78,11 @@ flutter:
     - assets/game/Tileset/pixel_16_woods v2 free/
     - assets/images/
 
+  fonts:
+    - family: Pixelify
+      fonts:
+        - asset: assets/fonts/PixelifySans.ttf
+
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 

@@ -13,8 +13,8 @@ class _MiniMap extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mapWidth = width.clamp(236.0, 286.0).toDouble();
-    final mapHeight = height.clamp(194.0, 264.0).toDouble();
+    final mapWidth = width;
+    final mapHeight = height;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {},

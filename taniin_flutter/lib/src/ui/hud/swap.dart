@@ -1,424 +1,382 @@
 part of '../game_hud.dart';
 
-class _SwapControl extends StatelessWidget {
-  const _SwapControl({required this.farmState, required this.compact});
+enum _SwapMode { tani, tarikEth, isiKoin }
+
+/// The swap house: three separate jobs instead of one generic from/to box.
+class _SwapHousePanel extends StatelessWidget {
+  const _SwapHousePanel({required this.farmState, required this.onClose});
 
   final FarmStateController farmState;
-  final bool compact;
+  final VoidCallback onClose;
+
+  _SwapMode get _mode {
+    if (farmState.swapFromAsset == SwapAsset.ethSepolia) return _SwapMode.isiKoin;
+    if (farmState.swapToAsset == SwapAsset.ethSepolia) return _SwapMode.tarikEth;
+    return _SwapMode.tani;
+  }
+
+  void _select(_SwapMode mode) {
+    switch (mode) {
+      case _SwapMode.tani:
+        farmState.setSwapFromAsset(SwapAsset.gameCoin);
+        farmState.setSwapToAsset(SwapAsset.taniSepolia);
+      case _SwapMode.tarikEth:
+        farmState.setSwapFromAsset(SwapAsset.gameCoin);
+        farmState.setSwapToAsset(SwapAsset.ethSepolia);
+      case _SwapMode.isiKoin:
+        farmState.setSwapFromAsset(SwapAsset.ethSepolia);
+        farmState.setSwapToAsset(SwapAsset.gameCoin);
+    }
+    farmState.prepareSwapAmount();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final sourceBalance = math.max(0, farmState.swapSourceBalance);
-    final amount = farmState.selectedSwapAmount;
-    final value = amount.toDouble();
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFF793A17),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF5E2C0D), width: 4),
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(compact ? 10 : 18),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final vertical = constraints.maxWidth < 650;
-            final rateHint = farmState.swapRateHintLabel;
-            final fromCard = _SwapAssetCard(
-              label: 'DARI',
-              selectedAsset: farmState.swapFromAsset,
-              amount: farmState.swapCardAmountLabel(
-                farmState.swapFromAsset,
-                amount,
-                to: false,
-              ),
-              balance: farmState.swapBalanceLabel(farmState.swapFromAsset),
-              icon: _swapAssetIcon(farmState.swapFromAsset),
-              color: _swapAssetColor(farmState.swapFromAsset),
-              onAssetChanged: farmState.setSwapFromAsset,
-            );
-            final toCard = _SwapAssetCard(
-              label: 'KE',
-              selectedAsset: farmState.swapToAsset,
-              amount: farmState.swapCardAmountLabel(
-                farmState.swapToAsset,
-                amount,
-                to: true,
-              ),
-              balance: farmState.swapBalanceLabel(farmState.swapToAsset),
-              icon: _swapAssetIcon(farmState.swapToAsset),
-              color: _swapAssetColor(farmState.swapToAsset),
-              onAssetChanged: farmState.setSwapToAsset,
-            );
-            final arrow = Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: vertical ? 0 : (compact ? 8 : 14),
-                vertical: vertical ? (compact ? 5 : 10) : 0,
-              ),
-              child: _SwapArrow(
-                vertical: vertical,
-                onTap: farmState.reverseSwapAssets,
-              ),
-            );
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                vertical
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          fromCard,
-                          Center(child: arrow),
-                          toCard,
-                        ],
-                      )
-                    : Row(
-                        children: [
-                          Expanded(child: fromCard),
-                          arrow,
-                          Expanded(child: toCard),
-                        ],
-                      ),
-                SizedBox(height: compact ? 9 : 18),
-                if (rateHint.isNotEmpty) ...[
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF5E2C0D),
-                      borderRadius: BorderRadius.circular(7),
-                      border: Border.all(
-                        color: const Color(0x99FFFF99),
-                        width: 2,
-                      ),
-                    ),
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: compact ? 6 : 9,
-                      ),
-                      child: Text(
-                        rateHint,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: const Color(0xFFFFF0D4),
-                          fontSize: compact ? 13 : 16,
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: compact ? 8 : 14),
-                ],
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Jumlah ${farmState.swapAmountUnitLabel}',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(
-                              color: const Color(0xFFFFF0D4),
-                              fontSize: compact ? 17 : 22,
-                            ),
-                      ),
-                    ),
-                    Text(
-                      farmState.swapAmountProgressLabel,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: const Color(0xFFFFDE19),
-                        fontSize: compact ? 17 : 22,
-                      ),
-                    ),
-                  ],
+    final mode = _mode;
+    return KayuPanel(
+      title: 'Rumah Tukar',
+      icon: Icons.swap_horiz,
+      subtitle: 'Tukar Game Coin, token TANI, dan ETH Sepolia.',
+      onClose: onClose,
+      maxWidth: 860,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _SwapBalances(farmState: farmState),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final (m, label) in const [
+                (_SwapMode.tani, 'Koin ⇄ TANI'),
+                (_SwapMode.tarikEth, 'Tarik ETH'),
+                (_SwapMode.isiKoin, 'Isi koin'),
+              ])
+                KayuButton(
+                  label: label,
+                  compact: true,
+                  tone: m == mode ? KayuTone.utama : KayuTone.kedua,
+                  onPressed: m == mode ? () {} : () => _select(m),
                 ),
-                SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    trackHeight: compact ? 7 : 10,
-                    thumbShape: RoundSliderThumbShape(
-                      enabledThumbRadius: compact ? 11 : 15,
-                    ),
-                    activeTrackColor: const Color(0xFFFFD900),
-                    inactiveTrackColor: const Color(0xFF5E2C0D),
-                    thumbColor: const Color(0xFFFFF0D4),
-                  ),
-                  child: Slider(
-                    value: value,
-                    min: 0,
-                    max: math.max(1, sourceBalance).toDouble(),
-                    divisions: sourceBalance <= 1000
-                        ? math.max(1, sourceBalance)
-                        : null,
-                    onChanged: sourceBalance == 0
-                        ? null
-                        : (newValue) =>
-                              farmState.setSwapAmount(newValue.round()),
-                  ),
-                ),
-                Wrap(
-                  spacing: compact ? 7 : 10,
-                  runSpacing: compact ? 7 : 10,
-                  children: [
-                    _SwapPresetButton(
-                      label: '25%',
-                      enabled: sourceBalance > 0,
-                      onTap: () => farmState.setSwapAmount(
-                        math.max(1, (sourceBalance * 0.25).round()),
-                      ),
-                    ),
-                    _SwapPresetButton(
-                      label: '50%',
-                      enabled: sourceBalance > 0,
-                      onTap: () => farmState.setSwapAmount(
-                        math.max(1, (sourceBalance * 0.50).round()),
-                      ),
-                    ),
-                    _SwapPresetButton(
-                      label: 'MAX',
-                      enabled: sourceBalance > 0,
-                      onTap: () => farmState.setSwapAmount(sourceBalance),
-                    ),
-                    _SwapPresetButton(
-                      label: farmState.isLoggedIn ? 'ON-CHAIN' : 'MODE TAMU',
-                      enabled: true,
-                      onTap: () => farmState.showMessage(
-                        farmState.isLoggedIn
-                            ? 'Swap tercatat di Sepolia: ${farmState.walletLabel}'
-                            : 'Mode tamu: swap tersimpan lokal. Tap MASUK di kanan atas.',
-                        success: farmState.isLoggedIn,
-                      ),
-                      highlighted: farmState.isLoggedIn,
-                    ),
-                  ],
-                ),
-              ],
-            );
+            ],
+          ),
+          const SizedBox(height: 16),
+          switch (mode) {
+            _SwapMode.tani => _SwapTani(farmState: farmState, onDone: onClose),
+            _SwapMode.tarikEth => _SwapTarikEth(farmState: farmState, onDone: onClose),
+            _SwapMode.isiKoin => _SwapIsiKoin(farmState: farmState),
           },
-        ),
+        ],
       ),
     );
   }
 }
 
-IconData _swapAssetIcon(SwapAsset asset) {
-  return switch (asset) {
-    SwapAsset.gameCoin => Icons.paid,
-    SwapAsset.taniSepolia => Icons.token,
-    SwapAsset.ethSepolia => Icons.bolt,
-  };
-}
+class _SwapBalances extends StatelessWidget {
+  const _SwapBalances({required this.farmState});
 
-Color _swapAssetColor(SwapAsset asset) {
-  return switch (asset) {
-    SwapAsset.gameCoin => const Color(0xFF6C3915),
-    SwapAsset.taniSepolia => const Color(0xFF22543B),
-    SwapAsset.ethSepolia => const Color(0xFF244D7A),
-  };
-}
-
-class _SwapAssetCard extends StatelessWidget {
-  const _SwapAssetCard({
-    required this.label,
-    required this.selectedAsset,
-    required this.amount,
-    required this.balance,
-    required this.icon,
-    required this.color,
-    required this.onAssetChanged,
-  });
-
-  final String label;
-  final SwapAsset selectedAsset;
-  final String amount;
-  final String balance;
-  final IconData icon;
-  final Color color;
-  final ValueChanged<SwapAsset> onAssetChanged;
+  final FarmStateController farmState;
 
   @override
   Widget build(BuildContext context) {
-    final titleStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
-      color: const Color(0xFFFFF0D4),
-      fontSize: 20,
+    final eth = farmState.walletNativeBalance;
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        _BalanceChip(label: 'Game Coin', child: CoinAmount(amount: farmState.coins, size: 20)),
+        _BalanceChip(
+          label: farmState.isLoggedIn ? 'TANI di wallet' : 'TANI (tamu)',
+          child: Text('${farmState.tani}', style: Kayu.judul(20)),
+        ),
+        if (farmState.isLoggedIn)
+          _BalanceChip(
+            label: 'ETH Sepolia',
+            child: Text(eth.isEmpty ? '…' : eth, style: Kayu.judul(20)),
+          ),
+      ],
     );
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFFFB23F), width: 3),
+  }
+}
+
+class _BalanceChip extends StatelessWidget {
+  const _BalanceChip({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return KayuWell(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: Kayu.teks(14, color: Kayu.kremRedup)),
+          child,
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              label,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: const Color(0xFFE9C692),
-                fontSize: 14,
-              ),
+    );
+  }
+}
+
+/// Amount picker shared by the three modes.
+class _SwapAmount extends StatelessWidget {
+  const _SwapAmount({required this.farmState, required this.unit, required this.max});
+
+  final FarmStateController farmState;
+  final String unit;
+  final int max;
+
+  @override
+  Widget build(BuildContext context) {
+    final amount = farmState.selectedSwapAmount.clamp(0, math.max(0, max)).toInt();
+    return KayuWell(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text('Jumlah', style: Kayu.teks(18))),
+              Text('$amount $unit', style: Kayu.judul(24)),
+            ],
+          ),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 10,
+              activeTrackColor: Kayu.emas,
+              inactiveTrackColor: Kayu.kayuGelap,
+              thumbColor: Kayu.krem,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 14),
             ),
-            const SizedBox(height: 7),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: const Color(0x33241008),
-                borderRadius: BorderRadius.circular(7),
-                border: Border.all(color: const Color(0x66FFF0D4), width: 2),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<SwapAsset>(
-                    value: selectedAsset,
-                    isExpanded: true,
-                    dropdownColor: const Color(0xFF5E2C0D),
-                    iconEnabledColor: const Color(0xFFFFDE19),
-                    style: titleStyle,
-                    items: SwapAsset.values
-                        .map(
-                          (asset) => DropdownMenuItem<SwapAsset>(
-                            value: asset,
-                            child: Text(
-                              asset.label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (asset) {
-                      if (asset != null) {
-                        onAssetChanged(asset);
-                      }
-                    },
-                  ),
+            child: Slider(
+              value: amount.toDouble(),
+              max: math.max(1, max).toDouble(),
+              divisions: max > 0 && max <= 1000 ? max : null,
+              onChanged: max <= 0 ? null : (v) => farmState.setSwapAmount(v.round()),
+            ),
+          ),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: [
+              for (final (label, fraction) in const [('25%', 0.25), ('50%', 0.5), ('Semua', 1.0)])
+                KayuButton(
+                  label: label,
+                  compact: true,
+                  tone: KayuTone.kedua,
+                  onPressed: max <= 0
+                      ? null
+                      : () => farmState.setSwapAmount(math.max(1, (max * fraction).round())),
                 ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SwapNote extends StatelessWidget {
+  const _SwapNote(this.lines);
+
+  final List<String> lines;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final line in lines)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: const Color(0x33FFFFFF),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: SizedBox.square(
-                    dimension: 54,
-                    child: Icon(icon, color: const Color(0xFFFFF0D4), size: 34),
-                  ),
+                const Padding(
+                  padding: EdgeInsets.only(top: 6, right: 10),
+                  child: Icon(Icons.circle, size: 8, color: Kayu.emas),
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Text(
-                    balance,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFFDDBF91),
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 130),
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      amount,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: const Color(0xFFFFDE19),
-                        fontSize: 32,
-                      ),
-                    ),
-                  ),
-                ),
+                Expanded(child: Text(line, style: Kayu.teks(17))),
               ],
             ),
-          ],
-        ),
+          ),
+      ],
+    );
+  }
+}
+
+class _SwapResult extends StatelessWidget {
+  const _SwapResult({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Text(text, style: Kayu.judul(24, color: Kayu.krem)),
+    );
+  }
+}
+
+class _NeedLogin extends StatelessWidget {
+  const _NeedLogin({required this.farmState, required this.reason});
+
+  final FarmStateController farmState;
+  final String reason;
+
+  @override
+  Widget build(BuildContext context) {
+    return KayuWell(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(reason, style: Kayu.teks(18)),
+          const SizedBox(height: 12),
+          KayuButton(
+            label: 'Masuk dengan Privy',
+            icon: Icons.login,
+            onPressed: farmState.canLogin
+                ? () async {
+                    final url = await farmState.prepareLoginUrl();
+                    await PlatformBridge.openUrl(url, sameTab: true);
+                  }
+                : null,
+          ),
+        ],
       ),
     );
   }
 }
 
-class _SwapArrow extends StatelessWidget {
-  const _SwapArrow({required this.vertical, required this.onTap});
+class _SwapTani extends StatelessWidget {
+  const _SwapTani({required this.farmState, required this.onDone});
 
-  final bool vertical;
-  final VoidCallback onTap;
+  final FarmStateController farmState;
+  final VoidCallback onDone;
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: 'Balik arah swap',
-      child: GestureDetector(
-        onTap: onTap,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: const Color(0xFF5E2C0D),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFFFD900), width: 3),
-          ),
-          child: SizedBox.square(
-            dimension: 54,
-            child: Icon(
-              vertical ? Icons.swap_vert : Icons.swap_horiz,
-              color: const Color(0xFFFFF0D4),
-              size: 34,
-            ),
-          ),
+    final toTani = farmState.swapFromAsset == SwapAsset.gameCoin;
+    final max = farmState.swapSourceBalance;
+    final amount = farmState.selectedSwapAmount;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SwapNote([
+          '1 Game Coin = 1 TANI.',
+          farmState.onChainMode
+              ? 'TANI adalah token ERC-20 di Sepolia, masuk ke wallet-mu.'
+              : 'Mode tamu: tukar tersimpan di perangkat. Masuk supaya TANI masuk ke wallet.',
+        ]),
+        const SizedBox(height: 10),
+        KayuButton(
+          label: toTani ? 'Arah: Koin → TANI' : 'Arah: TANI → Koin',
+          icon: Icons.swap_vert,
+          compact: true,
+          tone: KayuTone.kedua,
+          onPressed: farmState.reverseSwapAssets,
         ),
-      ),
+        const SizedBox(height: 12),
+        _SwapAmount(farmState: farmState, unit: toTani ? 'koin' : 'TANI', max: max),
+        _SwapResult(text: toTani ? 'Kamu dapat $amount TANI' : 'Kamu dapat $amount Game Coin'),
+        KayuButton(
+          label: amount > 0 ? 'Tukar sekarang' : (toTani ? 'Koin kosong' : 'TANI kosong'),
+          expand: true,
+          onPressed: amount > 0
+              ? () async {
+                  if (await farmState.swapSelectedAssets()) onDone();
+                }
+              : null,
+        ),
+      ],
     );
   }
 }
 
-class _SwapPresetButton extends StatelessWidget {
-  const _SwapPresetButton({
-    required this.label,
-    required this.enabled,
-    required this.onTap,
-    this.highlighted = false,
-  });
+class _SwapTarikEth extends StatelessWidget {
+  const _SwapTarikEth({required this.farmState, required this.onDone});
 
-  final String label;
-  final bool enabled;
-  final VoidCallback onTap;
-  final bool highlighted;
+  final FarmStateController farmState;
+  final VoidCallback onDone;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: enabled ? onTap : null,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: !enabled
-              ? const Color(0xFF5F4A38)
-              : highlighted
-              ? const Color(0xFF246644)
-              : const Color(0xFF6A3512),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: highlighted
-                ? const Color(0xFF86E276)
-                : const Color(0xFFFFB23F),
-            width: 3,
-          ),
+    if (!farmState.onChainMode) {
+      return _NeedLogin(
+        farmState: farmState,
+        reason: 'Tarik ETH mengirim Sepolia ETH sungguhan ke wallet-mu, jadi kamu perlu masuk dulu.',
+      );
+    }
+    final max = farmState.swapSourceBalance;
+    final amount = farmState.selectedSwapAmount;
+    final min = FarmStateController.minEthSwapAmount;
+    final enough = amount >= min;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SwapNote([
+          farmState.swapRateHintLabel.isEmpty
+              ? 'Game Coin ditukar ke Sepolia ETH dan dikirim ke wallet-mu.'
+              : farmState.swapRateHintLabel,
+          'Minimal $min koin sekali tarik. Batas 0,01 ETH per hari per wallet.',
+          'ETH dikirim dari server; tunggu konfirmasi Sepolia sekitar 15 detik.',
+        ]),
+        const SizedBox(height: 12),
+        _SwapAmount(farmState: farmState, unit: 'koin', max: max),
+        _SwapResult(
+          text: 'Kamu dapat ${farmState.swapCardAmountLabel(SwapAsset.ethSepolia, amount, to: true)}',
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: const Color(0xFFFFF0D4),
-              fontSize: 16,
-            ),
-          ),
+        KayuButton(
+          label: enough ? 'Tarik ETH' : 'Minimal $min koin',
+          icon: Icons.outbox,
+          expand: true,
+          onPressed: enough
+              ? () async {
+                  if (await farmState.swapSelectedAssets()) onDone();
+                }
+              : null,
         ),
-      ),
+      ],
+    );
+  }
+}
+
+class _SwapIsiKoin extends StatelessWidget {
+  const _SwapIsiKoin({required this.farmState});
+
+  final FarmStateController farmState;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!farmState.onChainMode) {
+      return _NeedLogin(
+        farmState: farmState,
+        reason: 'Isi koin dibayar dengan Sepolia ETH dari wallet-mu, jadi kamu perlu masuk dulu.',
+      );
+    }
+    final amount = math.max(FarmStateController.minEthSwapAmount, farmState.selectedSwapAmount);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SwapNote([
+          'Bayar Sepolia ETH dari wallet Privy-mu, lalu Game Coin masuk ke kebun.',
+          'Pembayaran dikonfirmasi di halaman Privy, setelah itu kamu kembali ke game.',
+          'Minimal ${FarmStateController.minEthSwapAmount} koin.',
+        ]),
+        const SizedBox(height: 12),
+        _SwapAmount(farmState: farmState, unit: 'koin', max: FarmStateController.maxOnChainSwapAmount),
+        _SwapResult(text: 'Kamu bayar ${farmState.swapCardAmountLabel(SwapAsset.ethSepolia, amount, to: false)}'),
+        KayuButton(
+          label: 'Bayar dengan ETH',
+          icon: Icons.account_balance_wallet,
+          expand: true,
+          onPressed: () => farmState.swapSelectedAssets(),
+        ),
+      ],
     );
   }
 }
