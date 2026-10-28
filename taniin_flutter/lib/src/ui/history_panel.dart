@@ -43,7 +43,7 @@ class HistoryPanel extends StatelessWidget {
               children: [
                 _PanelHeader(
                   icon: Icons.history,
-                  title: 'RIWAYAT',
+                  title: 'Riwayat',
                   onClose: onClose,
                   compact: compact,
                   farmState: farmState,
@@ -164,7 +164,7 @@ class _PanelHeader extends StatelessWidget {
                   border: Border.all(color: const Color(0xFF5C0000), width: 2),
                 ),
                 child: Text(
-                  'Hapus Semua',
+                  'Hapus semua',
                   style: TextStyle(
                     color: const Color(0xFFFFEDCD),
                     fontSize: compact ? 12 : 16,

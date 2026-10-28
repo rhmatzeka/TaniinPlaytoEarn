@@ -211,8 +211,8 @@ class FarmStateController extends ChangeNotifier {
   final List<HistoryRecord> history = <HistoryRecord>[
     const HistoryRecord(
       title: 'Game dimulai',
-      status: 'Local saved',
-      timeLabel: 'now',
+      status: 'lokal tersimpan',
+      timeLabel: 'baru saja',
       valueLabel: '+6 seed',
     ),
   ];
@@ -787,7 +787,7 @@ class FarmStateController extends ChangeNotifier {
               status: _normalizeHistoryStatus(
                 _readString(record['status'], 'lokal tersimpan'),
               ),
-              timeLabel: _readString(record['timeLabel'], 'now'),
+              timeLabel: _readString(record['timeLabel'], 'baru saja'),
               valueLabel: _readString(record['valueLabel'], ''),
               txHash: _readString(record['txHash'], ''),
               errorMessage: _readString(record['errorMessage'], ''),

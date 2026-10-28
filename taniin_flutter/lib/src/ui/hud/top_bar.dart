@@ -130,7 +130,7 @@ class _CurrencyBar extends StatelessWidget {
           _CoinIcon(size: 46),
           const SizedBox(width: 12),
           Expanded(
-            child: _AmountBlock(label: 'COIN', value: '${farmState.coins}'),
+            child: _AmountBlock(label: 'Koin', value: '${farmState.coins}'),
           ),
         ],
       ),

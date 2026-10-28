@@ -18,9 +18,11 @@ class TaniinColors {
 }
 
 ThemeData buildTaniinTheme() {
+  // Game titles use the pixel face shared with the landing page.
+  const pixel = <FontVariation>[FontVariation('wght', 700)];
   const textTheme = TextTheme(
-    titleLarge: TextStyle(fontSize: 30, fontWeight: FontWeight.w900),
-    titleMedium: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+    titleLarge: TextStyle(fontFamily: 'Pixelify', fontSize: 30, fontVariations: pixel),
+    titleMedium: TextStyle(fontFamily: 'Pixelify', fontSize: 24, fontVariations: pixel),
     bodyLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
     bodyMedium: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
     labelLarge: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),

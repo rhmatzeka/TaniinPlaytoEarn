@@ -326,7 +326,7 @@ class _ProfilePanelState extends State<ProfilePanel> {
 
   Widget _questSection() => _section(
     icon: Icons.event_available,
-    title: 'QUEST HARIAN',
+    title: 'Quest harian',
     subtitle: 'Selesaikan target dan kumpulkan XP',
     child: Column(
       children: widget.farmState.dailyQuests
@@ -422,7 +422,7 @@ class _ProfilePanelState extends State<ProfilePanel> {
     final achievements = widget.farmState.unlockedAchievements;
     return _section(
       icon: Icons.emoji_events,
-      title: 'PENCAPAIAN',
+      title: 'Pencapaian',
       subtitle: '${achievements.length}/3 berhasil dibuka',
       child: achievements.isEmpty
           ? Container(
@@ -493,7 +493,7 @@ class _ProfilePanelState extends State<ProfilePanel> {
 
   Widget _wardrobeSection() => _section(
     icon: Icons.checkroom,
-    title: 'WARDROBE',
+    title: 'Baju petani',
     subtitle: 'Pilih gaya petani yang sudah kamu buka',
     child: LayoutBuilder(
       builder: (context, constraints) {

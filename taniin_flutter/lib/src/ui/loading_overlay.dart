@@ -186,7 +186,7 @@ class _LoadingPainter extends CustomPainter {
     final percent = math.max(1, math.min(100, (progress * 100).round()));
     _drawText(
       canvas,
-      'LOADING FARM',
+      'Memuat kebun',
       Offset(panel.left + 24 * scale, panel.top + 34 * scale),
       19 * scale,
     );
