@@ -105,17 +105,23 @@ describe("Server economy rules", function () {
     );
   });
 
-  it("charges TANI for a seed bundle using the catalog price, not the client amount", function () {
+  it("charges Game Coin for a seed bundle using the catalog price, not the client amount", function () {
     const result = applyAction(
       newPlayerState(NOW),
       { type: "BUY_SEED", seedIndex: 2, quantity: 2, amount: 1 },
       NOW
     );
     expect(result.state.seeds[2]).to.equal(6);
-    expect(result.chainOps).to.deep.equal([
-      { kind: "spendTani", amount: 440 },
-      { kind: "mintSeed", amount: 6 }
-    ]);
+    expect(result.state.coins).to.equal(620 - 440);
+    expect(result.chainOps).to.deep.equal([{ kind: "mintSeed", amount: 6 }]);
+  });
+
+  it("refuses a seed bundle the player cannot afford", function () {
+    expectHttpError(
+      () => applyAction(withCoins(100), { type: "BUY_SEED", seedIndex: 2, quantity: 1 }, NOW),
+      409,
+      /Koin belum cukup/
+    );
   });
 
   it("swaps game coins to TANI and caps the swap amount", function () {

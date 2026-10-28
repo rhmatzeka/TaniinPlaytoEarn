@@ -49,6 +49,69 @@ class _TopCluster extends StatelessWidget {
   }
 }
 
+/// Single top row for short landscape screens: coins, account, panels, menu.
+class _TopRow extends StatelessWidget {
+  const _TopRow({
+    required this.farmState,
+    required this.activePanel,
+    required this.onPanelSelected,
+    required this.onWalletPressed,
+  });
+
+  final FarmStateController farmState;
+  final GamePanel? activePanel;
+  final ValueChanged<GamePanel> onPanelSelected;
+  final VoidCallback onWalletPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _CurrencyBar(farmState: farmState, width: 190),
+        const SizedBox(width: 8),
+        _HudIconButton(
+          icon: farmState.isLoggedIn ? Icons.verified_user : Icons.login,
+          tooltip: farmState.isLoggedIn ? 'Akun' : 'Masuk dengan Privy',
+          isActive: false,
+          onPressed: onWalletPressed,
+        ),
+        const SizedBox(width: 8),
+        _HudIconButton(
+          icon: Icons.person,
+          tooltip: 'Profil & Wardrobe',
+          isActive: activePanel == GamePanel.profile,
+          badge: 'Lv${farmState.playerLevel}',
+          onPressed: () => onPanelSelected(GamePanel.profile),
+        ),
+        const SizedBox(width: 8),
+        _HudIconButton(
+          icon: Icons.history,
+          tooltip: 'Riwayat',
+          isActive: activePanel == GamePanel.history,
+          badge: '${farmState.history.length}',
+          onPressed: () => onPanelSelected(GamePanel.history),
+        ),
+        const SizedBox(width: 8),
+        _HudIconButton(
+          icon: Icons.backpack,
+          tooltip: 'Tas',
+          isActive: activePanel == GamePanel.backpack,
+          badge: '${farmState.totalSeeds}',
+          onPressed: () => onPanelSelected(GamePanel.backpack),
+        ),
+        const SizedBox(width: 8),
+        _HudIconButton(
+          icon: Icons.menu,
+          tooltip: 'Menu',
+          isActive: activePanel == GamePanel.settings,
+          onPressed: () => onPanelSelected(GamePanel.settings),
+        ),
+      ],
+    );
+  }
+}
+
 class _CurrencyBar extends StatelessWidget {
   const _CurrencyBar({required this.farmState, required this.width});
 
@@ -67,7 +130,7 @@ class _CurrencyBar extends StatelessWidget {
           _CoinIcon(size: 46),
           const SizedBox(width: 12),
           Expanded(
-            child: _AmountBlock(label: 'COIN', value: '${farmState.coins}'),
+            child: _AmountBlock(label: 'Koin', value: '${farmState.coins}'),
           ),
         ],
       ),
@@ -324,21 +387,6 @@ class _WalletIcon extends StatelessWidget {
   }
 }
 
-class _SeedPacket extends StatelessWidget {
-  const _SeedPacket({required this.color, required this.size});
-
-  final Color color;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox.square(
-      dimension: size,
-      child: CustomPaint(painter: _SeedPacketPainter(color)),
-    );
-  }
-}
-
 class _CoinPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -404,66 +452,4 @@ class _WalletPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _WalletPainter oldDelegate) =>
       oldDelegate.connected != connected;
-}
-
-class _SeedPacketPainter extends CustomPainter {
-  const _SeedPacketPainter(this.color);
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..isAntiAlias = true;
-    final scale = size.width / 44;
-    final center = size.center(Offset.zero);
-    paint.color = const Color(0xFFFFF6D8);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: center, width: 32 * scale, height: 38 * scale),
-        Radius.circular(4 * scale),
-      ),
-      paint,
-    );
-    paint.color = color;
-    canvas.drawRect(
-      Rect.fromLTWH(
-        center.dx - 12 * scale,
-        center.dy - 12 * scale,
-        24 * scale,
-        19 * scale,
-      ),
-      paint,
-    );
-    paint.color = const Color(0xFF472C1F);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          center.dx - 8 * scale,
-          center.dy + 3 * scale,
-          16 * scale,
-          11 * scale,
-        ),
-        Radius.circular(3 * scale),
-      ),
-      paint,
-    );
-    paint.color = const Color(0xFF60D25C);
-    canvas.drawOval(
-      Rect.fromLTWH(
-        center.dx - 10 * scale,
-        center.dy - 4 * scale,
-        12 * scale,
-        9 * scale,
-      ),
-      paint,
-    );
-    canvas.drawOval(
-      Rect.fromLTWH(center.dx, center.dy - 7 * scale, 11 * scale, 10 * scale),
-      paint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _SeedPacketPainter oldDelegate) =>
-      oldDelegate.color != color;
 }

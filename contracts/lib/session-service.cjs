@@ -109,7 +109,7 @@ async function checkRateLimit(db, key, limit, windowMs) {
 
 // Runs `run` once per (wallet, key). Concurrent duplicates wait for the first
 // result; a failed run frees the key so the client can retry.
-async function withIdempotency(db, wallet, key, run) {
+async function withIdempotency(db, wallet, key, run, fingerprint = "") {
   const cleanKey = String(key || "").trim();
   if (!cleanKey) throw httpError(400, "Idempotency-Key wajib untuk aksi ekonomi.");
   if (cleanKey.length > 128) throw httpError(400, "Idempotency-Key terlalu panjang.");
@@ -119,9 +119,9 @@ async function withIdempotency(db, wallet, key, run) {
   while (Date.now() < deadline) {
     await db.query("DELETE FROM idempotency WHERE scoped_key = $1 AND expires_at < now()", [scopedKey]);
     const claimed = await db.query(
-      `INSERT INTO idempotency (scoped_key, status, expires_at)
-       VALUES ($1, 'pending', $2) ON CONFLICT (scoped_key) DO NOTHING RETURNING scoped_key`,
-      [scopedKey, new Date(Date.now() + IDEMPOTENCY_PENDING_TTL_MS).toISOString()]
+      `INSERT INTO idempotency (scoped_key, status, expires_at, fingerprint)
+       VALUES ($1, 'pending', $2, $3) ON CONFLICT (scoped_key) DO NOTHING RETURNING scoped_key`,
+      [scopedKey, new Date(Date.now() + IDEMPOTENCY_PENDING_TTL_MS).toISOString(), fingerprint]
     );
     if (claimed.rows.length) {
       let result;
@@ -137,7 +137,13 @@ async function withIdempotency(db, wallet, key, run) {
       );
       return result;
     }
-    const { rows } = await db.query("SELECT status, response FROM idempotency WHERE scoped_key = $1", [scopedKey]);
+    const { rows } = await db.query(
+      "SELECT status, response, fingerprint FROM idempotency WHERE scoped_key = $1",
+      [scopedKey]
+    );
+    if (rows[0] && (rows[0].fingerprint || "") !== fingerprint) {
+      throw httpError(409, "Idempotency-Key ini sudah dipakai untuk aksi lain.");
+    }
     if (rows[0]?.status === "done") {
       const response = typeof rows[0].response === "string" ? JSON.parse(rows[0].response) : rows[0].response;
       return { ...response, idempotentReplay: true };

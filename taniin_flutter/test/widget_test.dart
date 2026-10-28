@@ -210,7 +210,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('ABOUT'));
+    await tester.tap(find.text('Tentang'));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('Rahmat Eka Satria'), findsWidgets);
@@ -342,9 +342,9 @@ void main() {
       ),
     );
 
-    expect(find.textContaining('PROFIL PETANI'), findsOneWidget);
-    expect(find.text('QUEST HARIAN'), findsOneWidget);
-    expect(find.text('WARDROBE'), findsOneWidget);
+    expect(find.textContaining('Profil Petani'), findsOneWidget);
+    expect(find.text('Quest harian'), findsOneWidget);
+    expect(find.text('Baju petani'), findsOneWidget);
     expect(find.text('Petani Klasik'), findsOneWidget);
     expect(find.text('Petani Nusantara'), findsOneWidget);
   });

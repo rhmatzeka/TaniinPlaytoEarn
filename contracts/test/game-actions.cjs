@@ -181,6 +181,35 @@ describe("Game action API", function () {
     expect(second.json.error).to.match(/Batas harian/);
   });
 
+  it("enforces a global daily ETH payout cap across wallets", async function () {
+    process.env.TANIIN_GLOBAL_DAILY_ETH_PAYOUT_WEI = "15000000000000000";
+    process.env.TANIIN_ETH_WEI_PER_COIN = "10000000000000";
+    try {
+      await db.query(
+        "INSERT INTO daily_usage (wallet, day, tani_minted, eth_paid_wei) VALUES ('*', $1, 0, 10000000000000000)",
+        ["2026-10-28"]
+      );
+      await call(app, { path: "/player", headers: { authorization: `Bearer ${session}` } });
+      await db.query("UPDATE players SET state = jsonb_set(state, '{coins}', '100000') WHERE wallet = $1", [WALLET]);
+      const result = await action({ type: "SWAP_COIN_ETH", amount: 600 }, "eth-global");
+      expect(result.status).to.equal(429);
+      expect(result.json.error).to.match(/hari ini/);
+    } finally {
+      delete process.env.TANIIN_GLOBAL_DAILY_ETH_PAYOUT_WEI;
+    }
+  });
+
+  it("keeps working when a Privy user's wallet changes", async function () {
+    await call(app, { path: "/player", headers: { authorization: `Bearer ${session}` } });
+    setPrivyForTests({
+      verify: async () => ({ privyUserId: "did:privy:user2" }),
+      fetchWallet: async () => ({ wallet: "0x5555555555555555555555555555555555555555", loginMethod: "google" })
+    });
+    const login = await call(app, { method: "POST", path: "/auth/privy", body: { accessToken: "ok" } });
+    const player = await call(app, { path: "/player", headers: { authorization: `Bearer ${login.json.session}` } });
+    expect(player.status).to.equal(200);
+  });
+
   it("allows only one guest import per account", async function () {
     const guestState = { coins: 300, seedQuantities: [2, 0, 0, 0] };
     const headers = { authorization: `Bearer ${session}` };
@@ -220,6 +249,21 @@ describe("Game action API", function () {
     });
     expect(result.status).to.equal(200);
     expect(result.json).to.deep.equal({ ok: true });
+  });
+
+  it("caches the chain part of health for a short while", async function () {
+    let calls = 0;
+    const cachedApp = createApp({
+      getDb: () => db,
+      now: () => clock,
+      chainHealth: async () => {
+        calls += 1;
+        return { signer: "0xabc" };
+      }
+    });
+    expect((await call(cachedApp, { path: "/health" })).json.signer).to.equal("0xabc");
+    await call(cachedApp, { path: "/health" });
+    expect(calls).to.equal(1);
   });
 
   it("reports health with the economy switch", async function () {

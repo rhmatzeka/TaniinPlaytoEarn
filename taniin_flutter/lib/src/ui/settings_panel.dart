@@ -32,10 +32,12 @@ class _SettingsPanelState extends State<SettingsPanel> {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.sizeOf(context);
+    // Sideways phones are short: tighter padding so the settings stay visible.
+    final short = media.height < 600;
     return ConstrainedBox(
       constraints: BoxConstraints(
-        maxWidth: math.max(360.0, media.width - 80),
-        maxHeight: math.max(300.0, media.height - 80),
+        maxWidth: math.max(360.0, media.width - (short ? 32 : 80)),
+        maxHeight: math.max(300.0, media.height - (short ? 24 : 80)),
       ),
       child: SizedBox(
         width: 1120,
@@ -47,7 +49,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
           child: Column(
             children: [
               _MenuHeader(
-                title: 'MENU',
+                title: 'Menu',
                 icon: Icons.menu,
                 onClose: widget.onClose,
               ),
@@ -56,7 +58,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     SizedBox(
-                      width: 300,
+                      width: short ? 230 : 300,
                       child: _SettingsSidebar(
                         selectedSection: _selectedSection,
                         onSelected: _selectSection,
@@ -66,7 +68,9 @@ class _SettingsPanelState extends State<SettingsPanel> {
                     ),
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(32, 28, 32, 34),
+                        padding: short
+                            ? const EdgeInsets.fromLTRB(16, 14, 16, 16)
+                            : const EdgeInsets.fromLTRB(32, 28, 32, 34),
                         child: DecoratedBox(
                           decoration: BoxDecoration(
                             color: const Color(0xFF7A2D0E),
@@ -77,12 +81,14 @@ class _SettingsPanelState extends State<SettingsPanel> {
                             ),
                           ),
                           child: Padding(
-                            padding: const EdgeInsets.fromLTRB(32, 26, 32, 28),
+                            padding: short
+                                ? const EdgeInsets.fromLTRB(18, 14, 18, 14)
+                                : const EdgeInsets.fromLTRB(32, 26, 32, 28),
                             child: ListView(
                               padding: EdgeInsets.zero,
                               children:
                                   _selectedSection == _SettingsSection.audio
-                                  ? _buildAudioContent()
+                                  ? _buildAudioContent(short)
                                   : _buildAboutContent(context),
                             ),
                           ),
@@ -99,20 +105,22 @@ class _SettingsPanelState extends State<SettingsPanel> {
     );
   }
 
-  List<Widget> _buildAudioContent() {
+  List<Widget> _buildAudioContent(bool short) {
     return [
-      const _SettingsTitle(icon: Icons.volume_up, title: 'SETTINGS'),
-      const SizedBox(height: 24),
+      if (!short) ...[
+        const _SettingsTitle(icon: Icons.volume_up, title: 'Suara'),
+        const SizedBox(height: 24),
+      ],
       _SettingSwitch(
         icon: Icons.music_note,
-        title: 'MUSIC',
-        subtitle: 'BACKSOUND GAME',
+        title: 'Musik',
+        subtitle: 'Musik latar game',
         value: farmState.musicEnabled,
         onChanged: farmState.setMusicEnabled,
       ),
       const SizedBox(height: 18),
       _VolumeSlider(
-        title: 'MASTER VOLUME',
+        title: 'Volume musik',
         value: farmState.musicVolume,
         enabled: farmState.musicEnabled,
         onChanged: farmState.setMusicVolume,
@@ -120,14 +128,14 @@ class _SettingsPanelState extends State<SettingsPanel> {
       const SizedBox(height: 22),
       _SettingSwitch(
         icon: Icons.surround_sound,
-        title: 'SFX',
-        subtitle: 'TOMBOL DAN AKSI',
+        title: 'Efek suara',
+        subtitle: 'Bunyi tombol dan aksi',
         value: farmState.sfxEnabled,
         onChanged: farmState.setSfxEnabled,
       ),
       const SizedBox(height: 18),
       _VolumeSlider(
-        title: 'SFX VOLUME',
+        title: 'Volume efek',
         value: farmState.sfxVolume,
         enabled: farmState.sfxEnabled,
         onChanged: farmState.setSfxVolume,
@@ -137,19 +145,19 @@ class _SettingsPanelState extends State<SettingsPanel> {
 
   List<Widget> _buildAboutContent(BuildContext context) {
     return [
-      const _SettingsTitle(icon: Icons.info, title: 'ABOUT'),
+      const _SettingsTitle(icon: Icons.info, title: 'Tentang'),
       const SizedBox(height: 24),
       _AboutCard(onGithubTap: _openGithub),
       const SizedBox(height: 18),
       _AboutInfoRow(
         icon: Icons.person,
-        title: 'CREATOR',
+        title: 'Pembuat',
         value: 'Rahmat Eka Satria',
       ),
       const SizedBox(height: 14),
       _AboutInfoRow(
         icon: Icons.gamepad,
-        title: 'PROJECT',
+        title: 'Proyek',
         value: 'Taniin Play to Earn - Flutter game farming',
       ),
     ];
@@ -249,14 +257,14 @@ class _SettingsSidebar extends StatelessWidget {
           children: [
             _SideTab(
               icon: Icons.volume_up,
-              label: 'AUDIO',
+              label: 'Suara',
               selected: selectedSection == _SettingsSection.audio,
               onTap: () => onSelected(_SettingsSection.audio),
             ),
             const SizedBox(height: 18),
             _SideTab(
               icon: Icons.info,
-              label: 'ABOUT',
+              label: 'Tentang',
               selected: selectedSection == _SettingsSection.about,
               onTap: () => onSelected(_SettingsSection.about),
             ),
@@ -441,7 +449,7 @@ class _GithubButton extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'GITHUB',
+                      'GitHub',
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                         color: const Color(0xFFA9EFA7),
                         fontSize: 15,
@@ -540,7 +548,7 @@ class _SidebarLogoutButton extends StatelessWidget {
               const Icon(Icons.logout, color: Color(0xFFFFF0CE), size: 28),
               const SizedBox(width: 12),
               Text(
-                'LOGOUT WALLET',
+                'Keluar',
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
                   color: const Color(0xFFFFF0CE),
                   fontSize: 20,

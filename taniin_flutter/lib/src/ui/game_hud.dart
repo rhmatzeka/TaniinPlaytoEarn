@@ -6,12 +6,13 @@ import 'package:flutter/material.dart';
 import '../game/taniin_game.dart';
 import '../state/farm_state.dart';
 import '../chain/multiplayer_client.dart';
+import '../chain/platform_bridge.dart';
 import 'physical_viewport.dart';
-import 'pixel_panel.dart';
 import 'web_input_capability.dart'
     if (dart.library.js_interop) 'web_input_capability_web.dart'
     as web_input;
 import 'hud/status_strip.dart';
+import 'kayu.dart';
 import 'wallet_panel.dart';
 
 part 'hud/top_bar.dart';
@@ -54,7 +55,14 @@ class GameHud extends StatelessWidget {
           child: PhysicalViewport(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final compact = constraints.maxWidth < 980;
+                final portrait = PhysicalViewport.isPortrait(
+                  constraints.biggest,
+                );
+                // Sideways phones: one row of buttons along the top instead of a column.
+                final short = !portrait && constraints.maxHeight < 600;
+                final compact = portrait || short || constraints.maxWidth < 980;
+                // Portrait phones: HUD stacks down the edges instead of across the top.
+                const edge = 16.0;
                 final showTouchJoystick = shouldShowTouchJoystickForPlatform(
                   viewportSize: logicalViewport,
                 );
@@ -65,7 +73,11 @@ class GameHud extends StatelessWidget {
                           .toDouble();
                 final mobileWebTouchLayout = kIsWeb && showTouchJoystick;
                 const showMiniMap = true;
-                final miniMapWidth = compact
+                final miniMapWidth = portrait
+                    ? 168.0
+                    : short
+                    ? 190.0
+                    : compact
                     ? (constraints.maxWidth * 0.28)
                           .clamp(112.0, 140.0)
                           .toDouble()
@@ -114,7 +126,9 @@ class GameHud extends StatelessWidget {
                           )
                           .toDouble()
                     : 0.0;
-                final joystickTop = showTouchJoystick
+                final joystickTop = showTouchJoystick && portrait
+                    ? constraints.maxHeight - joystickSize - 120
+                    : showTouchJoystick
                     ? (mobileWebTouchLayout
                               ? constraints.maxHeight -
                                     joystickSize -
@@ -140,70 +154,100 @@ class GameHud extends StatelessWidget {
                     ),
                     if (showMiniMap)
                       Positioned(
-                        left: 32,
-                        top: 26,
+                        left: portrait ? edge : 32,
+                        top: portrait ? edge : 26,
                         child: _MiniMap(
                           game: game,
                           width: miniMapWidth,
                           height: miniMapWidth * game.miniMapAspectRatio,
                         ),
                       ),
-                    Positioned(
-                      right: 20,
-                      top: 10,
-                      child: _TopCluster(
-                        farmState: farmState,
-                        compact: compact,
-                        menuActive: activePanel == GamePanel.settings,
-                        onMenuPressed: () =>
-                            onPanelSelected(GamePanel.settings),
-                        onWalletPressed: () => _showWalletDialog(context),
+                    if (short)
+                      Positioned(
+                        right: edge,
+                        top: 10,
+                        child: _TopRow(
+                          farmState: farmState,
+                          activePanel: activePanel,
+                          onPanelSelected: onPanelSelected,
+                          onWalletPressed: () => _showWalletDialog(context),
+                        ),
+                      )
+                    else ...[
+                      Positioned(
+                        right: portrait ? edge : 20,
+                        top: portrait ? edge : 10,
+                        child: _TopCluster(
+                          farmState: farmState,
+                          compact: compact,
+                          menuActive: activePanel == GamePanel.settings,
+                          onMenuPressed: () =>
+                              onPanelSelected(GamePanel.settings),
+                          onWalletPressed: () => _showWalletDialog(context),
+                        ),
                       ),
-                    ),
-                    Positioned(
-                      right: 20,
-                      top: compact ? 196 : 204,
-                      child: Column(
-                        children: [
-                          _HudIconButton(
-                            icon: Icons.person,
-                            tooltip: 'Profil & Wardrobe',
-                            isActive: activePanel == GamePanel.profile,
-                            badge: 'Lv${farmState.playerLevel}',
-                            onPressed: () => onPanelSelected(GamePanel.profile),
-                          ),
-                          const SizedBox(height: 8),
-                          _HudIconButton(
-                            icon: Icons.history,
-                            tooltip: 'Riwayat',
-                            isActive: activePanel == GamePanel.history,
-                            badge: '${farmState.history.length}',
-                            onPressed: () => onPanelSelected(GamePanel.history),
-                          ),
-                          const SizedBox(height: 8),
-                          _HudIconButton(
-                            icon: Icons.backpack,
-                            tooltip: 'Backpack',
-                            isActive: activePanel == GamePanel.backpack,
-                            badge: '${farmState.totalSeeds}',
-                            onPressed: () =>
-                                onPanelSelected(GamePanel.backpack),
-                          ),
-                        ],
+                      Positioned(
+                        right: portrait ? edge : 20,
+                        top: portrait
+                            ? 196
+                            : compact
+                            ? 196
+                            : 204,
+                        child: Column(
+                          children: [
+                            _HudIconButton(
+                              icon: Icons.person,
+                              tooltip: 'Profil & Wardrobe',
+                              isActive: activePanel == GamePanel.profile,
+                              badge: 'Lv${farmState.playerLevel}',
+                              onPressed: () =>
+                                  onPanelSelected(GamePanel.profile),
+                            ),
+                            const SizedBox(height: 8),
+                            _HudIconButton(
+                              icon: Icons.history,
+                              tooltip: 'Riwayat',
+                              isActive: activePanel == GamePanel.history,
+                              badge: '${farmState.history.length}',
+                              onPressed: () =>
+                                  onPanelSelected(GamePanel.history),
+                            ),
+                            const SizedBox(height: 8),
+                            _HudIconButton(
+                              icon: Icons.backpack,
+                              tooltip: 'Backpack',
+                              isActive: activePanel == GamePanel.backpack,
+                              badge: '${farmState.totalSeeds}',
+                              onPressed: () =>
+                                  onPanelSelected(GamePanel.backpack),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
                     Positioned(
-                      top: 8,
-                      left: miniMapWidth + 48,
-                      right: compact ? 300 : 420,
+                      top: portrait
+                          ? edge + miniMapWidth * game.miniMapAspectRatio + 36
+                          : 8,
+                      left: portrait ? edge : miniMapWidth + 48,
+                      right: portrait
+                          ? 110
+                          : short
+                          ? 560
+                          : compact
+                          ? 300
+                          : 420,
                       child: Align(
-                        alignment: Alignment.topCenter,
+                        alignment: portrait
+                            ? Alignment.topLeft
+                            : Alignment.topCenter,
                         child: AnimatedBuilder(
                           animation: game.multiplayerClient,
                           builder: (context, _) => StatusStrip(
                             farmState: farmState,
                             multiplayerOnline: game.multiplayerClient.connected,
-                            aiOnline: game.multiplayerClient.connected &&
+                            aiOnline:
+                                game.multiplayerClient.connected &&
                                 game.multiplayerClient.aiAgent != null,
                           ),
                         ),
@@ -217,8 +261,10 @@ class GameHud extends StatelessWidget {
                       ),
                     // Chat / AI Agent Panel (collapsible, anchored under minimap)
                     Positioned(
-                      left: 32,
-                      top: 26 + miniMapWidth * game.miniMapAspectRatio + 12,
+                      left: portrait ? edge : 32,
+                      top: portrait
+                          ? edge + miniMapWidth * game.miniMapAspectRatio + 96
+                          : 26 + miniMapWidth * game.miniMapAspectRatio + 12,
                       child: _ChatHud(
                         multiplayerClient: game.multiplayerClient,
                         compact: compact,
@@ -226,9 +272,21 @@ class GameHud extends StatelessWidget {
                       ),
                     ),
                     Positioned(
-                      left: compact ? 194 : 260,
-                      right: compact ? 330 : 320,
-                      bottom: compact ? 20 : 32,
+                      left: portrait
+                          ? edge
+                          : compact
+                          ? 194
+                          : 260,
+                      right: portrait
+                          ? edge
+                          : compact
+                          ? 330
+                          : 320,
+                      bottom: portrait
+                          ? 28
+                          : compact
+                          ? 20
+                          : 32,
                       child: _ContextPill(
                         text: contextText,
                         enabled: interaction != GameInteraction.none,
@@ -244,9 +302,9 @@ class GameHud extends StatelessWidget {
                     ),
                     if (farmState.statusVisible)
                       Positioned(
-                        left: constraints.maxWidth * 0.31,
-                        right: constraints.maxWidth * 0.31,
-                        top: 80,
+                        left: portrait ? 40 : constraints.maxWidth * 0.31,
+                        right: portrait ? 40 : constraints.maxWidth * 0.31,
+                        top: portrait ? 300 : 80,
                         child: _StatusPopup(farmState: farmState),
                       ),
                   ],
@@ -286,6 +344,11 @@ class GameHud extends StatelessWidget {
     }
     if (interaction == GameInteraction.swapToken) {
       farmState.prepareSwapAmount();
+      _showPanelDialog(
+        context,
+        (onClose) => _SwapHousePanel(farmState: farmState, onClose: onClose),
+      );
+      return;
     }
     _showInteractionDialog(context, interaction, plotIndex);
   }
@@ -314,6 +377,27 @@ class GameHud extends StatelessWidget {
                   _showShopDialog(context);
                 },
               ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showPanelDialog(
+    BuildContext context,
+    Widget Function(VoidCallback onClose) panel,
+  ) {
+    showDialog<void>(
+      context: context,
+      barrierColor: const Color(0xAA000000),
+      builder: (dialogContext) {
+        return AnimatedBuilder(
+          animation: farmState,
+          builder: (context, _) {
+            return _DialogSurface(
+              farmState: farmState,
+              child: panel(() => Navigator.of(dialogContext).maybePop()),
             );
           },
         );

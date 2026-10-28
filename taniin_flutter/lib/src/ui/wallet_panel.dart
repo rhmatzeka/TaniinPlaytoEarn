@@ -435,7 +435,7 @@ class _WalletFacts extends StatelessWidget {
         ),
         _FactChip(
           icon: Icons.bolt,
-          label: 'ETH (presisi)',
+          label: 'ETH',
           value: farmState.walletNativeBalance.isEmpty
               ? '-'
               : farmState.walletNativeBalance,
@@ -446,11 +446,6 @@ class _WalletFacts extends StatelessWidget {
           value: farmState.walletTaniBalanceAvailable
               ? '${farmState.tani}'
               : '-',
-        ),
-        _FactChip(
-          icon: Icons.cloud_done,
-          label: 'API',
-          value: farmState.hasGameApi ? 'aktif' : 'lokal',
         ),
       ],
     );

@@ -14,6 +14,9 @@ const IP_ACTION_LIMIT = 60;
 const RATE_WINDOW_MS = 60_000;
 const DEFAULT_DAILY_TANI_MINT = 2000;
 const DEFAULT_DAILY_ETH_PAYOUT_WEI = "10000000000000000";
+// Fresh Privy accounts are free to create, so the signer also gets a daily total.
+const DEFAULT_GLOBAL_DAILY_ETH_PAYOUT_WEI = "200000000000000000";
+const GLOBAL_WALLET = "*";
 
 let chainExecutorOverride = null;
 
@@ -67,6 +70,7 @@ async function runGameAction(db, session, body, idempotencyKey, { ip, nowMs }) {
   await checkRateLimit(db, `ip:${ip || "unknown"}`, IP_ACTION_LIMIT, RATE_WINDOW_MS);
   const type = String(body?.type || "").trim().toUpperCase();
 
+  const fingerprint = require("crypto").createHash("sha256").update(JSON.stringify(body ?? {})).digest("hex");
   return withIdempotency(db, session.wallet, idempotencyKey, async () => {
     let prepared;
     try {
@@ -103,7 +107,7 @@ async function runGameAction(db, session, body, idempotencyKey, { ip, nowMs }) {
       etherscanUrl: chain.txHash ? `https://sepolia.etherscan.io/tx/${chain.txHash}` : "",
       state: publicState(prepared.state)
     };
-  });
+  }, fingerprint);
 }
 
 // Phase one: validate and commit the debit before anything reaches the chain, so
@@ -141,6 +145,12 @@ function compensate(db, wallet, prepared, reason) {
         `UPDATE daily_usage SET tani_minted = tani_minted - $3, eth_paid_wei = eth_paid_wei - $4
          WHERE wallet = $1 AND day = $2`,
         [wallet, day, taniMint.toString(), ethWei.toString()]
+      );
+    }
+    if (ethWei > 0n) {
+      await tx.query(
+        "UPDATE daily_usage SET eth_paid_wei = eth_paid_wei - $2 WHERE wallet = $3 AND day = $1",
+        [day, ethWei.toString(), GLOBAL_WALLET]
       );
     }
     await tx.query(
@@ -183,6 +193,18 @@ async function reserveDailyUsage(tx, wallet, chainOps, nowMs) {
   }
   if (BigInt(rows[0].eth) > ethCap) {
     throw httpError(429, "Batas harian payout ETH tercapai. Coba lagi besok.");
+  }
+  if (ethWei > 0n) {
+    const global = await tx.query(
+      `INSERT INTO daily_usage (wallet, day, tani_minted, eth_paid_wei) VALUES ($1, $2, 0, $3)
+       ON CONFLICT (wallet, day) DO UPDATE SET eth_paid_wei = daily_usage.eth_paid_wei + EXCLUDED.eth_paid_wei
+       RETURNING eth_paid_wei::text AS eth`,
+      [GLOBAL_WALLET, day, ethWei.toString()]
+    );
+    const globalCap = BigInt(process.env.TANIIN_GLOBAL_DAILY_ETH_PAYOUT_WEI || DEFAULT_GLOBAL_DAILY_ETH_PAYOUT_WEI);
+    if (BigInt(global.rows[0].eth) > globalCap) {
+      throw httpError(429, "Hadiah ETH untuk hari ini sudah habis. Coba lagi besok.");
+    }
   }
   return { taniMint, ethWei, day };
 }

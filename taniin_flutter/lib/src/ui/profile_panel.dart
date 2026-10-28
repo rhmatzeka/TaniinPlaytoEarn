@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../state/farm_state.dart';
+import 'kayu.dart';
 import 'taniin_theme.dart';
 
 class ProfilePanel extends StatefulWidget {
@@ -42,8 +43,8 @@ class _ProfilePanelState extends State<ProfilePanel> {
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               color: const Color(0xFFFFF1C7),
-              border: Border.all(color: TaniinColors.darkSoil, width: 5),
-              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: Kayu.kayuGelap, width: 5),
+              borderRadius: BorderRadius.circular(18),
               boxShadow: const <BoxShadow>[
                 BoxShadow(
                   color: Color(0xA6000000),
@@ -58,15 +59,11 @@ class _ProfilePanelState extends State<ProfilePanel> {
                 Expanded(
                   child: LayoutBuilder(
                     builder: (context, bodyConstraints) {
-                      return FittedBox(
-                        fit: BoxFit.contain,
-                        alignment: Alignment.topCenter,
-                        child: SizedBox(
-                          width: bodyConstraints.maxWidth,
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
-                            child: _profileContent(),
-                          ),
+                      // Scroll rather than shrink, so text stays readable on phones.
+                      return SingleChildScrollView(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+                          child: _profileContent(),
                         ),
                       );
                     },
@@ -113,11 +110,11 @@ class _ProfilePanelState extends State<ProfilePanel> {
   );
 
   Widget _header() => Container(
-    height: 68,
-    padding: const EdgeInsets.only(left: 20, right: 10),
+    height: 80,
+    padding: const EdgeInsets.only(left: 20, right: 12),
     decoration: const BoxDecoration(
-      color: TaniinColors.leafDark,
-      border: Border(bottom: BorderSide(color: Color(0xFF163F25), width: 4)),
+      color: Kayu.kayu,
+      border: Border(bottom: BorderSide(color: Kayu.rim, width: 4)),
     ),
     child: Row(
       children: <Widget>[
@@ -137,36 +134,25 @@ class _ProfilePanelState extends State<ProfilePanel> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
+              Text('Profil Petani', style: TextStyle(
+                fontFamily: 'Pixelify',
+                color: Kayu.emas,
+                fontSize: 26,
+                fontVariations: [FontVariation('wght', 700)],
+              )),
               Text(
-                'PROFIL PETANI',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 21,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: .5,
-                ),
-              ),
-              Text(
-                'Perjalanan, pencapaian, dan koleksimu',
+                'Level, quest harian, pencapaian, dan baju',
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: Color(0xFFC8E2C3),
-                  fontSize: 12,
+                  color: Kayu.kremRedup,
+                  fontSize: 14,
                   fontWeight: FontWeight.w700,
                 ),
               ),
             ],
           ),
         ),
-        IconButton.filled(
-          style: IconButton.styleFrom(
-            backgroundColor: const Color(0xFF173F27),
-            foregroundColor: Colors.white,
-          ),
-          tooltip: 'Tutup',
-          onPressed: widget.onClose,
-          icon: const Icon(Icons.close),
-        ),
+        KayuCloseButton(onPressed: widget.onClose),
       ],
     ),
   );
@@ -177,11 +163,11 @@ class _ProfilePanelState extends State<ProfilePanel> {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: <Color>[Color(0xFF315F38), Color(0xFF244B2D)],
+          colors: <Color>[Kayu.kayu, Kayu.kayuTua],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        border: Border.all(color: const Color(0xFF193A23), width: 3),
+        border: Border.all(color: Kayu.kayuGelap, width: 3),
         borderRadius: BorderRadius.circular(18),
         boxShadow: const <BoxShadow>[
           BoxShadow(color: Color(0x33000000), offset: Offset(0, 5)),
@@ -261,7 +247,7 @@ class _ProfilePanelState extends State<ProfilePanel> {
       const Text(
         'NAMA PETANI',
         style: TextStyle(
-          color: Color(0xFFC8E2C3),
+          color: Color(0xFFF3C99A),
           fontSize: 12,
           fontWeight: FontWeight.w900,
           letterSpacing: 1,
@@ -280,11 +266,11 @@ class _ProfilePanelState extends State<ProfilePanel> {
           isDense: true,
           counterText: '',
           filled: true,
-          fillColor: const Color(0x44203124),
+          fillColor: const Color(0x44000000),
           contentPadding: const EdgeInsets.fromLTRB(12, 11, 4, 11),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: Color(0xFF7DA66F), width: 2),
+            borderSide: const BorderSide(color: Color(0xFFE07B20), width: 2),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
@@ -318,7 +304,7 @@ class _ProfilePanelState extends State<ProfilePanel> {
           Text(
             '${100 - state.xpInLevel} XP lagi ke Level ${state.playerLevel + 1}',
             style: const TextStyle(
-              color: Color(0xFFC8E2C3),
+              color: Color(0xFFF3C99A),
               fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
@@ -332,7 +318,7 @@ class _ProfilePanelState extends State<ProfilePanel> {
           value: state.levelProgress,
           minHeight: 13,
           color: TaniinColors.wheat,
-          backgroundColor: const Color(0xFF173F27),
+          backgroundColor: const Color(0xFF4A1D08),
         ),
       ),
     ],
@@ -340,7 +326,7 @@ class _ProfilePanelState extends State<ProfilePanel> {
 
   Widget _questSection() => _section(
     icon: Icons.event_available,
-    title: 'QUEST HARIAN',
+    title: 'Quest harian',
     subtitle: 'Selesaikan target dan kumpulkan XP',
     child: Column(
       children: widget.farmState.dailyQuests
@@ -436,7 +422,7 @@ class _ProfilePanelState extends State<ProfilePanel> {
     final achievements = widget.farmState.unlockedAchievements;
     return _section(
       icon: Icons.emoji_events,
-      title: 'PENCAPAIAN',
+      title: 'Pencapaian',
       subtitle: '${achievements.length}/3 berhasil dibuka',
       child: achievements.isEmpty
           ? Container(
@@ -507,7 +493,7 @@ class _ProfilePanelState extends State<ProfilePanel> {
 
   Widget _wardrobeSection() => _section(
     icon: Icons.checkroom,
-    title: 'WARDROBE',
+    title: 'Baju petani',
     subtitle: 'Pilih gaya petani yang sudah kamu buka',
     child: LayoutBuilder(
       builder: (context, constraints) {

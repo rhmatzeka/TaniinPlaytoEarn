@@ -166,6 +166,9 @@ class FarmStateController extends ChangeNotifier {
 
   final List<int> cropRows = <int>[5, 3, 1, 7];
 
+  /// Row in spring_crops.png (16x32 cells) for the shop and inventory sprites.
+  int cropSpriteRow(int seedIndex) => cropRows[seedIndex] ~/ 2;
+
   final List<FarmPlotData> plots = <FarmPlotData>[
     FarmPlotData(tileX: 4, tileY: 19, tileWidth: 2, tileHeight: 4, owned: true),
     FarmPlotData(
@@ -208,8 +211,8 @@ class FarmStateController extends ChangeNotifier {
   final List<HistoryRecord> history = <HistoryRecord>[
     const HistoryRecord(
       title: 'Game dimulai',
-      status: 'Local saved',
-      timeLabel: 'now',
+      status: 'lokal tersimpan',
+      timeLabel: 'baru saja',
       valueLabel: '+6 seed',
     ),
   ];
@@ -784,7 +787,7 @@ class FarmStateController extends ChangeNotifier {
               status: _normalizeHistoryStatus(
                 _readString(record['status'], 'lokal tersimpan'),
               ),
-              timeLabel: _readString(record['timeLabel'], 'now'),
+              timeLabel: _readString(record['timeLabel'], 'baru saja'),
               valueLabel: _readString(record['valueLabel'], ''),
               txHash: _readString(record['txHash'], ''),
               errorMessage: _readString(record['errorMessage'], ''),
@@ -1538,20 +1541,12 @@ class FarmStateController extends ChangeNotifier {
       return false;
     }
     final price = seedTotalPrice(seedIndex);
-    if (onChainMode && !walletTaniBalanceAvailable) {
-      showMessage('Saldo TANI belum kebaca. Tunggu sync wallet sebentar.', success: false);
-      unawaited(refreshWalletState(revealMessage: false));
-      return false;
-    }
-    if (tani < price) {
-      showMessage(
-        'TANI belum cukup. Swap Game Coin ke TANI dulu.',
-        success: false,
-      );
+    if (coins < price) {
+      showMessage('Koin belum cukup. Butuh $price koin.', success: false);
       return false;
     }
     final total = seedTotalAmount();
-    tani -= price;
+    coins -= price;
     selectedSeedIndex = seedIndex;
     seeds[seedIndex] = seeds[seedIndex].copyWith(
       quantity: seeds[seedIndex].quantity + total,
@@ -1565,7 +1560,7 @@ class FarmStateController extends ChangeNotifier {
         quantity: shopBundleQuantity,
       ),
       title: 'Beli ${seeds[seedIndex].name}',
-      valueLabel: '-$price TANI',
+      valueLabel: '-$price koin',
     );
     showMessage(
       onChainMode
@@ -1819,7 +1814,8 @@ class FarmStateController extends ChangeNotifier {
     final nextAmount = sourceBalance <= 0
         ? 0
         : (swapAmount <= 0 || swapAmount > sourceBalance
-              ? sourceBalance
+              // Start small; "Semua" is one tap away.
+              ? math.min(sourceBalance, minEthSwapAmount)
               : swapAmount);
     if (swapAmount == nextAmount) {
       return;
