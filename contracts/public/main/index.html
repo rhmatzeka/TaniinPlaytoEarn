@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        registrations.forEach(function(registration) { registration.unregister(); });
+      });
+    }
+  </script>
+  <base href="/main/">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="Taniin farming game prototype with Sepolia Web3 hooks.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Taniin">
+  <meta name="theme-color" content="#17351f">
+
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" href="assets/assets/images/iconaplikasi.png">
+  <title>Taniin</title>
+
+  <style>
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #17351f;
+      color: #fff0cf;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      overscroll-behavior: none;
+      touch-action: none;
+    }
+
+    .boot {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background:
+        linear-gradient(rgba(10, 28, 16, 0.38), rgba(10, 28, 16, 0.38)),
+        url("assets/assets/images/loadingscreen.jpg") center / cover no-repeat,
+        #17351f;
+    }
+
+    .boot__label {
+      padding: 10px 14px;
+      border: 2px solid #f0ad45;
+      background: rgba(61, 40, 25, 0.92);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="boot" aria-hidden="true">
+    <div class="boot__label">Loading Taniin...</div>
+  </div>
+  <script>
+    window.taniinLastEthereumError = '';
+
+    window.taniinHasEthereumProvider = function () {
+      return false;
+    };
+
+    window.taniinEthereumError = function () {
+      return window.taniinLastEthereumError || '';
+    };
+
+    window.taniinRequestEthereumAccount = async function () {
+      window.taniinLastEthereumError = '';
+      const ethereum = window.ethereum;
+      if (!ethereum || typeof ethereum.request !== 'function') {
+        window.taniinLastEthereumError = 'Wallet browser Ethereum tidak terdeteksi di browser ini.';
+        return '';
+      }
+
+      try {
+        const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+        const account = accounts && accounts[0] ? String(accounts[0]) : '';
+        if (!account) {
+          window.taniinLastEthereumError = 'Wallet tidak mengirim public address.';
+          return '';
+        }
+
+        try {
+          const chainId = await ethereum.request({ method: 'eth_chainId' });
+          if (chainId !== '0xaa36a7') {
+            await ethereum.request({
+              method: 'wallet_switchEthereumChain',
+              params: [{ chainId: '0xaa36a7' }],
+            });
+          }
+        } catch (switchError) {
+          if (switchError && switchError.code === 4902) {
+            try {
+              await ethereum.request({
+                method: 'wallet_addEthereumChain',
+                params: [{
+                  chainId: '0xaa36a7',
+                  chainName: 'Sepolia',
+                  nativeCurrency: { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
+                  rpcUrls: ['https://ethereum-sepolia-rpc.publicnode.com'],
+                  blockExplorerUrls: ['https://sepolia.etherscan.io'],
+                }],
+              });
+            } catch (_) {}
+          }
+        }
+
+        return account;
+      } catch (error) {
+        window.taniinLastEthereumError = error && error.message
+          ? error.message
+          : 'Connect wallet dibatalkan.';
+        return '';
+      }
+    };
+
+    window.taniinSendEthereum = async function (from, to, valueHex) {
+      window.taniinLastEthereumError = '';
+      try {
+        return String(await window.ethereum.request({
+          method: 'eth_sendTransaction',
+          params: [{ from: from, to: to, value: valueHex }],
+        }));
+      } catch (error) {
+        window.taniinLastEthereumError = error && error.message
+          ? error.message
+          : 'Transfer ETH dibatalkan.';
+        return '';
+      }
+    };
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

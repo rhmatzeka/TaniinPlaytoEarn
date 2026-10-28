@@ -1,0 +1,10 @@
+{
+  "name": "Taniin",
+  "short_name": "Taniin",
+  "start_url": ".",
+  "display": "fullscreen",
+  "background_color": "#17351f",
+  "theme_color": "#17351f",
+  "description": "Taniin farming game prototype with Sepolia Web3 hooks.",
+  "orientation": "landscape"
+}
