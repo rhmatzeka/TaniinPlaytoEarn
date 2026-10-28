@@ -3,64 +3,130 @@
     {
       "source": "/",
       "headers": [
-        { "key": "Cache-Control", "value": "no-store, max-age=0" },
-        { "key": "CDN-Cache-Control", "value": "no-store" },
-        { "key": "Cloudflare-CDN-Cache-Control", "value": "no-store" }
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "CDN-Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "Cloudflare-CDN-Cache-Control",
+          "value": "no-store"
+        }
       ]
     },
     {
       "source": "/index.html",
       "headers": [
-        { "key": "Cache-Control", "value": "no-store, max-age=0" },
-        { "key": "CDN-Cache-Control", "value": "no-store" },
-        { "key": "Cloudflare-CDN-Cache-Control", "value": "no-store" }
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "CDN-Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "Cloudflare-CDN-Cache-Control",
+          "value": "no-store"
+        }
       ]
     },
     {
       "source": "/flutter_bootstrap.js",
       "headers": [
-        { "key": "Cache-Control", "value": "no-store, max-age=0" },
-        { "key": "CDN-Cache-Control", "value": "no-store" },
-        { "key": "Cloudflare-CDN-Cache-Control", "value": "no-store" }
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "CDN-Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "Cloudflare-CDN-Cache-Control",
+          "value": "no-store"
+        }
       ]
     },
     {
       "source": "/main.dart.js",
       "headers": [
-        { "key": "Cache-Control", "value": "no-store, max-age=0" },
-        { "key": "CDN-Cache-Control", "value": "no-store" },
-        { "key": "Cloudflare-CDN-Cache-Control", "value": "no-store" }
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "CDN-Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "Cloudflare-CDN-Cache-Control",
+          "value": "no-store"
+        }
       ]
     },
     {
       "source": "/flutter_service_worker.js",
       "headers": [
-        { "key": "Cache-Control", "value": "no-store, max-age=0" },
-        { "key": "CDN-Cache-Control", "value": "no-store" },
-        { "key": "Cloudflare-CDN-Cache-Control", "value": "no-store" }
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "CDN-Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "Cloudflare-CDN-Cache-Control",
+          "value": "no-store"
+        }
       ]
     }
   ],
   "rewrites": [
     {
-      "source": "/game-actions",
-      "destination": "/api/game-actions"
-    },
-    {
       "source": "/health",
       "destination": "/api/health"
     },
     {
-      "source": "/auth/nonce",
-      "destination": "/api/auth-nonce"
+      "source": "/auth/privy",
+      "destination": "/api/auth/privy"
     },
     {
-      "source": "/auth/verify",
-      "destination": "/api/auth-verify"
+      "source": "/auth/logout",
+      "destination": "/api/auth/logout"
     },
     {
-      "source": "/wallet-connect",
-      "destination": "/api/wallet-connect"
+      "source": "/player",
+      "destination": "/api/player"
+    },
+    {
+      "source": "/player/import",
+      "destination": "/api/player/import"
+    },
+    {
+      "source": "/game-actions",
+      "destination": "/api/game-actions"
+    }
+  ],
+  "functions": {
+    "api/[...path].js": {
+      "maxDuration": 60
+    }
+  },
+  "redirects": [
+    {
+      "source": "/unduh",
+      "destination": "https://github.com/rhmatzeka/TaniinPlaytoEarn/releases/download/apk-terbaru/Taniin.apk",
+      "permanent": false
+    },
+    {
+      "source": "/unduh/Taniin.apk",
+      "destination": "https://github.com/rhmatzeka/TaniinPlaytoEarn/releases/download/apk-terbaru/Taniin.apk",
+      "permanent": false
     }
   ]
 }

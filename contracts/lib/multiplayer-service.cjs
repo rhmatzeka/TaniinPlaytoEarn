@@ -1,11 +1,12 @@
 const { Server } = require("socket.io");
-const { enqueueGameAction } = require("./game-action-service.cjs");
 const { interpret } = require("./ai-brain.cjs");
 
 // AI Agent State
 // Valid checksummed Sepolia address used as the AI Farmer Agent's smart account.
 const AI_WALLET_ADDRESS = "0x000000000000000000000000000000000000dEaD"; // AI Virtual Address
-const AI_ONCHAIN_ENABLED = String(process.env.TANIIN_AI_ONCHAIN_ENABLED || "").trim().toLowerCase() === "true";
+// Pak Tani AI acts only inside the shared world; it never sends chain transactions.
+const AI_ONCHAIN_ENABLED = false;
+const enqueueGameAction = async () => ({});
 const MAX_AI_QUEUE = 20;
 const MAX_CHAT_LENGTH = 300;
 const MAP_MIN = 0;
