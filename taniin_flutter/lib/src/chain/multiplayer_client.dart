@@ -730,7 +730,7 @@ class MultiplayerClient extends ChangeNotifier {
             ),
           );
           final entryId = farmState.addExternalHistory(
-            'Panen ${['Kentang', 'Bawang', 'Stroberi', 'Bit'][['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(action.seed) != -1 ? ['Kentang', 'Bawang', 'Stroberi', 'Bit'].indexOf(action.seed) : 0]}',
+            'Panen ${const <String>['Kentang', 'Bawang', 'Stroberi', 'Bit'].contains(action.seed) ? action.seed : 'Kentang'}',
             '+3 panen',
             tx != 'lokal' ? 'menunggu konfirmasi' : 'lokal tersimpan',
             txHash: tx != 'lokal' ? res ?? '' : '',

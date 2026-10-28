@@ -849,11 +849,12 @@ class FarmStateController extends ChangeNotifier {
         final progressById = <String, int>{};
         for (final value in savedQuests) {
           final quest = _mapValue(value);
-          if (quest != null)
+          if (quest != null) {
             progressById[_readString(quest['id'], '')] = _readInt(
               quest['progress'],
               0,
             );
+          }
         }
         dailyQuests = dailyQuests
             .map(
