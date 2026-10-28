@@ -142,5 +142,14 @@ void main() {
     expect(farmState.statusMessage, contains('Koin'));
     expect(farmState.coins, 50);
   });
+
+  test('opening the swap house starts with a small amount, not everything', () {
+    farmState.prepareSwapAmount();
+    expect(farmState.selectedSwapAmount, 100);
+    farmState.coins = 40;
+    farmState.swapAmount = 0;
+    farmState.prepareSwapAmount();
+    expect(farmState.selectedSwapAmount, 40);
+  });
 }
 

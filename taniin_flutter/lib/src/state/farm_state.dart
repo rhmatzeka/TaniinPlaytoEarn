@@ -1814,7 +1814,8 @@ class FarmStateController extends ChangeNotifier {
     final nextAmount = sourceBalance <= 0
         ? 0
         : (swapAmount <= 0 || swapAmount > sourceBalance
-              ? sourceBalance
+              // Start small; "Semua" is one tap away.
+              ? math.min(sourceBalance, minEthSwapAmount)
               : swapAmount);
     if (swapAmount == nextAmount) {
       return;

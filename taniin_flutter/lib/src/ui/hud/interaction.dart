@@ -208,13 +208,17 @@ class _InteractionButtons extends StatelessWidget {
           onPressed: onClose,
         ),
         KayuButton(
-          label: _primaryLabel(),
+          label: _cannotAfford ? 'Koin kurang' : _primaryLabel(),
           compact: true,
-          onPressed: () => _performPrimary(context),
+          onPressed: _cannotAfford ? null : () => _performPrimary(context),
         ),
       ],
     );
   }
+
+  bool get _cannotAfford =>
+      interaction == GameInteraction.buyLand &&
+      farmState.coins < FarmStateController.landBuyPrice;
 
   String _primaryLabel() {
     return switch (interaction) {
