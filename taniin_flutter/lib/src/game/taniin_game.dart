@@ -14,6 +14,9 @@ class TaniinGame extends FlameGame {
   TaniinGame(this.farmState, this.multiplayerClient);
 
   static const double _tile = 128;
+  // Character sheets use 32 px frames and the map 16 px tiles, so two tiles
+  // keeps characters at the same pixel size as the world.
+  static const double _characterSize = _tile * 2;
   static const double _playerSpeed = _tile * 3.9;
   static const double _maxCollisionStep = _tile * 0.16;
   static const double _shopLeftTile = 13.8;
@@ -669,7 +672,7 @@ class TaniinGame extends FlameGame {
   }
 
   Rect _shopNpcTapBounds() {
-    final npcSize = _tile * 1.16;
+    const npcSize = _characterSize;
     return Rect.fromCenter(
       center: Offset(_shopNpcXTile * _tile, (_shopNpcYTile - 0.38) * _tile),
       width: npcSize * 0.95,
@@ -1185,7 +1188,7 @@ class TaniinGame extends FlameGame {
     }
     final footWorldX = 19.18 * _tile;
     final footWorldY = 25.88 * _tile;
-    final npcSize = _tile * 1.16;
+    const npcSize = _characterSize;
     final footX = footWorldX - _cameraX;
     final footY = footWorldY - _cameraY;
     if (_isOffscreen(
@@ -1309,7 +1312,7 @@ class TaniinGame extends FlameGame {
 
   void _drawPlayer(Canvas canvas) {
     final sheet = _moving ? (_walkSheet ?? _idleSheet) : _idleSheet;
-    final playerSize = _tile * 1.35;
+    const playerSize = _characterSize;
     final footX = _playerX - _cameraX;
     final footY = _playerY - _cameraY + _tile * 0.05;
     _paint
@@ -1317,10 +1320,10 @@ class TaniinGame extends FlameGame {
       ..color = const Color(0x50000000);
     canvas.drawOval(
       Rect.fromLTRB(
-        footX - _tile * 0.22,
-        footY - _tile * 0.06,
-        footX + _tile * 0.22,
-        footY + _tile * 0.07,
+        footX - _tile * 0.32,
+        footY - _tile * 0.08,
+        footX + _tile * 0.32,
+        footY + _tile * 0.09,
       ),
       _paint,
     );
@@ -1757,7 +1760,7 @@ class TaniinGame extends FlameGame {
   }
 
   void _drawRemotePlayers(Canvas canvas) {
-    final playerSize = _tile * 1.35;
+    const playerSize = _characterSize;
     final idleS = _idleSheet;
     final walkS = _walkSheet;
 
@@ -1781,10 +1784,10 @@ class TaniinGame extends FlameGame {
         ..color = const Color(0x50000000);
       canvas.drawOval(
         Rect.fromLTRB(
-          footX - _tile * 0.22,
-          footY - _tile * 0.06,
-          footX + _tile * 0.22,
-          footY + _tile * 0.07,
+          footX - _tile * 0.32,
+          footY - _tile * 0.08,
+          footX + _tile * 0.32,
+          footY + _tile * 0.09,
         ),
         _paint,
       );
@@ -1819,7 +1822,7 @@ class TaniinGame extends FlameGame {
         canvas,
         player.name,
         player.x,
-        player.y - playerSize * 0.8,
+        player.y - playerSize * 0.7,
         const Color(0xFF6FB7FF),
       );
     });
@@ -1862,7 +1865,7 @@ class TaniinGame extends FlameGame {
     final ai = multiplayerClient.aiAgent;
     if (ai == null) return;
 
-    final playerSize = _tile * 1.35;
+    const playerSize = _characterSize;
     final idleS = _idleSheet;
     final walkS = _walkSheet;
 
@@ -1885,10 +1888,10 @@ class TaniinGame extends FlameGame {
       ..color = const Color(0x50000000);
     canvas.drawOval(
       Rect.fromLTRB(
-        footX - _tile * 0.22,
-        footY - _tile * 0.06,
-        footX + _tile * 0.22,
-        footY + _tile * 0.07,
+        footX - _tile * 0.32,
+        footY - _tile * 0.08,
+        footX + _tile * 0.32,
+        footY + _tile * 0.09,
       ),
       _paint,
     );
@@ -1935,7 +1938,7 @@ class TaniinGame extends FlameGame {
       canvas,
       ai.name,
       ai.x,
-      ai.y - playerSize * 0.8,
+      ai.y - playerSize * 0.7,
       const Color(0xFF52E07A),
     );
   }
@@ -1949,13 +1952,13 @@ class TaniinGame extends FlameGame {
   ) {
     final painter = TextPainter(
       text: TextSpan(
-        text: ' $name ',
+        text: name,
         style: TextStyle(
-          fontFamily: 'monospace',
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
+          fontFamily: 'Pixelify',
+          fontSize: 30,
+          height: 1,
           color: tagColor,
-          backgroundColor: const Color(0xE60F1A12),
+          fontVariations: const [FontVariation('wght', 700)],
         ),
       ),
       textDirection: TextDirection.ltr,
@@ -1963,14 +1966,20 @@ class TaniinGame extends FlameGame {
 
     final x = worldX - _cameraX - painter.width * 0.5;
     final y = worldY - _cameraY - painter.height * 0.5;
-
-    // Draw small green/blue accent bar under name tag
-    final borderPaint = Paint()
-      ..style = PaintingStyle.fill
-      ..color = tagColor;
+    final tag = Rect.fromLTWH(
+      x - 12,
+      y - 7,
+      painter.width + 24,
+      painter.height + 14,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(tag, const Radius.circular(8)),
+      Paint()..color = const Color(0xE60F1A12),
+    );
+    // Coloured accent along the bottom of the tag.
     canvas.drawRect(
-      Rect.fromLTWH(x, y + painter.height - 2, painter.width, 2.5),
-      borderPaint,
+      Rect.fromLTWH(tag.left + 8, tag.bottom - 4, tag.width - 16, 4),
+      Paint()..color = tagColor,
     );
 
     painter.paint(canvas, Offset(x, y));
