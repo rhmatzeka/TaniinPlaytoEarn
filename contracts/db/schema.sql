@@ -69,3 +69,5 @@ CREATE TABLE IF NOT EXISTS auth_codes (
 -- A Privy user can change wallets; one player row per wallet, not per user.
 ALTER TABLE players DROP CONSTRAINT IF EXISTS players_privy_user_id_key;
 CREATE INDEX IF NOT EXISTS players_privy_user_idx ON players (privy_user_id);
+
+ALTER TABLE idempotency ADD COLUMN IF NOT EXISTS fingerprint text NOT NULL DEFAULT '';

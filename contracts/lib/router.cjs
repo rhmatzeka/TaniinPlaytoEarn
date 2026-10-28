@@ -3,12 +3,13 @@ const { exchangePrivyToken, redeemAuthCode, requireSession, revokeSession } = re
 const { getPlayer, importGuest, runGameAction } = require("./player-service.cjs");
 
 // One handler for every API path, so Vercel deploys a single function.
-function createApp({ getDb, now = Date.now, multiplayerOnly = false }) {
+function createApp({ getDb, now = Date.now, multiplayerOnly = false, chainHealth = defaultChainHealth }) {
+  const healthCache = { value: null, at: 0 };
   const routes = multiplayerOnly ? {
     // srv runs only Socket.IO; the economy API lives on Vercel.
     "GET /health": async () => ({ ok: true, multiplayer: true })
   } : {
-    "GET /health": async () => health(),
+    "GET /health": async () => health(chainHealth, healthCache, now()),
     "POST /auth/privy": async (req, db, body) => ({
       ok: true,
       ...await exchangePrivyToken(db, body.accessToken, clientIp(req), { codeChallenge: body.codeChallenge })
@@ -54,18 +55,28 @@ function createApp({ getDb, now = Date.now, multiplayerOnly = false }) {
   };
 }
 
-async function health() {
+// The chain part is cached so a burst of /health calls does not hit Sepolia RPC.
+const HEALTH_CACHE_MS = 30_000;
+
+async function health(chainHealth, cache, nowMs) {
   const base = {
     ok: true,
     economyPaused: String(process.env.TANIIN_ECONOMY_PAUSED || "").trim().toLowerCase() === "true",
     multiplayerUrl: String(process.env.TANIIN_MULTIPLAYER_URL || "").trim()
   };
-  try {
-    const { health: chainHealth } = require("./game-action-service.cjs");
-    return { ...base, ...await withTimeout(chainHealth(), 8000) };
-  } catch (error) {
-    return { ...base, chainError: error.message };
+  if (!cache.value || nowMs - cache.at > HEALTH_CACHE_MS) {
+    try {
+      cache.value = await withTimeout(chainHealth(), 8000);
+    } catch (error) {
+      cache.value = { chainError: error.message };
+    }
+    cache.at = nowMs;
   }
+  return { ...base, ...cache.value };
+}
+
+function defaultChainHealth() {
+  return require("./game-action-service.cjs").health();
 }
 
 function withTimeout(promise, ms) {

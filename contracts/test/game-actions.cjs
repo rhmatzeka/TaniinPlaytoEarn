@@ -251,6 +251,21 @@ describe("Game action API", function () {
     expect(result.json).to.deep.equal({ ok: true });
   });
 
+  it("caches the chain part of health for a short while", async function () {
+    let calls = 0;
+    const cachedApp = createApp({
+      getDb: () => db,
+      now: () => clock,
+      chainHealth: async () => {
+        calls += 1;
+        return { signer: "0xabc" };
+      }
+    });
+    expect((await call(cachedApp, { path: "/health" })).json.signer).to.equal("0xabc");
+    await call(cachedApp, { path: "/health" });
+    expect(calls).to.equal(1);
+  });
+
   it("reports health with the economy switch", async function () {
     const result = await call(app, { path: "/health" });
     expect(result.status).to.equal(200);

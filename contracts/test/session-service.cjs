@@ -164,6 +164,13 @@ describe("Privy sessions", function () {
     expect(rows[0].ttl).to.be.greaterThan(3600);
   });
 
+  it("rejects reusing a key for a different request", async function () {
+    await withIdempotency(db, WALLET, "key-4", async () => ({ ok: true }), "body-a");
+    const replay = await withIdempotency(db, WALLET, "key-4", async () => ({ ok: false }), "body-a");
+    expect(replay.ok).to.equal(true);
+    await rejects(withIdempotency(db, WALLET, "key-4", async () => ({ ok: true }), "body-b"), 409, /aksi lain/);
+  });
+
   it("forgets a key whose run failed so the client can retry", async function () {
     await rejects(withIdempotency(db, WALLET, "key-2", async () => {
       const error = new Error("chain down");

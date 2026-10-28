@@ -70,6 +70,7 @@ async function runGameAction(db, session, body, idempotencyKey, { ip, nowMs }) {
   await checkRateLimit(db, `ip:${ip || "unknown"}`, IP_ACTION_LIMIT, RATE_WINDOW_MS);
   const type = String(body?.type || "").trim().toUpperCase();
 
+  const fingerprint = require("crypto").createHash("sha256").update(JSON.stringify(body ?? {})).digest("hex");
   return withIdempotency(db, session.wallet, idempotencyKey, async () => {
     let prepared;
     try {
@@ -106,7 +107,7 @@ async function runGameAction(db, session, body, idempotencyKey, { ip, nowMs }) {
       etherscanUrl: chain.txHash ? `https://sepolia.etherscan.io/tx/${chain.txHash}` : "",
       state: publicState(prepared.state)
     };
-  });
+  }, fingerprint);
 }
 
 // Phase one: validate and commit the debit before anything reaches the chain, so
