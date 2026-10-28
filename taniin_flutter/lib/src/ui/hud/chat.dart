@@ -126,43 +126,32 @@ class _ChatHudState extends State<_ChatHud> {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: compact ? 16 : 20,
-              vertical: compact ? 12 : 14,
-            ),
-            decoration: BoxDecoration(
-              color: _kPanel,
-              border: Border.all(color: _kBorder, width: 2.5),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x66000000),
-                  blurRadius: 6,
-                  offset: Offset(0, 3),
-                ),
-              ],
-            ),
+          PixelFrame(
+            tone: PixelFrameTone.gelap,
+            padding: EdgeInsets.fromLTRB(10, 6, compact ? 14 : 18, 6),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _AiAvatar(size: compact ? 26 : 30),
-                const SizedBox(width: 10),
-                Text(
-                  'Pak Tani AI',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontFamily: 'monospace',
-                    fontWeight: FontWeight.bold,
-                    fontSize: compact ? 15 : 18,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.asset(
+                    'assets/images/iconaplikasi.png',
+                    width: compact ? 44 : 50,
+                    height: compact ? 44 : 50,
+                    filterQuality: FilterQuality.medium,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Icon(
-                  Icons.chat_bubble_outline,
-                  color: _kAccent,
-                  size: compact ? 18 : 22,
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Pak Tani AI', style: Kayu.judul(compact ? 19 : 22, color: Kayu.krem)),
+                    Text('Ketuk untuk ngobrol', style: Kayu.teks(compact ? 13 : 14, color: Kayu.kremRedup)),
+                  ],
                 ),
+                const SizedBox(width: 10),
+                PixelIcon('chat', size: compact ? 30 : 34),
               ],
             ),
           ),

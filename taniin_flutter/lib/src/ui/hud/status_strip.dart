@@ -4,7 +4,7 @@ import '../../state/farm_state.dart';
 
 /// Small row of service indicators. Each state has an icon shape as well as a
 /// color, so it reads without relying on color alone.
-class StatusStrip extends StatelessWidget {
+class StatusStrip extends StatefulWidget {
   const StatusStrip({
     required this.farmState,
     required this.multiplayerOnline,
@@ -17,25 +17,90 @@ class StatusStrip extends StatelessWidget {
   final bool aiOnline;
 
   @override
-  Widget build(BuildContext context) {
-    final items = <_StatusItem>[
+  State<StatusStrip> createState() => _StatusStripState();
+}
+
+/// One quiet summary chip; tapping it lists every service.
+class _StatusStripState extends State<StatusStrip> {
+  bool _open = false;
+
+  List<_StatusItem> get _items {
+    final farmState = widget.farmState;
+    return <_StatusItem>[
       _StatusItem('Akun', farmState.isLoggedIn ? _Level.ok : _Level.idle,
           farmState.isLoggedIn ? 'masuk' : 'tamu'),
       _StatusItem('Sepolia', _fromService(farmState.sepoliaState),
           _serviceWord(farmState.sepoliaState)),
       _StatusItem('Server', _fromService(farmState.serverState),
           _serviceWord(farmState.serverState)),
-      _StatusItem('Multiplayer', multiplayerOnline ? _Level.ok : _Level.down,
-          multiplayerOnline ? 'online' : 'offline'),
-      _StatusItem('AI', aiOnline ? _Level.ok : _Level.down,
-          aiOnline ? 'online' : 'offline'),
+      _StatusItem('Multiplayer', widget.multiplayerOnline ? _Level.ok : _Level.down,
+          widget.multiplayerOnline ? 'online' : 'offline'),
+      _StatusItem('AI', widget.aiOnline ? _Level.ok : _Level.down,
+          widget.aiOnline ? 'online' : 'offline'),
     ];
-    return Wrap(
-      spacing: 6,
-      runSpacing: 4,
-      children: [for (final item in items) _StatusChip(item: item)],
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final items = _items;
+    final down = items.where((item) => item.level == _Level.down).length;
+    final summary = down == 0 ? 'Semua online' : '$down offline';
+    final chip = Semantics(
+      button: true,
+      label: [for (final item in items) '${item.label}: ${item.word}'].join(', '),
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: () => setState(() => _open = !_open),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xCC25140A),
+            border: Border.all(color: const Color(0xFF6E2A0C), width: 3),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final item in items) ...[
+                Container(width: 10, height: 10, color: _color(item.level)),
+                const SizedBox(width: 3),
+              ],
+              const SizedBox(width: 6),
+              Text(
+                summary,
+                style: const TextStyle(
+                  color: Color(0xFFF4F1E0),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  height: 1,
+                ),
+              ),
+              Icon(_open ? Icons.expand_less : Icons.expand_more, size: 18, color: const Color(0xFFF4F1E0)),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!_open) return chip;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        chip,
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          runSpacing: 4,
+          children: [for (final item in items) _StatusChip(item: item)],
+        ),
+      ],
     );
   }
+
+  static Color _color(_Level level) => switch (level) {
+    _Level.ok => const Color(0xFF8FE39A),
+    _Level.idle => const Color(0xFFFFE49D),
+    _Level.down => const Color(0xFFFF9C8A),
+  };
 
   static _Level _fromService(ServiceState state) => switch (state) {
     ServiceState.online => _Level.ok,

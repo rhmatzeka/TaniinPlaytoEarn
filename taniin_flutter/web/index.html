@@ -52,20 +52,76 @@
         #17351f;
     }
 
+    @font-face {
+      font-family: "Pixelify";
+      src: url("assets/assets/fonts/PixelifySans.ttf") format("truetype");
+      font-display: swap;
+    }
+
+    .boot__card {
+      display: grid;
+      justify-items: center;
+      gap: 10px;
+      padding: 22px 30px 20px;
+      background: #a34a1c;
+      border: 4px solid #25140a;
+      box-shadow: inset 0 0 0 4px #e07b20, 0 8px 0 #25140a;
+      text-align: center;
+    }
+
+    .boot__card img {
+      width: 72px;
+      height: 72px;
+      border: 3px solid #25140a;
+      border-radius: 12px;
+    }
+
+    .boot__title {
+      font: 700 36px/1 "Pixelify", monospace;
+      color: #ffde19;
+      text-shadow: 0 3px 0 #4a1d08;
+    }
+
+    .boot__bar {
+      width: 180px;
+      height: 14px;
+      border: 3px solid #25140a;
+      background: #4a1d08;
+      overflow: hidden;
+    }
+
+    .boot__bar span {
+      display: block;
+      width: 40%;
+      height: 100%;
+      background: repeating-linear-gradient(90deg, #86e276 0 10px, #2f7d45 10px 14px);
+      animation: boot-jalan 1.1s steps(8) infinite;
+    }
+
     .boot__label {
-      padding: 10px 14px;
-      border: 2px solid #f0ad45;
-      background: rgba(61, 40, 25, 0.92);
-      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
-      font-size: 14px;
-      font-weight: 800;
-      letter-spacing: 0;
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff0d4;
+    }
+
+    @keyframes boot-jalan {
+      from { transform: translateX(-100%); }
+      to { transform: translateX(250%); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .boot__bar span { animation: none; width: 100%; }
     }
   </style>
 </head>
 <body>
-  <div class="boot" aria-hidden="true">
-    <div class="boot__label">Loading Taniin...</div>
+  <div class="boot" role="status">
+    <div class="boot__card">
+      <img src="assets/assets/images/iconaplikasi.png" alt="">
+      <div class="boot__title">Taniin</div>
+      <div class="boot__bar"><span></span></div>
+      <div class="boot__label">Memuat kebun…</div>
+    </div>
   </div>
   <script>
     window.taniinLastEthereumError = '';

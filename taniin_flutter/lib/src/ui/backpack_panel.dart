@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../state/farm_state.dart';
 import 'kayu.dart';
+import 'pixel_art.dart';
 
 /// The bag: what the farmer is carrying, drawn with the game's own sprites.
 class BackpackPanel extends StatelessWidget {
@@ -25,7 +26,7 @@ class BackpackPanel extends StatelessWidget {
         );
         return KayuPanel(
           title: 'Tas',
-          icon: Icons.backpack,
+          leading: const PixelIcon('tas', size: 52),
           subtitle: 'Benih dan hasil panen yang kamu bawa.',
           trailing: KayuWell(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),

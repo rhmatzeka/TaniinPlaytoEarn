@@ -263,10 +263,16 @@ void main() {
       ),
     );
 
+    // Collapsed: one summary that still tells screen readers every service.
+    expect(find.textContaining('offline'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('Multiplayer: offline')), findsOneWidget);
+    expect(find.text('Sepolia'), findsNothing);
+
+    await tester.tap(find.textContaining('offline'));
+    await tester.pump();
     for (final label in <String>['Akun', 'Sepolia', 'Server', 'Multiplayer', 'AI']) {
       expect(find.text(label), findsOneWidget);
     }
-    expect(find.bySemanticsLabel(RegExp('Multiplayer: offline')), findsOneWidget);
   });
 
   test('persists planted plot state locally', () async {

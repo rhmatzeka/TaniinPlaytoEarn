@@ -6,6 +6,7 @@ import '../chain/chain_client.dart';
 import '../chain/platform_bridge.dart';
 import '../state/farm_state.dart';
 import 'pixel_panel.dart';
+import 'pixel_art.dart';
 
 class HistoryPanel extends StatelessWidget {
   const HistoryPanel({
@@ -42,7 +43,7 @@ class HistoryPanel extends StatelessWidget {
             child: Column(
               children: [
                 _PanelHeader(
-                  icon: Icons.history,
+                  ikon: 'riwayat',
                   title: 'Riwayat',
                   onClose: onClose,
                   compact: compact,
@@ -100,14 +101,14 @@ class HistoryPanel extends StatelessWidget {
 
 class _PanelHeader extends StatelessWidget {
   const _PanelHeader({
-    required this.icon,
+    required this.ikon,
     required this.title,
     required this.onClose,
     required this.compact,
     required this.farmState,
   });
 
-  final IconData icon;
+  final String ikon;
   final String title;
   final VoidCallback onClose;
   final bool compact;
@@ -133,11 +134,7 @@ class _PanelHeader extends StatelessWidget {
         children: [
           _YellowPixelDot(compact: compact),
           SizedBox(width: compact ? 12 : 24),
-          Icon(
-            icon,
-            size: compact ? 28 : 50,
-            color: const Color(0xFFFFF0CE),
-          ),
+          PixelIcon(ikon, size: compact ? 40 : 52),
           SizedBox(width: compact ? 12 : 22),
           Expanded(
             child: Text(

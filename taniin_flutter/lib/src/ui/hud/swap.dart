@@ -35,7 +35,7 @@ class _SwapHousePanel extends StatelessWidget {
     final mode = _mode;
     return KayuPanel(
       title: 'Rumah Tukar',
-      icon: Icons.swap_horiz,
+      leading: const PixelIcon('koin', size: 52),
       subtitle: 'Tukar Game Coin, token TANI, dan ETH Sepolia.',
       onClose: onClose,
       maxWidth: 860,

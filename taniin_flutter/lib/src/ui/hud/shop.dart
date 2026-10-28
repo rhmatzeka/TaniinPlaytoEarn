@@ -11,7 +11,7 @@ class _ShopPanel extends StatelessWidget {
     final narrow = MediaQuery.sizeOf(context).width < 760;
     return KayuPanel(
       title: 'Toko Benih',
-      icon: Icons.storefront,
+      leading: CropSprite(cropRow: farmState.cropSpriteRow(0), height: 52),
       subtitle: 'Satu paket berisi ${FarmStateController.seedBundleAmount} benih.',
       trailing: KayuWell(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
