@@ -54,7 +54,10 @@ class GameHud extends StatelessWidget {
           child: PhysicalViewport(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final compact = constraints.maxWidth < 980;
+                final portrait = PhysicalViewport.isPortrait(constraints.biggest);
+                final compact = portrait || constraints.maxWidth < 980;
+                // Portrait phones: HUD stacks down the edges instead of across the top.
+                const edge = 16.0;
                 final showTouchJoystick = shouldShowTouchJoystickForPlatform(
                   viewportSize: logicalViewport,
                 );
@@ -65,7 +68,9 @@ class GameHud extends StatelessWidget {
                           .toDouble();
                 final mobileWebTouchLayout = kIsWeb && showTouchJoystick;
                 const showMiniMap = true;
-                final miniMapWidth = compact
+                final miniMapWidth = portrait
+                    ? 168.0
+                    : compact
                     ? (constraints.maxWidth * 0.28)
                           .clamp(112.0, 140.0)
                           .toDouble()
@@ -114,7 +119,9 @@ class GameHud extends StatelessWidget {
                           )
                           .toDouble()
                     : 0.0;
-                final joystickTop = showTouchJoystick
+                final joystickTop = showTouchJoystick && portrait
+                    ? constraints.maxHeight - joystickSize - 120
+                    : showTouchJoystick
                     ? (mobileWebTouchLayout
                               ? constraints.maxHeight -
                                     joystickSize -
@@ -140,8 +147,8 @@ class GameHud extends StatelessWidget {
                     ),
                     if (showMiniMap)
                       Positioned(
-                        left: 32,
-                        top: 26,
+                        left: portrait ? edge : 32,
+                        top: portrait ? edge : 26,
                         child: _MiniMap(
                           game: game,
                           width: miniMapWidth,
@@ -149,8 +156,8 @@ class GameHud extends StatelessWidget {
                         ),
                       ),
                     Positioned(
-                      right: 20,
-                      top: 10,
+                      right: portrait ? edge : 20,
+                      top: portrait ? edge : 10,
                       child: _TopCluster(
                         farmState: farmState,
                         compact: compact,
@@ -161,8 +168,8 @@ class GameHud extends StatelessWidget {
                       ),
                     ),
                     Positioned(
-                      right: 20,
-                      top: compact ? 196 : 204,
+                      right: portrait ? edge : 20,
+                      top: portrait ? 196 : compact ? 196 : 204,
                       child: Column(
                         children: [
                           _HudIconButton(
@@ -193,11 +200,15 @@ class GameHud extends StatelessWidget {
                       ),
                     ),
                     Positioned(
-                      top: 8,
-                      left: miniMapWidth + 48,
-                      right: compact ? 300 : 420,
+                      top: portrait
+                          ? edge + miniMapWidth * game.miniMapAspectRatio + 36
+                          : 8,
+                      left: portrait ? edge : miniMapWidth + 48,
+                      right: portrait ? 110 : compact ? 300 : 420,
                       child: Align(
-                        alignment: Alignment.topCenter,
+                        alignment: portrait
+                            ? Alignment.topLeft
+                            : Alignment.topCenter,
                         child: AnimatedBuilder(
                           animation: game.multiplayerClient,
                           builder: (context, _) => StatusStrip(
@@ -217,8 +228,10 @@ class GameHud extends StatelessWidget {
                       ),
                     // Chat / AI Agent Panel (collapsible, anchored under minimap)
                     Positioned(
-                      left: 32,
-                      top: 26 + miniMapWidth * game.miniMapAspectRatio + 12,
+                      left: portrait ? edge : 32,
+                      top: portrait
+                          ? edge + miniMapWidth * game.miniMapAspectRatio + 96
+                          : 26 + miniMapWidth * game.miniMapAspectRatio + 12,
                       child: _ChatHud(
                         multiplayerClient: game.multiplayerClient,
                         compact: compact,
@@ -226,9 +239,9 @@ class GameHud extends StatelessWidget {
                       ),
                     ),
                     Positioned(
-                      left: compact ? 194 : 260,
-                      right: compact ? 330 : 320,
-                      bottom: compact ? 20 : 32,
+                      left: portrait ? edge : compact ? 194 : 260,
+                      right: portrait ? edge : compact ? 330 : 320,
+                      bottom: portrait ? 28 : compact ? 20 : 32,
                       child: _ContextPill(
                         text: contextText,
                         enabled: interaction != GameInteraction.none,
@@ -244,9 +257,9 @@ class GameHud extends StatelessWidget {
                     ),
                     if (farmState.statusVisible)
                       Positioned(
-                        left: constraints.maxWidth * 0.31,
-                        right: constraints.maxWidth * 0.31,
-                        top: 80,
+                        left: portrait ? 40 : constraints.maxWidth * 0.31,
+                        right: portrait ? 40 : constraints.maxWidth * 0.31,
+                        top: portrait ? 300 : 80,
                         child: _StatusPopup(farmState: farmState),
                       ),
                   ],
