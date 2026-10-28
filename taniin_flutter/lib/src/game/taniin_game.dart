@@ -110,7 +110,8 @@ class TaniinGame extends FlameGame {
   ({GameInteraction interaction, int? plotIndex}) interactionAtScreenPosition(
     Offset screenPosition,
   ) {
-    final worldPosition = screenPosition + Offset(_cameraX, _cameraY);
+    final worldPosition =
+        screenPosition / _renderScale + Offset(_cameraX, _cameraY);
     final plotIndex = _plotIndexAtWorldPosition(worldPosition);
     if (plotIndex != null) {
       return (
@@ -334,7 +335,7 @@ class TaniinGame extends FlameGame {
     final scale = _renderScale;
     final viewport = Size(size.x / scale, size.y / scale);
     _visibleViewport = viewport;
-    _updateCamera(viewport);
+    _updateCamera(viewport, scale);
 
     canvas.drawColor(TaniinColors.grass, BlendMode.src);
     canvas.save();
@@ -358,10 +359,26 @@ class TaniinGame extends FlameGame {
     canvas.restore();
   }
 
-  double get _renderScale {
+  // About 12 tiles across the short side of the screen, at least 44 logical
+  // pixels per tile on phones. Snapped to whole multiples of the 16 px art in
+  // physical pixels so every art pixel stays the same size.
+  double get _devicePixelRatio {
     final views = ui.PlatformDispatcher.instance.views;
-    final ratio = views.isEmpty ? 1.0 : views.first.devicePixelRatio;
-    return ratio <= 1 ? 1 : 1 / ratio;
+    return views.isEmpty ? 1.0 : math.max(1.0, views.first.devicePixelRatio);
+  }
+
+  double get _renderScale {
+    final ratio = _devicePixelRatio;
+    final shortSide = math.min(size.x, size.y);
+    if (shortSide <= 0) {
+      return 1 / ratio;
+    }
+    final logicalTile = math.max(44.0, shortSide / 12);
+    final physicalTile = math.max(
+      16.0,
+      (logicalTile * ratio / 16).round() * 16,
+    );
+    return physicalTile / ratio / _tile;
   }
 
   Future<TmxMap?> _tryLoadMap() async {
@@ -544,13 +561,25 @@ class TaniinGame extends FlameGame {
     );
   }
 
-  void _updateCamera(Size viewport) {
-    _cameraX = (_playerX - viewport.width * 0.5)
-        .clamp(0, math.max(0, _worldWidth - viewport.width))
-        .roundToDouble();
-    _cameraY = (_playerY - viewport.height * 0.56)
-        .clamp(0, math.max(0, _worldHeight - viewport.height))
-        .roundToDouble();
+  void _updateCamera(Size viewport, double scale) {
+    // Round in physical pixels so tiles land on whole pixels at any zoom.
+    final physical = scale * _devicePixelRatio;
+    _cameraX =
+        ((_playerX - viewport.width * 0.5).clamp(
+                  0,
+                  math.max(0, _worldWidth - viewport.width),
+                ) *
+                physical)
+            .roundToDouble() /
+        physical;
+    _cameraY =
+        ((_playerY - viewport.height * 0.56).clamp(
+                  0,
+                  math.max(0, _worldHeight - viewport.height),
+                ) *
+                physical)
+            .roundToDouble() /
+        physical;
   }
 
   double get _worldWidth => _tmxMap?.getWorldWidthPixels(_tile) ?? 72 * _tile;

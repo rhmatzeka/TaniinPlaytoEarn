@@ -150,7 +150,7 @@ class GameHud extends StatelessWidget {
                       child: GestureDetector(
                         behavior: HitTestBehavior.translucent,
                         onTapUp: (details) =>
-                            _handleWorldTap(context, details.localPosition),
+                            _handleWorldTap(context, details.globalPosition),
                       ),
                     ),
                     if (showMiniMap)
@@ -207,7 +207,11 @@ class GameHud extends StatelessWidget {
                           : short
                           ? 118
                           : 8,
-                      left: portrait ? edge : short ? 400 : miniMapWidth + 48,
+                      left: portrait
+                          ? edge
+                          : short
+                          ? 400
+                          : miniMapWidth + 48,
                       right: portrait
                           ? 110
                           : short
