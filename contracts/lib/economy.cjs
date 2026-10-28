@@ -9,6 +9,7 @@ const CATALOG = Object.freeze({
   seedBundleAmount: 3,
   maxSeedBundles: 9,
   seedNames: ["Kentang", "Bawang", "Stroberi", "Bit"],
+  // Game Coin per bundle of 3 seeds.
   seedBundlePrices: [100, 140, 220, 180],
   harvestYields: [3, 4, 5, 4],
   startingSeeds: [6, 0, 0, 0],
@@ -170,9 +171,11 @@ function applyAction(previous, action, nowMs) {
       const bundles = boundedInt(action.quantity ?? 1, 1, CATALOG.maxSeedBundles, "quantity");
       const price = CATALOG.seedBundlePrices[seedIndex] * bundles;
       const total = CATALOG.seedBundleAmount * bundles;
+      if (state.coins < price) throw httpError(409, `Koin belum cukup. Butuh ${price} koin.`);
+      state.coins -= price;
       state.seeds[seedIndex] += total;
-      chainOps = [{ kind: "spendTani", amount: price }, { kind: "mintSeed", amount: total }];
-      summary = `-${price} TANI`;
+      chainOps = [{ kind: "mintSeed", amount: total }];
+      summary = `-${price} koin`;
       break;
     }
     case "SELL_CROP": {

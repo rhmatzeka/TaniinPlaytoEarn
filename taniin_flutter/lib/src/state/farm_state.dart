@@ -1538,20 +1538,12 @@ class FarmStateController extends ChangeNotifier {
       return false;
     }
     final price = seedTotalPrice(seedIndex);
-    if (onChainMode && !walletTaniBalanceAvailable) {
-      showMessage('Saldo TANI belum kebaca. Tunggu sync wallet sebentar.', success: false);
-      unawaited(refreshWalletState(revealMessage: false));
-      return false;
-    }
-    if (tani < price) {
-      showMessage(
-        'TANI belum cukup. Swap Game Coin ke TANI dulu.',
-        success: false,
-      );
+    if (coins < price) {
+      showMessage('Koin belum cukup. Butuh $price koin.', success: false);
       return false;
     }
     final total = seedTotalAmount();
-    tani -= price;
+    coins -= price;
     selectedSeedIndex = seedIndex;
     seeds[seedIndex] = seeds[seedIndex].copyWith(
       quantity: seeds[seedIndex].quantity + total,
@@ -1565,7 +1557,7 @@ class FarmStateController extends ChangeNotifier {
         quantity: shopBundleQuantity,
       ),
       title: 'Beli ${seeds[seedIndex].name}',
-      valueLabel: '-$price TANI',
+      valueLabel: '-$price koin',
     );
     showMessage(
       onChainMode

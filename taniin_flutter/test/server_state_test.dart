@@ -127,5 +127,20 @@ void main() {
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getString('taniin.farmState.v1'), contains('"coins":123'));
   });
+
+  test('guests buy seeds with Game Coin, not TANI', () async {
+    final taniBefore = farmState.tani;
+    expect(farmState.buySeeds(0), isTrue);
+    expect(farmState.coins, 620 - 100);
+    expect(farmState.tani, taniBefore);
+    expect(farmState.seeds[0].quantity, 6 + 3);
+  });
+
+  test('a guest without enough coins cannot buy seeds', () async {
+    farmState.coins = 50;
+    expect(farmState.buySeeds(2), isFalse);
+    expect(farmState.statusMessage, contains('Koin'));
+    expect(farmState.coins, 50);
+  });
 }
 
