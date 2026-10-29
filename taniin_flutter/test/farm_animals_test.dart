@@ -9,7 +9,7 @@ const tile = 128.0;
 bool open(Rect _) => false;
 
 void main() {
-  test('cows draw at twice the size of chickens, matching the map pixels', () {
+  test('cows stand about as tall as a farmer, hens knee-high', () {
     final cow = FarmAnimal(
       kind: AnimalKind.cow,
       home: Offset.zero,
@@ -25,7 +25,7 @@ void main() {
       seed: 1,
     );
     expect(cow.size, tile * 2);
-    expect(hen.size, tile);
+    expect(hen.size, lessThan(cow.size / 3));
   });
 
   test('wanders away from home and stays within its roam radius', () {

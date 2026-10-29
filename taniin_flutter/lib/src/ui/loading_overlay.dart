@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
+import 'boot_screen.dart';
 import 'kayu.dart';
 
 /// Loading screen: a wood card like the web boot screen, with a row of crops
@@ -28,12 +30,24 @@ class _LoadingOverlayState extends State<LoadingOverlay>
     'Masuk dengan wallet untuk menukar koin ke TANI atau Sepolia ETH.',
   ];
 
+  /// Everything the loading screen draws; decoded before it is revealed.
+  static const _images = <String>[
+    'assets/images/loadingscreen.jpg',
+    'assets/images/iconaplikasi.png',
+    'assets/images/spring_crops.png',
+    'assets/images/walk.png',
+    'assets/images/idle.png',
+  ];
+
   late final AnimationController _controller;
   late final Ticker _ticker;
   late final int _firstTip = math.Random().nextInt(_tips.length);
   Duration _elapsed = Duration.zero;
   bool _visible = true;
   bool _finishing = false;
+  bool _precacheStarted = false;
+  bool _revealed = false;
+  Timer? _revealFallback;
 
   @override
   void initState() {
@@ -43,10 +57,40 @@ class _LoadingOverlayState extends State<LoadingOverlay>
       duration: const Duration(milliseconds: 2800),
     );
     _controller.addStatusListener((_) => _completeIfReady());
-    _controller.forward();
     _ticker = createTicker((elapsed) => setState(() => _elapsed = elapsed))
       ..start();
     widget.loaded.addListener(_completeIfReady);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_precacheStarted) {
+      return;
+    }
+    _precacheStarted = true;
+    // The HTML boot card stays on top until these are decoded, so the
+    // background, icon and sprites never pop in after the card appears.
+    Future.wait([
+      for (final path in _images)
+        precacheImage(AssetImage(path), context, onError: (_, _) {}),
+    ]).whenComplete(_reveal);
+    _revealFallback = Timer(const Duration(seconds: 6), _reveal);
+  }
+
+  void _reveal() {
+    _revealFallback?.cancel();
+    if (!mounted || _revealed) {
+      return;
+    }
+    setState(() => _revealed = true);
+    // Start the progress once the card is actually on screen.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      hideBootScreen();
+      if (mounted) {
+        _controller.forward();
+      }
+    });
   }
 
   @override
@@ -61,6 +105,7 @@ class _LoadingOverlayState extends State<LoadingOverlay>
   @override
   void dispose() {
     widget.loaded.removeListener(_completeIfReady);
+    _revealFallback?.cancel();
     _ticker.dispose();
     _controller.dispose();
     super.dispose();
@@ -133,7 +178,7 @@ class _LoadingOverlayState extends State<LoadingOverlay>
   }
 
   void _completeIfReady() {
-    if (_finishing || !mounted || !widget.loaded.value) {
+    if (_finishing || !mounted || !_revealed || !widget.loaded.value) {
       return;
     }
     if (!_controller.isCompleted) {
@@ -157,6 +202,7 @@ class _LoadingOverlayState extends State<LoadingOverlay>
       return;
     }
     _ticker.stop();
+    hideBootScreen();
     setState(() => _visible = false);
     widget.onFinished?.call();
   }

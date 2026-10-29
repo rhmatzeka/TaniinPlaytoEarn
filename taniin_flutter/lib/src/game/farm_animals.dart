@@ -20,8 +20,7 @@ enum AnimalKind {
 
   final String asset;
 
-  /// Frame edge in art pixels; drawn at 8 world pixels per art pixel, the
-  /// same scale as the 16 px map tiles.
+  /// Frame edge in art pixels.
   final int frameSize;
   final int columns;
   final double tilesPerSecond;
@@ -70,14 +69,20 @@ class FarmAnimal {
   double _animClock = 0;
   Offset? _target;
 
-  // Chick art nearly fills its frame, so it is drawn smaller to read as a chick.
-  double get size =>
-      kind.frameSize * tile / 16 * (kind == AnimalKind.babyChicken ? 0.75 : 1);
+  /// Drawn size in world pixels. Cows keep the map's pixel scale (two tiles,
+  /// about as tall as a farmer); chicken art fills its whole 16 px frame, so
+  /// at that scale a hen stands chest-high to a person. Hens are drawn
+  /// knee-high instead and chicks smaller still.
+  double get size => switch (kind) {
+    AnimalKind.cow || AnimalKind.maleCow => tile * 2,
+    AnimalKind.chicken || AnimalKind.chickenRed => tile * 0.62,
+    AnimalKind.babyChicken => tile * 0.42,
+  };
 
   /// Box around the feet that must stay clear of fences, houses and water.
   Rect footprint(double atX, double atY) {
-    final halfW = kind.isCow ? tile * 0.42 : tile * 0.18;
-    final halfH = kind.isCow ? tile * 0.16 : tile * 0.10;
+    final halfW = kind.isCow ? tile * 0.42 : tile * 0.14;
+    final halfH = kind.isCow ? tile * 0.16 : tile * 0.08;
     return Rect.fromLTRB(atX - halfW, atY - halfH, atX + halfW, atY + halfH);
   }
 
@@ -157,11 +162,11 @@ class FarmAnimal {
     final dx = parent.x - x;
     final dy = parent.y - y;
     final gap = math.sqrt(dx * dx + dy * dy);
-    if (!walking && gap > tile * 0.95) {
+    if (!walking && gap > tile * 0.7) {
       final side = parent.facing == AnimalFacing.right ? -1 : 1;
       _target = Offset(
-        parent.x + side * tile * 0.55,
-        parent.y + tile * 0.2 * (_random.nextBool() ? 1 : -1),
+        parent.x + side * tile * 0.4,
+        parent.y + tile * 0.15 * (_random.nextBool() ? 1 : -1),
       );
       walking = true;
     }
