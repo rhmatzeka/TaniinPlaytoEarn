@@ -81,6 +81,20 @@ class PlatformBridge {
     }
   }
 
+  /// Fades out the native Android loading card drawn by MainActivity.
+  static Future<void> hideNativeSplash() async {
+    if (kIsWeb) {
+      return;
+    }
+    try {
+      await _channel.invokeMethod<void>('hideSplash');
+    } on MissingPluginException {
+      return;
+    } on PlatformException {
+      return;
+    }
+  }
+
   /// `/masuk` page URL; web returns to the game path, Android to `taniin://auth`.
   static String loginUrl(
     ChainConfig config, {

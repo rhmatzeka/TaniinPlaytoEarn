@@ -4,10 +4,14 @@ on:
   push:
     branches: [main]
     paths: ["taniin_flutter/**", ".github/workflows/android.yml"]
+  # PRs build the APK too (without publishing) so Kotlin/Gradle breakage is
+  # caught before it reaches main.
+  pull_request:
+    paths: ["taniin_flutter/**", ".github/workflows/android.yml"]
   workflow_dispatch:
 
 concurrency:
-  group: android-apk
+  group: android-apk-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -37,6 +41,7 @@ jobs:
           channel: stable
           cache: true
       - name: Restore release key
+        if: github.event_name != 'pull_request'
         env:
           KEYSTORE_B64: ${{ secrets.TANIIN_KEYSTORE_B64 }}
         run: |
@@ -53,6 +58,7 @@ jobs:
             --build-number=${{ github.run_number }} \
             --dart-define=TANIIN_BUILD=${{ github.run_number }}
       - name: Publish to the apk-terbaru release
+        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
