@@ -27445,7 +27445,7 @@ return}B.wH.ko(new A.agn(a))},
 aEc(){var s=0,r=A.C(t.Br),q,p,o,n,m,l,k
 var $async$aEc=A.D(function(a,b){if(a===1)return A.z(b,r)
 for(;;)switch(s){case 0:k=t.X
-k=A.a2(["rpcUrl",u.m,"coinContractAddress","0x8E1584fF95842C888F1FAaB29ed1e55d886A81F8","itemsContractAddress","0x9414eD4F6d9beF484484D72da3d8361989348AEf","landContractAddress","0x55D768D736b66B842EE72Ff7fa143f03245F81cc","gameApiUrl",A.aWf(),"multiplayerUrl","https://taniin-mp.rahmateka.my.id"],k,k)
+k=A.a2(["rpcUrl",u.m,"coinContractAddress","","itemsContractAddress","","landContractAddress","","gameApiUrl",A.aWf(),"multiplayerUrl",""],k,k)
 p=A.tS(k.h(0,"rpcUrl"),u.m)
 o=A.tS(k.h(0,"coinContractAddress"),"")
 n=A.bR("^0x[0-9a-fA-F]{40}$",!0,!1)
@@ -27484,7 +27484,7 @@ if(e!=null)r.m(0,"jumlah",A.l(e))
 if(c!=null)r.m(0,"challenge",c)
 if(f!=null)r.m(0,"state",f)
 return q.N3(r).grb()},
-aWf(){var s,r,q,p=B.c.ba("https://taniin.rahmateka.my.id")
+aWf(){var s,r,q,p=B.c.ba("")
 if(p.length!==0)return p
 s=A.ao9()
 if(s.glW().length!==0)r=s.ghO()!=="http"&&s.ghO()!=="https"
