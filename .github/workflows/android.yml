@@ -45,7 +45,13 @@ jobs:
           fi
           echo "$KEYSTORE_B64" | base64 -d > android/app/taniin.keystore
       - run: flutter pub get
-      - run: flutter build apk --release
+      # Every CI build gets its own version (1.0.<run>) so Android sees it as
+      # an update, and the app can compare itself with versi.json below.
+      - run: |
+          flutter build apk --release \
+            --build-name=1.0.${{ github.run_number }} \
+            --build-number=${{ github.run_number }} \
+            --dart-define=TANIIN_BUILD=${{ github.run_number }}
       - name: Publish to the apk-terbaru release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -55,4 +61,5 @@ jobs:
             --title "Taniin APK terbaru" \
             --notes "APK Android terbaru, dibangun otomatis dari branch main. Unduh juga lewat https://taniin.rahmateka.my.id/unduh" \
             --latest
-          gh release upload apk-terbaru Taniin.apk --clobber
+          printf '{"build": %s, "versi": "1.0.%s"}\n' "${{ github.run_number }}" "${{ github.run_number }}" > versi.json
+          gh release upload apk-terbaru Taniin.apk versi.json --clobber
