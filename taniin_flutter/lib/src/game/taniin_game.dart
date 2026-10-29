@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import '../chain/multiplayer_client.dart';
 import '../state/farm_state.dart';
 import '../ui/taniin_theme.dart';
+import 'farm_animals.dart';
 import 'tmx_map.dart';
 
 class TaniinGame extends FlameGame {
@@ -72,6 +73,7 @@ class TaniinGame extends FlameGame {
   ui.Image? _cow;
   ui.Image? _maleCow;
   ui.Image? _chickenRed;
+  final List<FarmAnimal> _animals = _spawnAnimals();
   ui.Image? _shopNpcSheet;
 
   double _clock = 0;
@@ -320,6 +322,9 @@ class TaniinGame extends FlameGame {
     }
 
     _updatePlayer(dt);
+    for (final animal in _animals) {
+      animal.update(dt, _animalBlocked);
+    }
 
     // Broadcast player coordinates to WebSocket server
     multiplayerClient.sendMove(_playerX, _playerY, _moving ? 'walk' : 'idle');
@@ -415,6 +420,9 @@ class TaniinGame extends FlameGame {
       ..addAll(_tmxMap?.collisionRects(_tile) ?? const <Rect>[]);
     if (_collisionRects.isEmpty) {
       _addFallbackCollisionRects(_collisionRects);
+    }
+    for (final animal in _animals) {
+      animal.settle(_animalBlocked);
     }
   }
 
@@ -740,11 +748,7 @@ class TaniinGame extends FlameGame {
   }
 
   void _drawBackgroundDecorations(Canvas canvas) {
-    final now = (_clock * 1000).round();
-    _drawFieldEdgeAnimals(canvas, now);
-    _drawOpenMeadowAnimals(canvas, now);
-    _drawRoadsideAnimals(canvas, now);
-    _drawShopPenAnimals(canvas, now);
+    _drawAnimals(canvas);
   }
 
   void _drawFarmPlots(Canvas canvas) {
@@ -923,262 +927,121 @@ class TaniinGame extends FlameGame {
     }
   }
 
-  void _drawShopPenAnimals(Canvas canvas, int now) {
-    final chickenFrame = (now ~/ 440) % 4;
-    final babyFrame = (now ~/ 520) % 4;
-    final cowFrame = (now ~/ 620) % 4;
-    final chickenWiggleA = math.sin(now / 360.0) * _tile * 0.025;
-    final chickenWiggleB = math.sin(now / 430.0 + 1.7) * _tile * 0.025;
-    final babyWiggle = math.sin(now / 390.0 + 2.4) * _tile * 0.020;
-    final cowWiggle = math.sin(now / 720.0 + 0.8) * _tile * 0.018;
-
-    _drawSpriteWithShadowWorld(
-      _chicken,
-      chickenFrame,
-      16,
-      16,
-      4,
-      22.38 * _tile + chickenWiggleA,
-      18.08 * _tile,
-      _tile * 0.50,
-      _tile * 0.50,
-      canvas,
-    );
-    _drawSpriteWithShadowWorld(
-      _chicken,
-      (chickenFrame + 1) % 4,
-      16,
-      16,
-      4,
-      23.34 * _tile + chickenWiggleB,
-      18.42 * _tile,
-      _tile * 0.50,
-      _tile * 0.50,
-      canvas,
-    );
-    _drawSpriteWithShadowWorld(
-      _cow,
-      cowFrame,
-      32,
-      32,
-      4,
-      22.82 * _tile + cowWiggle,
-      20.04 * _tile,
-      _tile,
-      _tile,
-      canvas,
-    );
-    _drawSpriteWithShadowWorld(
-      _chicken,
-      (chickenFrame + 2) % 4,
-      16,
-      16,
-      4,
-      23.58 * _tile - chickenWiggleA,
-      21.68 * _tile,
-      _tile * 0.50,
-      _tile * 0.50,
-      canvas,
-    );
-    _drawSpriteWithShadowWorld(
-      _babyChicken,
-      babyFrame,
-      16,
-      16,
-      4,
-      22.42 * _tile + babyWiggle,
-      22.00 * _tile,
-      _tile * 0.38,
-      _tile * 0.38,
-      canvas,
-    );
-    _drawSpriteWithShadowWorld(
-      _chicken,
-      (chickenFrame + 3) % 4,
-      16,
-      16,
-      4,
-      22.98 * _tile - chickenWiggleB,
-      22.50 * _tile,
-      _tile * 0.50,
-      _tile * 0.50,
-      canvas,
-    );
-    _drawSpriteWithShadowWorld(
-      _babyChicken,
-      (babyFrame + 1) % 4,
-      16,
-      16,
-      4,
-      23.66 * _tile - babyWiggle,
-      22.34 * _tile,
-      _tile * 0.38,
-      _tile * 0.38,
-      canvas,
-    );
+  void _drawAnimals(Canvas canvas) {
+    for (final animal in _animals) {
+      final sheet = switch (animal.kind) {
+        AnimalKind.chicken => _chicken,
+        AnimalKind.chickenRed => _chickenRed,
+        AnimalKind.babyChicken => _babyChicken,
+        AnimalKind.cow => _cow,
+        AnimalKind.maleCow => _maleCow,
+      };
+      if (sheet == null) {
+        continue;
+      }
+      final size = animal.size;
+      // Feet sit near the bottom of each frame; the sheets carry their own
+      // ground shadow.
+      final target = Rect.fromLTWH(
+        animal.x - size * 0.5 - _cameraX,
+        animal.y - size * 0.9 - _cameraY,
+        size,
+        size,
+      );
+      if (_isOffscreen(target)) {
+        continue;
+      }
+      final frame = animal.frame();
+      final edge = animal.kind.frameSize.toDouble();
+      final source = Rect.fromLTWH(
+        frame.column * edge,
+        frame.row * edge,
+        edge,
+        edge,
+      );
+      if (frame.flip) {
+        canvas.save();
+        canvas.translate(target.center.dx, 0);
+        canvas.scale(-1, 1);
+        canvas.drawImageRect(
+          sheet,
+          source,
+          target.shift(Offset(-target.center.dx, 0)),
+          _pixelPaint,
+        );
+        canvas.restore();
+      } else {
+        canvas.drawImageRect(sheet, source, target, _pixelPaint);
+      }
+    }
   }
 
-  void _drawFieldEdgeAnimals(Canvas canvas, int now) {
-    final chickenFrame = (now ~/ 440) % 4;
-    final babyFrame = (now ~/ 520) % 4;
-    _drawSpriteWithShadowWorld(
-      _chicken,
-      chickenFrame,
-      16,
-      16,
-      4,
-      10.86 * _tile,
-      24.54 * _tile,
-      _tile * 0.50,
-      _tile * 0.50,
-      canvas,
-    );
-    _drawSpriteWithShadowWorld(
-      _babyChicken,
-      babyFrame,
-      16,
-      16,
-      4,
-      11.62 * _tile,
-      24.92 * _tile,
-      _tile * 0.37,
-      _tile * 0.37,
-      canvas,
-    );
-    _drawSpriteWithShadowWorld(
-      _chicken,
-      (chickenFrame + 2) % 4,
-      16,
-      16,
-      4,
-      13.74 * _tile,
-      24.64 * _tile,
-      _tile * 0.48,
-      _tile * 0.48,
-      canvas,
-    );
-    _drawSpriteWithShadowWorld(
-      _babyChicken,
-      (babyFrame + 1) % 4,
-      16,
-      16,
-      4,
-      14.42 * _tile,
-      24.96 * _tile,
-      _tile * 0.35,
-      _tile * 0.35,
-      canvas,
-    );
+  bool _animalBlocked(Rect footprint) {
+    if (footprint.left < 0 ||
+        footprint.top < 0 ||
+        footprint.right > _worldWidth ||
+        footprint.bottom > _worldHeight) {
+      return true;
+    }
+    if (_tmxMap?.blocksWaterHitbox(footprint, _tile) ?? false) {
+      return true;
+    }
+    for (final obstacle in _collisionRects) {
+      if (footprint.overlaps(obstacle)) {
+        return true;
+      }
+    }
+    return false;
   }
 
-  void _drawOpenMeadowAnimals(Canvas canvas, int now) {
-    final chickenFrame = (now ~/ 430) % 4;
-    final babyFrame = (now ~/ 510) % 4;
-    final cowFrame = (now ~/ 660) % 4;
-    final swayA = math.sin(now / 520.0) * _tile * 0.018;
-    final swayB = math.sin(now / 610.0 + 1.8) * _tile * 0.018;
-    _drawSpriteWithShadowWorld(
-      _chickenRed,
-      chickenFrame,
-      16,
-      16,
-      4,
-      19.70 * _tile + swayA,
-      28.24 * _tile,
-      _tile * 0.54,
-      _tile * 0.54,
-      canvas,
+  static List<FarmAnimal> _spawnAnimals() {
+    var seed = 7;
+    FarmAnimal at(
+      AnimalKind kind,
+      double tileX,
+      double tileY,
+      double roamTiles, {
+      FarmAnimal? parent,
+    }) => FarmAnimal(
+      kind: kind,
+      home: Offset(tileX * _tile, tileY * _tile),
+      roam: roamTiles * _tile,
+      tile: _tile,
+      seed: seed++,
+      parent: parent,
     );
-    _drawSpriteWithShadowWorld(
-      _babyChicken,
-      babyFrame,
-      16,
-      16,
-      4,
-      20.38 * _tile - swayB,
-      28.68 * _tile,
-      _tile * 0.38,
-      _tile * 0.38,
-      canvas,
-    );
-    _drawSpriteWithShadowWorld(
-      _maleCow,
-      cowFrame,
-      32,
-      32,
-      4,
-      24.10 * _tile + swayB,
-      28.14 * _tile,
-      _tile * 1.04,
-      _tile * 1.04,
-      canvas,
-    );
-    _drawSpriteWithShadowWorld(
-      _chicken,
-      (chickenFrame + 2) % 4,
-      16,
-      16,
-      4,
-      24.18 * _tile - swayA,
-      30.22 * _tile,
-      _tile * 0.52,
-      _tile * 0.52,
-      canvas,
-    );
-    _drawSpriteWithShadowWorld(
-      _babyChicken,
-      (babyFrame + 1) % 4,
-      16,
-      16,
-      4,
-      24.82 * _tile + swayA,
-      30.58 * _tile,
-      _tile * 0.38,
-      _tile * 0.38,
-      canvas,
-    );
-  }
 
-  void _drawRoadsideAnimals(Canvas canvas, int now) {
-    final chickenFrame = (now ~/ 470) % 4;
-    final cowFrame = (now ~/ 690) % 4;
-    final drift = math.sin(now / 720.0) * _tile * 0.016;
-    _drawSpriteWithShadowWorld(
-      _cow,
-      cowFrame,
-      32,
-      32,
-      4,
-      31.18 * _tile + drift,
-      29.22 * _tile,
-      _tile * 1.02,
-      _tile * 1.02,
-      canvas,
-    );
-    _drawSpriteWithShadowWorld(
-      _chicken,
-      chickenFrame,
-      16,
-      16,
-      4,
-      34.62 * _tile - drift,
-      31.48 * _tile,
-      _tile * 0.52,
-      _tile * 0.52,
-      canvas,
-    );
-    _drawSpriteWithShadowWorld(
-      _chickenRed,
-      (chickenFrame + 1) % 4,
-      16,
-      16,
-      4,
-      35.20 * _tile + drift,
-      31.82 * _tile,
-      _tile * 0.52,
-      _tile * 0.52,
-      canvas,
-    );
+    // Shop pen.
+    final penHen = at(AnimalKind.chicken, 22.6, 18.5, 0.7);
+    final penHenB = at(AnimalKind.chicken, 23.2, 22.9, 0.6);
+    // Field edge.
+    final fieldHen = at(AnimalKind.chicken, 11.1, 25.0, 1.4);
+    final fieldHenB = at(AnimalKind.chicken, 14.0, 25.1, 1.4);
+    // Open meadow.
+    final meadowHen = at(AnimalKind.chickenRed, 20.0, 28.7, 1.6);
+    final meadowHenB = at(AnimalKind.chicken, 24.4, 30.7, 1.6);
+    // Roadside.
+    final roadHen = at(AnimalKind.chicken, 34.9, 31.9, 1.4);
+    return [
+      penHen,
+      at(AnimalKind.chicken, 23.6, 18.9, 0.6),
+      at(AnimalKind.cow, 23.3, 20.9, 0.6),
+      penHenB,
+      at(AnimalKind.babyChicken, 22.6, 22.3, 0, parent: penHenB),
+      at(AnimalKind.babyChicken, 23.8, 22.7, 0, parent: penHenB),
+      fieldHen,
+      at(AnimalKind.babyChicken, 11.8, 25.2, 0, parent: fieldHen),
+      fieldHenB,
+      at(AnimalKind.babyChicken, 14.6, 25.3, 0, parent: fieldHenB),
+      meadowHen,
+      at(AnimalKind.babyChicken, 20.6, 29.0, 0, parent: meadowHen),
+      at(AnimalKind.maleCow, 24.6, 28.8, 2.2),
+      meadowHenB,
+      at(AnimalKind.babyChicken, 25.0, 30.9, 0, parent: meadowHenB),
+      at(AnimalKind.cow, 31.7, 30.0, 2.4),
+      roadHen,
+      at(AnimalKind.chickenRed, 35.5, 32.3, 1.4),
+    ];
   }
 
   void _drawShopNpc(Canvas canvas) {
@@ -1226,57 +1089,6 @@ class TaniinGame extends FlameGame {
       worldY,
       npcSize,
       npcSize,
-      canvas,
-    );
-  }
-
-  void _drawSpriteWithShadowWorld(
-    ui.Image? image,
-    int frame,
-    int frameW,
-    int frameH,
-    int columns,
-    double worldX,
-    double worldY,
-    double width,
-    double height,
-    Canvas canvas,
-  ) {
-    if (image == null) {
-      return;
-    }
-    final centerX = worldX + width * 0.5 - _cameraX;
-    final centerY = worldY + height * 0.87 - _cameraY;
-    if (_isOffscreen(
-      Rect.fromCenter(
-        center: Offset(centerX, centerY),
-        width: width,
-        height: height,
-      ),
-    )) {
-      return;
-    }
-    _paint
-      ..style = PaintingStyle.fill
-      ..color = const Color(0x3E000000);
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(centerX, centerY),
-        width: width * 0.72,
-        height: math.max(5, height * 0.16),
-      ),
-      _paint,
-    );
-    _drawSpriteWorld(
-      image,
-      frame,
-      frameW,
-      frameH,
-      columns,
-      worldX,
-      worldY,
-      width,
-      height,
       canvas,
     );
   }
