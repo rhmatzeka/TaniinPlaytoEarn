@@ -4,6 +4,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../app/app_update.dart';
 import '../chain/platform_bridge.dart';
 import '../chain/multiplayer_client.dart';
 import '../audio/game_audio.dart';
@@ -12,6 +13,7 @@ import '../state/farm_state.dart';
 import 'backpack_panel.dart';
 import 'game_hud.dart';
 import 'history_panel.dart';
+import 'kayu.dart';
 import 'loading_overlay.dart';
 import 'physical_viewport.dart';
 import 'profile_panel.dart';
@@ -37,6 +39,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   bool _audioStarted = false;
   bool _appInForeground = true;
   bool _chatTyping = false;
+  AppUpdate? _update;
 
   @override
   void initState() {
@@ -165,6 +168,24 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void _handleLoadingFinished() {
     setState(() => _loadingFinished = true);
     _startAudioIfReady();
+    _requestGameFocus();
+    unawaited(
+      checkForAppUpdate().then((update) {
+        if (mounted && update != null) {
+          setState(() => _update = update);
+        }
+      }),
+    );
+  }
+
+  Future<void> _downloadUpdate() async {
+    _farmState.playClick();
+    await PlatformBridge.openUrl(apkDownloadUrl);
+  }
+
+  void _dismissUpdate() {
+    _farmState.playClick();
+    setState(() => _update = null);
     _requestGameFocus();
   }
 
@@ -307,6 +328,22 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                 ),
                               ),
                       ),
+                      if (_update != null && _activePanel == null)
+                        Positioned.fill(
+                          child: ColoredBox(
+                            color: const Color(0x66000000),
+                            child: PhysicalViewport(
+                              alignment: Alignment.center,
+                              child: Center(
+                                child: _UpdateCard(
+                                  update: _update!,
+                                  onDownload: _downloadUpdate,
+                                  onLater: _dismissUpdate,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ] else
                     const Positioned.fill(child: _LoadingBackdrop()),
@@ -374,6 +411,70 @@ bool _isMovementKey(LogicalKeyboardKey key) =>
     _rightMovementKeys.contains(key) ||
     _upMovementKeys.contains(key) ||
     _downMovementKeys.contains(key);
+
+/// Shown once per launch when the apk-terbaru release has a newer build.
+class _UpdateCard extends StatelessWidget {
+  const _UpdateCard({
+    required this.update,
+    required this.onDownload,
+    required this.onLater,
+  });
+
+  final AppUpdate update;
+  final VoidCallback onDownload;
+  final VoidCallback onLater;
+
+  @override
+  Widget build(BuildContext context) {
+    return KayuPanel(
+      title: 'Ada versi baru!',
+      subtitle: 'Taniin ${update.versionName}',
+      leading: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.asset(
+          'assets/images/iconaplikasi.png',
+          width: 56,
+          height: 56,
+          filterQuality: FilterQuality.medium,
+        ),
+      ),
+      maxWidth: 560,
+      onClose: onLater,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Unduh APK terbaru untuk tampilan dan fitur terbaru. '
+            'Pasang di atas versi ini, kebunmu tetap aman.',
+            style: Kayu.teks(17),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: KayuButton(
+                  label: 'Nanti',
+                  tone: KayuTone.kedua,
+                  expand: true,
+                  onPressed: onLater,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: KayuButton(
+                  label: 'Unduh',
+                  icon: Icons.download,
+                  expand: true,
+                  onPressed: onDownload,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _LoadingBackdrop extends StatelessWidget {
   const _LoadingBackdrop();

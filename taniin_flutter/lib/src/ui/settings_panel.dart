@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../app/app_update.dart';
 import '../chain/platform_bridge.dart';
 import '../state/farm_state.dart';
 import 'pixel_panel.dart';
@@ -160,6 +161,12 @@ class _SettingsPanelState extends State<SettingsPanel> {
         icon: Icons.gamepad,
         title: 'Proyek',
         value: 'Taniin Play to Earn - Flutter game farming',
+      ),
+      const SizedBox(height: 14),
+      _AboutInfoRow(
+        icon: Icons.system_update,
+        title: 'Versi',
+        value: appBuild > 0 ? '1.0.$appBuild' : 'Web',
       ),
     ];
   }

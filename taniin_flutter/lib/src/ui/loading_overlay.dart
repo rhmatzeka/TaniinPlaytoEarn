@@ -116,6 +116,11 @@ class _LoadingOverlayState extends State<LoadingOverlay>
     if (!_visible) {
       return const SizedBox.shrink();
     }
+    if (!_revealed) {
+      // Same green as the Android launch splash; on web the HTML boot card
+      // covers this until the images are decoded.
+      return const ColoredBox(color: Color(0xFF275D35));
+    }
     final progress = widget.loaded.value
         ? _controller.value
         : math.min(_controller.value, 0.92);
