@@ -1053,10 +1053,15 @@ class TaniinGame extends FlameGame {
       if (image == null) {
         return;
       }
+      final width = image.width / deco.frames;
+      // Offset by position so neighbouring props don't move in lockstep.
+      final frame = deco.frames > 1
+          ? (_clock * deco.fps + deco.x * 0.37).floor() % deco.frames
+          : 0;
       _drawSpriteAt(
         canvas,
         image,
-        Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
+        Rect.fromLTWH(frame * width, 0, width, image.height.toDouble()),
         deco.x * _tile,
         deco.y * _tile,
       );
