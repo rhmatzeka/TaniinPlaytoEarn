@@ -308,7 +308,10 @@ class TaniinGame extends FlameGame {
         'assets/game/Tileset/Cute_Fantasy_Free/Player/Player.png',
       );
       final duniaNames = <String>{
-        'kupu', 'burung', 'bebek', 'ikan',
+        'kupu',
+        'burung',
+        'bebek',
+        'ikan',
         for (final deco in decorations) deco.asset,
         for (final villager in _life.villagers) ...[
           'warga_${villager.spec.id}_jalan',
@@ -381,15 +384,11 @@ class TaniinGame extends FlameGame {
     _drawBackgroundDecorations(canvas);
     _drawFarmPlots(canvas);
     _drawPlotActionMarkers(canvas);
-    _drawShopNpc(canvas);
-    _drawRemotePlayers(canvas);
-    _drawAiAgent(canvas);
-    _drawVillagers(canvas);
-    _drawPlayer(canvas);
+    _drawActors(canvas);
     map?.drawForeground(canvas, _cameraX, _cameraY, _tile, viewport);
     _drawFlyers(canvas);
-    _drawVillagerTalk(canvas);
     _drawHouseSigns(canvas);
+    _drawTags(canvas);
     canvas.restore();
   }
 
@@ -776,8 +775,6 @@ class TaniinGame extends FlameGame {
 
   void _drawBackgroundDecorations(Canvas canvas) {
     _drawWaterLife(canvas);
-    _drawDecorations(canvas);
-    _drawAnimals(canvas);
     _drawBirdShadows(canvas);
   }
 
@@ -957,8 +954,8 @@ class TaniinGame extends FlameGame {
     }
   }
 
-  void _drawAnimals(Canvas canvas) {
-    for (final animal in _animals) {
+  void _drawAnimal(Canvas canvas, FarmAnimal animal) {
+    {
       final sheet = switch (animal.kind) {
         AnimalKind.chicken => _chicken,
         AnimalKind.chickenRed => _chickenRed,
@@ -967,7 +964,7 @@ class TaniinGame extends FlameGame {
         AnimalKind.maleCow => _maleCow,
       };
       if (sheet == null) {
-        continue;
+        return;
       }
       final size = animal.size;
       // Feet sit near the bottom of each frame; the sheets carry their own
@@ -979,7 +976,7 @@ class TaniinGame extends FlameGame {
         size,
       );
       if (_isOffscreen(target)) {
-        continue;
+        return;
       }
       final frame = animal.frame();
       final edge = animal.kind.frameSize.toDouble();
@@ -1050,11 +1047,11 @@ class TaniinGame extends FlameGame {
     canvas.restore();
   }
 
-  void _drawDecorations(Canvas canvas) {
-    for (final deco in decorations) {
+  void _drawDecoration(Canvas canvas, Prop deco) {
+    {
       final image = _dunia[deco.asset];
       if (image == null) {
-        continue;
+        return;
       }
       _drawSpriteAt(
         canvas,
@@ -1134,14 +1131,14 @@ class TaniinGame extends FlameGame {
     }
   }
 
-  void _drawVillagers(Canvas canvas) {
+  void _drawVillager(Canvas canvas, Villager villager) {
     const size = _characterSize;
-    for (final villager in _life.villagers) {
+    {
       final sheet = villager.walking
           ? _dunia['warga_${villager.spec.id}_jalan']
           : _dunia['warga_${villager.spec.id}_diam'];
       if (sheet == null) {
-        continue;
+        return;
       }
       final footX = villager.x - _cameraX;
       final footY = villager.y - _cameraY;
@@ -1152,7 +1149,7 @@ class TaniinGame extends FlameGame {
         size,
       );
       if (_isOffscreen(target)) {
-        continue;
+        return;
       }
       _paint
         ..style = PaintingStyle.fill
@@ -1187,6 +1184,28 @@ class TaniinGame extends FlameGame {
     }
   }
 
+  /// Everything that stands on the ground, drawn back to front by the y of
+  /// its feet so nearer things cover farther ones.
+  void _drawActors(Canvas canvas) {
+    final actors = <(double, VoidCallback)>[
+      for (final deco in decorations)
+        (deco.y * _tile, () => _drawDecoration(canvas, deco)),
+      for (final animal in _animals)
+        (animal.y, () => _drawAnimal(canvas, animal)),
+      for (final villager in _life.villagers)
+        (villager.y, () => _drawVillager(canvas, villager)),
+      for (final player in multiplayerClient.remotePlayers.values)
+        (player.y, () => _drawRemotePlayer(canvas, player)),
+      if (multiplayerClient.aiAgent case final ai?)
+        (ai.y, () => _drawAiAgent(canvas)),
+      (_shopNpcYTile * _tile, () => _drawShopNpc(canvas)),
+      (_playerY, () => _drawPlayer(canvas)),
+    ]..sort((a, b) => a.$1.compareTo(b.$1));
+    for (final (_, draw) in actors) {
+      draw();
+    }
+  }
+
   void _drawFlyers(Canvas canvas) {
     final butterfly = _dunia['kupu'];
     if (butterfly != null) {
@@ -1217,64 +1236,114 @@ class TaniinGame extends FlameGame {
     }
   }
 
-  void _drawVillagerTalk(Canvas canvas) {
+  /// Name tags and speech bubbles, drawn after everything else so no sprite
+  /// covers them.
+  void _drawTags(Canvas canvas) {
+    _tagRects.clear();
+    multiplayerClient.remotePlayers.forEach((_, player) {
+      _drawNameTag(
+        canvas,
+        player.name,
+        player.x,
+        player.y - _characterSize * 0.7,
+        const Color(0xFF6FB7FF),
+      );
+    });
+    final ai = multiplayerClient.aiAgent;
+    if (ai != null) {
+      _drawNameTag(
+        canvas,
+        ai.name,
+        ai.x,
+        ai.y - _characterSize * 0.7,
+        const Color(0xFF52E07A),
+      );
+    }
     for (final villager in _life.villagers) {
       final bubble = villager.bubble;
       if (!villager.near && bubble == null) {
         continue;
       }
-      final tagY = villager.y - _characterSize * 0.7;
-      _drawNameTag(
+      final tagTop = _drawNameTag(
         canvas,
         villager.spec.name,
         villager.x,
-        tagY,
+        villager.y - _characterSize * 0.7,
         const Color(0xFFFFDE19),
       );
       if (bubble != null) {
-        _drawSpeechBubble(canvas, bubble, villager.x, tagY - _tile * 0.4);
+        _drawSpeechBubble(
+          canvas,
+          bubble,
+          villager.x,
+          tagTop - 4 * _screenPx,
+          villager.y + _tile * 0.15,
+        );
       }
     }
   }
 
-  /// Cream speech bubble whose tail points down at world ([x], [bottom]).
-  void _drawSpeechBubble(Canvas canvas, String text, double x, double bottom) {
+  /// Cream speech bubble over world ([x], [bottom]). Near the top of the
+  /// screen, where the HUD buttons sit, it moves under the speaker's feet
+  /// ([below]) with the tail pointing up; it never leaves the screen sideways.
+  void _drawSpeechBubble(
+    Canvas canvas,
+    String text,
+    double x,
+    double bottom,
+    double below,
+  ) {
+    final u = _screenPx;
     final painter = TextPainter(
       text: TextSpan(
         text: text,
-        style: const TextStyle(
-          color: Color(0xFF3A1E0C),
-          fontSize: 30,
+        style: TextStyle(
+          color: const Color(0xFF3A1E0C),
+          fontSize: 14 * u,
           height: 1.25,
           fontWeight: FontWeight.w700,
         ),
       ),
       textAlign: TextAlign.center,
       textDirection: TextDirection.ltr,
-    )..layout(maxWidth: _tile * 4.2);
-    final width = painter.width + 36;
-    final height = painter.height + 24;
-    final left = x - width / 2 - _cameraX;
-    final top = bottom - height - _cameraY;
+    )..layout(maxWidth: 220 * u);
+    final width = painter.width + 20 * u;
+    final height = painter.height + 14 * u;
+    final view = _visibleViewport;
+    final tip = x - _cameraX;
+    final left = (tip - width / 2)
+        .clamp(8 * u, math.max(8 * u, view.width - width - 8 * u))
+        .toDouble();
+    var top = bottom - height - _cameraY;
+    final flip = top < view.height * 0.22;
+    if (flip) {
+      top = below - _cameraY + 12 * u;
+    }
     final box = RRect.fromRectAndRadius(
       Rect.fromLTWH(left, top, width, height),
-      const Radius.circular(14),
+      Radius.circular(8 * u),
     );
-    final tail = Path()
-      ..moveTo(x - _cameraX - 14, top + height - 2)
-      ..lineTo(x - _cameraX, top + height + 18)
-      ..lineTo(x - _cameraX + 14, top + height - 2)
-      ..close();
+    final tail = flip
+        ? (Path()
+            ..moveTo(tip - 7 * u, top + u)
+            ..lineTo(tip, top - 9 * u)
+            ..lineTo(tip + 7 * u, top + u)
+            ..close())
+        : (Path()
+            ..moveTo(tip - 7 * u, top + height - u)
+            ..lineTo(tip, top + height + 9 * u)
+            ..lineTo(tip + 7 * u, top + height - u)
+            ..close());
     final border = Paint()
       ..color = const Color(0xFF4A1D08)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 5;
+      ..strokeWidth = 2.5 * u;
     final fill = Paint()..color = const Color(0xFFFFF0D4);
     canvas.drawRRect(box, border);
     canvas.drawPath(tail, border);
     canvas.drawRRect(box, fill);
     canvas.drawPath(tail, fill);
-    painter.paint(canvas, Offset(left + 18, top + 12));
+    painter.paint(canvas, Offset(left + 10 * u, top + 7 * u));
   }
 
   bool _animalBlocked(Rect footprint) {
@@ -1872,14 +1941,14 @@ class TaniinGame extends FlameGame {
     rects.add(Rect.fromLTWH(x, y, w, h));
   }
 
-  void _drawRemotePlayers(Canvas canvas) {
+  void _drawRemotePlayer(Canvas canvas, RemotePlayer player) {
     const playerSize = _characterSize;
     final idleS = _idleSheet;
     final walkS = _walkSheet;
 
     if (idleS == null) return;
 
-    multiplayerClient.remotePlayers.forEach((id, player) {
+    {
       final isWalking = player.anim == 'walk';
       final sheet = isWalking ? (walkS ?? idleS) : idleS;
 
@@ -1914,31 +1983,33 @@ class TaniinGame extends FlameGame {
       final frame = isWalking ? _walkFrame : ((_clock * 1000) ~/ 240) % 6;
       final frameIndex = frame % columns;
 
-      // Determine facing direction row for remote player (down=0, up=1, side=2)
-      int row = 0;
-      if (isWalking) {
-        row = 0;
-      }
-
       final source = Rect.fromLTWH(
         (frameIndex * frameW).toDouble(),
-        (row * frameH).toDouble(),
+        (player.facingDirection * frameH).toDouble(),
         frameW.toDouble(),
         frameH.toDouble(),
       );
 
-      canvas.drawImageRect(sheet, source, target, remotePaint);
+      if (player.flipLeft) {
+        canvas.save();
+        canvas.translate(target.center.dx, target.center.dy);
+        canvas.scale(-1, 1);
+        canvas.drawImageRect(
+          sheet,
+          source,
+          Rect.fromCenter(
+            center: Offset.zero,
+            width: playerSize,
+            height: playerSize,
+          ),
+          remotePaint,
+        );
+        canvas.restore();
+      } else {
+        canvas.drawImageRect(sheet, source, target, remotePaint);
+      }
       _drawSkinBadge(canvas, target, player.skinId);
-
-      // Draw Name tag
-      _drawNameTag(
-        canvas,
-        player.name,
-        player.x,
-        player.y - playerSize * 0.7,
-        const Color(0xFF6FB7FF),
-      );
-    });
+    }
   }
 
   Paint _skinPaint(String skinId) {
@@ -2045,30 +2116,32 @@ class TaniinGame extends FlameGame {
       canvas.drawImageRect(sheet, source, target, _pixelPaint);
     }
     canvas.restore();
-
-    // Draw Name tag
-    _drawNameTag(
-      canvas,
-      ai.name,
-      ai.x,
-      ai.y - playerSize * 0.7,
-      const Color(0xFF52E07A),
-    );
   }
 
-  void _drawNameTag(
+  /// World px per logical screen px, so tags and bubbles keep a readable
+  /// size whatever the zoom (phones show much smaller tiles).
+  double get _screenPx => 1 / _renderScale;
+
+  /// Tags drawn this frame, in world pixels, so close characters' tags
+  /// stack instead of overlapping.
+  final List<Rect> _tagRects = [];
+
+  /// Draws a name tag centred on world ([worldX], [worldY]), nudged up past
+  /// tags already drawn this frame; returns the tag's top in world pixels.
+  double _drawNameTag(
     Canvas canvas,
     String name,
     double worldX,
     double worldY,
     Color tagColor,
   ) {
+    final u = _screenPx;
     final painter = TextPainter(
       text: TextSpan(
         text: name,
         style: TextStyle(
           fontFamily: 'Pixelify',
-          fontSize: 30,
+          fontSize: 15 * u,
           height: 1,
           color: tagColor,
           fontVariations: const [FontVariation('wght', 700)],
@@ -2077,24 +2150,34 @@ class TaniinGame extends FlameGame {
       textDirection: TextDirection.ltr,
     )..layout();
 
-    final x = worldX - _cameraX - painter.width * 0.5;
-    final y = worldY - _cameraY - painter.height * 0.5;
-    final tag = Rect.fromLTWH(
-      x - 12,
-      y - 7,
-      painter.width + 24,
-      painter.height + 14,
+    var world = Rect.fromCenter(
+      center: Offset(worldX, worldY),
+      width: painter.width + 12 * u,
+      height: painter.height + 8 * u,
     );
+    for (var i = 0; i < 4 && _tagRects.any(world.overlaps); i++) {
+      world = world.shift(Offset(0, -(world.height + 2 * u)));
+    }
+    _tagRects.add(world);
+    final tag = world.shift(Offset(-_cameraX, -_cameraY));
+    final x = tag.left + 6 * u;
+    final y = tag.top + 4 * u;
     canvas.drawRRect(
-      RRect.fromRectAndRadius(tag, const Radius.circular(8)),
+      RRect.fromRectAndRadius(tag, Radius.circular(5 * u)),
       Paint()..color = const Color(0xE60F1A12),
     );
     // Coloured accent along the bottom of the tag.
     canvas.drawRect(
-      Rect.fromLTWH(tag.left + 8, tag.bottom - 4, tag.width - 16, 4),
+      Rect.fromLTWH(
+        tag.left + 4 * u,
+        tag.bottom - 2 * u,
+        tag.width - 8 * u,
+        2 * u,
+      ),
       Paint()..color = tagColor,
     );
 
     painter.paint(canvas, Offset(x, y));
+    return world.top;
   }
 }

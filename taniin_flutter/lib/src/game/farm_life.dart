@@ -116,8 +116,8 @@ class FarmLife {
 
 /// A placed prop. [x], [y] are the tile coordinates of its bottom centre;
 /// [block] is its collision box relative to that point, in tiles.
-class Decoration {
-  const Decoration(this.asset, this.x, this.y, {this.block});
+class Prop {
+  const Prop(this.asset, this.x, this.y, {this.block});
 
   final String asset;
   final double x;
@@ -125,22 +125,22 @@ class Decoration {
   final Rect? block;
 }
 
-const decorations = <Decoration>[
+const decorations = <Prop>[
   // Scarecrow watching the plots.
-  Decoration('orangan', 14.5, 22.4, block: Rect.fromLTRB(-0.2, -0.3, 0.2, 0)),
+  Prop('orangan', 14.5, 22.4, block: Rect.fromLTRB(-0.2, -0.3, 0.2, 0)),
   // Hay by the field yard.
-  Decoration('jerami', 6.2, 16.9, block: Rect.fromLTRB(-0.42, -0.5, 0.42, 0)),
-  Decoration('jerami', 7.3, 17.0, block: Rect.fromLTRB(-0.42, -0.5, 0.42, 0)),
+  Prop('jerami', 6.2, 16.9, block: Rect.fromLTRB(-0.42, -0.5, 0.42, 0)),
+  Prop('jerami', 7.3, 17.0, block: Rect.fromLTRB(-0.42, -0.5, 0.42, 0)),
   // Crates and a barrel outside the buyer's house.
-  Decoration('peti', 28.4, 13.5, block: Rect.fromLTRB(-0.42, -0.6, 0.42, 0)),
-  Decoration('tong', 28.6, 14.7, block: Rect.fromLTRB(-0.36, -0.5, 0.36, 0)),
+  Prop('peti', 28.4, 13.5, block: Rect.fromLTRB(-0.42, -0.6, 0.42, 0)),
+  Prop('tong', 28.6, 14.7, block: Rect.fromLTRB(-0.36, -0.5, 0.36, 0)),
   // Village well beside the swap house.
-  Decoration('sumur', 14.0, 13.7, block: Rect.fromLTRB(-0.8, -0.7, 0.8, 0)),
+  Prop('sumur', 14.0, 13.7, block: Rect.fromLTRB(-0.8, -0.7, 0.8, 0)),
   // Market stall on the south side of the main road.
-  Decoration('kios', 22.0, 30.0, block: Rect.fromLTRB(-1.4, -0.8, 1.4, 0)),
+  Prop('kios', 22.0, 30.0, block: Rect.fromLTRB(-1.4, -0.8, 1.4, 0)),
   // Flower beds along the main road.
-  Decoration('bunga', 10.5, 28.8, block: Rect.fromLTRB(-0.9, -0.5, 0.9, 0)),
-  Decoration('bunga', 29.5, 28.9, block: Rect.fromLTRB(-0.9, -0.5, 0.9, 0)),
+  Prop('bunga', 10.5, 28.8, block: Rect.fromLTRB(-0.9, -0.5, 0.9, 0)),
+  Prop('bunga', 29.5, 28.9, block: Rect.fromLTRB(-0.9, -0.5, 0.9, 0)),
 ];
 
 class VillagerSpec {
