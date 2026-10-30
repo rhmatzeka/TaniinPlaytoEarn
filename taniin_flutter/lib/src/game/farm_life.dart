@@ -130,7 +130,7 @@ const decorations = <Prop>[
   Prop('orangan', 14.5, 22.4, block: Rect.fromLTRB(-0.2, -0.3, 0.2, 0)),
   // Hay by the field yard.
   Prop('jerami', 6.2, 16.9, block: Rect.fromLTRB(-0.42, -0.5, 0.42, 0)),
-  Prop('jerami', 7.3, 17.0, block: Rect.fromLTRB(-0.42, -0.5, 0.42, 0)),
+  Prop('jerami_tumpuk', 7.4, 17.0, block: Rect.fromLTRB(-0.5, -0.5, 0.5, 0)),
   // Crates and a barrel outside the buyer's house.
   Prop('peti', 28.4, 13.5, block: Rect.fromLTRB(-0.42, -0.6, 0.42, 0)),
   Prop('tong', 28.6, 14.7, block: Rect.fromLTRB(-0.36, -0.5, 0.36, 0)),
@@ -140,7 +140,7 @@ const decorations = <Prop>[
   Prop('kios', 22.0, 30.0, block: Rect.fromLTRB(-1.4, -0.8, 1.4, 0)),
   // Flower beds along the main road.
   Prop('bunga', 10.5, 28.8, block: Rect.fromLTRB(-0.9, -0.5, 0.9, 0)),
-  Prop('bunga', 29.5, 28.9, block: Rect.fromLTRB(-0.9, -0.5, 0.9, 0)),
+  Prop('bunga_2', 29.5, 28.9, block: Rect.fromLTRB(-0.9, -0.5, 0.9, 0)),
 ];
 
 class VillagerSpec {
