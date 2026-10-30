@@ -60,10 +60,17 @@ class KayuPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final narrow = size.width < 760;
+    // Sideways phones: small header and padding so the content gets the
+    // little height there is.
+    final short = size.height < 600;
+    final tight = narrow || short;
     return ConstrainedBox(
       constraints: BoxConstraints(
         maxWidth: (size.width - (narrow ? 24 : 48)).clamp(280, maxWidth),
-        maxHeight: (size.height - (narrow ? 32 : 48)).clamp(320, 900),
+        maxHeight: (size.height - (short ? 16 : narrow ? 32 : 48)).clamp(
+          240,
+          900,
+        ),
       ),
       child: DecoratedBox(
         decoration: BoxDecoration(
@@ -81,10 +88,10 @@ class KayuPanel extends StatelessWidget {
           ),
           child: Padding(
             padding: EdgeInsets.fromLTRB(
-              narrow ? 18 : 28,
-              narrow ? 16 : 22,
-              narrow ? 18 : 28,
-              narrow ? 18 : 26,
+              tight ? 16 : 28,
+              short ? 10 : (narrow ? 16 : 22),
+              tight ? 16 : 28,
+              short ? 12 : (narrow ? 18 : 26),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -94,25 +101,37 @@ class KayuPanel extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     if (leading != null) ...[
-                      leading!,
-                      SizedBox(width: narrow ? 10 : 14),
+                      SizedBox.square(
+                        dimension: short ? 30 : (narrow ? 40 : 52),
+                        child: FittedBox(fit: BoxFit.scaleDown, child: leading),
+                      ),
+                      SizedBox(width: tight ? 10 : 14),
                     ] else if (icon != null) ...[
-                      Icon(icon, size: narrow ? 34 : 42, color: Kayu.emas),
-                      SizedBox(width: narrow ? 10 : 14),
+                      Icon(
+                        icon,
+                        size: short ? 26 : (narrow ? 34 : 42),
+                        color: Kayu.emas,
+                      ),
+                      SizedBox(width: tight ? 10 : 14),
                     ],
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(title, style: Kayu.judul(narrow ? 30 : 40)),
+                          Text(
+                            title,
+                            style: Kayu.judul(short ? 24 : (narrow ? 30 : 40)),
+                          ),
                           if (subtitle != null)
                             Padding(
-                              padding: const EdgeInsets.only(top: 4),
+                              padding: EdgeInsets.only(top: short ? 2 : 4),
                               child: Text(
                                 subtitle!,
+                                maxLines: short ? 1 : null,
+                                overflow: short ? TextOverflow.ellipsis : null,
                                 style: Kayu.teks(
-                                  narrow ? 16 : 18,
+                                  short ? 14 : (narrow ? 16 : 18),
                                   color: Kayu.kremRedup,
                                 ),
                               ),
@@ -126,11 +145,11 @@ class KayuPanel extends StatelessWidget {
                     ],
                     if (onClose != null) ...[
                       const SizedBox(width: 12),
-                      KayuCloseButton(onPressed: onClose!),
+                      KayuCloseButton(onPressed: onClose!, compact: short),
                     ],
                   ],
                 ),
-                SizedBox(height: narrow ? 14 : 20),
+                SizedBox(height: short ? 8 : (narrow ? 14 : 20)),
                 Flexible(child: SingleChildScrollView(child: child)),
               ],
             ),
@@ -142,9 +161,14 @@ class KayuPanel extends StatelessWidget {
 }
 
 class KayuCloseButton extends StatelessWidget {
-  const KayuCloseButton({required this.onPressed, super.key});
+  const KayuCloseButton({
+    required this.onPressed,
+    this.compact = false,
+    super.key,
+  });
 
   final VoidCallback onPressed;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -155,14 +179,14 @@ class KayuCloseButton extends StatelessWidget {
         onTap: onPressed,
         borderRadius: BorderRadius.circular(10),
         child: Container(
-          width: 56,
-          height: 56,
+          width: compact ? 40 : 56,
+          height: compact ? 40 : 56,
           decoration: BoxDecoration(
             color: Kayu.kayuTua,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: Kayu.emas, width: 3),
           ),
-          child: const Icon(Icons.close, color: Kayu.krem, size: 32),
+          child: Icon(Icons.close, color: Kayu.krem, size: compact ? 24 : 32),
         ),
       ),
     );

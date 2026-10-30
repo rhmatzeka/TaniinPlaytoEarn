@@ -22,7 +22,72 @@ class BackpackPanel extends StatelessWidget {
       builder: (context, _) {
         final harvestValue = farmState.crops.fold<int>(
           0,
-          (sum, crop) => sum + crop.quantity * FarmStateController.harvestSellPrice,
+          (sum, crop) =>
+              sum + crop.quantity * FarmStateController.harvestSellPrice,
+        );
+        // Sideways phones are short but wide: seeds and harvest side by side.
+        final short = MediaQuery.sizeOf(context).height < 600;
+        final seedSection = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Benih', style: Kayu.judul(short ? 20 : 26)),
+            const SizedBox(height: 10),
+            _BagGrid(
+              children: [
+                for (var i = 0; i < farmState.seeds.length; i++)
+                  _BagItem(
+                    cropRow: farmState.cropSpriteRow(i),
+                    frame: CropFrame.benih,
+                    name: farmState.seeds[i].name,
+                    detail: '${farmState.seeds[i].quantity} benih',
+                    empty: farmState.seeds[i].quantity == 0,
+                    selected: farmState.selectedSeedIndex == i,
+                    onTap: () => farmState.selectSeed(i),
+                  ),
+              ],
+            ),
+          ],
+        );
+        final harvestSection = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Hasil panen',
+                    style: Kayu.judul(short ? 20 : 26),
+                  ),
+                ),
+                if (harvestValue > 0)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Laku ',
+                        style: Kayu.teks(17, color: Kayu.kremRedup),
+                      ),
+                      CoinAmount(amount: harvestValue, size: 20),
+                    ],
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            _BagGrid(
+              children: [
+                for (var i = 0; i < farmState.crops.length; i++)
+                  _BagItem(
+                    cropRow: farmState.cropSpriteRow(i),
+                    frame: CropFrame.panen,
+                    name: farmState.crops[i].name,
+                    detail: '${farmState.crops[i].quantity} buah',
+                    empty: farmState.crops[i].quantity == 0,
+                    selected: false,
+                    onTap: null,
+                  ),
+              ],
+            ),
+          ],
         );
         return KayuPanel(
           title: 'Tas',
@@ -33,55 +98,24 @@ class BackpackPanel extends StatelessWidget {
             child: CoinAmount(amount: farmState.coins, size: 22),
           ),
           onClose: onClose,
-          maxWidth: 900,
+          maxWidth: short ? 1180 : 900,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Benih', style: Kayu.judul(26)),
-              const SizedBox(height: 10),
-              _BagGrid(
-                children: [
-                  for (var i = 0; i < farmState.seeds.length; i++)
-                    _BagItem(
-                      cropRow: farmState.cropSpriteRow(i),
-                      frame: CropFrame.benih,
-                      name: farmState.seeds[i].name,
-                      detail: '${farmState.seeds[i].quantity} benih',
-                      empty: farmState.seeds[i].quantity == 0,
-                      selected: farmState.selectedSeedIndex == i,
-                      onTap: () => farmState.selectSeed(i),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 22),
-              Row(
-                children: [
-                  Expanded(child: Text('Hasil panen', style: Kayu.judul(26))),
-                  if (harvestValue > 0)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('Laku ', style: Kayu.teks(17, color: Kayu.kremRedup)),
-                        CoinAmount(amount: harvestValue, size: 20),
-                      ],
-                    ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              _BagGrid(
-                children: [
-                  for (var i = 0; i < farmState.crops.length; i++)
-                    _BagItem(
-                      cropRow: farmState.cropSpriteRow(i),
-                      frame: CropFrame.panen,
-                      name: farmState.crops[i].name,
-                      detail: '${farmState.crops[i].quantity} buah',
-                      empty: farmState.crops[i].quantity == 0,
-                      selected: false,
-                      onTap: null,
-                    ),
-                ],
-              ),
+              if (short)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: seedSection),
+                    const SizedBox(width: 18),
+                    Expanded(child: harvestSection),
+                  ],
+                )
+              else ...[
+                seedSection,
+                const SizedBox(height: 22),
+                harvestSection,
+              ],
               const SizedBox(height: 16),
               Text(
                 'Tanam benih di lahanmu, lalu jual hasil panen di rumah pengepul.',

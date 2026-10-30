@@ -275,8 +275,8 @@ class _LoadingCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(11),
                       child: Image.asset(
                         'assets/images/iconaplikasi.png',
-                        width: narrow || short ? 52 : 66,
-                        height: narrow || short ? 52 : 66,
+                        width: short ? 40 : (narrow ? 52 : 66),
+                        height: short ? 40 : (narrow ? 52 : 66),
                         filterQuality: FilterQuality.medium,
                       ),
                     ),
@@ -289,14 +289,15 @@ class _LoadingCard extends StatelessWidget {
                       children: [
                         Text(
                           'Taniin',
-                          style: Kayu.judul(narrow || short ? 40 : 54).copyWith(
-                            shadows: const [
-                              Shadow(
-                                color: Kayu.kayuGelap,
-                                offset: Offset(0, 4),
+                          style: Kayu.judul(short ? 32 : (narrow ? 40 : 54))
+                              .copyWith(
+                                shadows: const [
+                                  Shadow(
+                                    color: Kayu.kayuGelap,
+                                    offset: Offset(0, 4),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(

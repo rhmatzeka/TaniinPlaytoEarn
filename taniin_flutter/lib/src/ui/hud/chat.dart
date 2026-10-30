@@ -4,11 +4,21 @@ class _ChatHud extends StatefulWidget {
   const _ChatHud({
     required this.multiplayerClient,
     required this.compact,
+    required this.maxHeight,
+    this.lift = 0,
     this.onTypingChanged,
   });
 
   final MultiplayerClient multiplayerClient;
   final bool compact;
+
+  /// Room for the open panel, from the widget's top down to the bottom bar.
+  final double maxHeight;
+
+  /// Space above the collapsed button. The open panel starts at the top
+  /// instead, so on sideways phones it covers the minimap and keeps a usable
+  /// message list.
+  final double lift;
   final ValueChanged<bool>? onTypingChanged;
 
   @override
@@ -108,7 +118,12 @@ class _ChatHudState extends State<_ChatHud> {
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
         alignment: Alignment.topLeft,
-        child: _expanded ? _buildExpanded(context) : _buildCollapsed(),
+        child: _expanded
+            ? _buildExpanded(context)
+            : Padding(
+                padding: EdgeInsets.only(top: widget.lift),
+                child: _buildCollapsed(),
+              ),
       ),
     );
   }
@@ -186,7 +201,11 @@ class _ChatHudState extends State<_ChatHud> {
     final compact = widget.compact;
     // Further enlarged for mobile readability (compact: 400, desktop: 460)
     final width = compact ? 400.0 : 460.0;
-    final listHeight = compact ? 260.0 : 300.0;
+    // Header and input take about 140 px; the list gets the rest.
+    final listHeight = (widget.maxHeight - 140).clamp(
+      110.0,
+      compact ? 260.0 : 300.0,
+    );
     final connected = widget.multiplayerClient.connected;
 
     return Container(

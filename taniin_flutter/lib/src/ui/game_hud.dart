@@ -98,6 +98,10 @@ class GameHud extends StatelessWidget {
                         16.0,
                         constraints.maxHeight - joystickSize - joystickMargin,
                       );
+                final chatTop = portrait
+                    ? edge + miniMapWidth * game.miniMapAspectRatio + 96
+                    : 26 + miniMapWidth * game.miniMapAspectRatio + 12;
+                final chatLift = short ? chatTop - 16 : 0.0;
                 return Stack(
                   children: [
                     Positioned.fill(
@@ -200,12 +204,17 @@ class GameHud extends StatelessWidget {
                     // Chat / AI Agent Panel (collapsible, anchored under minimap)
                     Positioned(
                       left: portrait ? edge : 32,
-                      top: portrait
-                          ? edge + miniMapWidth * game.miniMapAspectRatio + 96
-                          : 26 + miniMapWidth * game.miniMapAspectRatio + 12,
+                      top: chatTop - chatLift,
                       child: _ChatHud(
                         multiplayerClient: game.multiplayerClient,
                         compact: compact,
+                        lift: chatLift,
+                        // Stop above the bottom info bar (and the stick on
+                        // portrait phones).
+                        maxHeight:
+                            constraints.maxHeight -
+                            (chatTop - chatLift) -
+                            (portrait ? 240 : 110),
                         onTypingChanged: onChatTypingChanged,
                       ),
                     ),

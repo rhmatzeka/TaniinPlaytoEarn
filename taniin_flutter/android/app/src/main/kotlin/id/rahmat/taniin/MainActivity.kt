@@ -326,7 +326,7 @@ private class NativeLoadingSplashView(context: Context) : View(context) {
         val px = if (cardW - 2 * pad - 16f >= 560f && !short) 4f else 3f
         val soilH = 16f * px + 8f * px
         val kebunH = soilH + 13f * px
-        val headerH = if (short) 40f * 1.1f + 4f + 24.3f else 54f * 1.1f + 4f + 24.3f
+        val headerH = if (short) 32f * 1.1f + 4f + 24.3f else 54f * 1.1f + 4f + 24.3f
         val contentH = headerH + (if (short) 10f else 18f) + kebunH +
             (if (short) 10f else 16f) + 26f + 10f + 26.4f
         val cardH = contentH + padTop + padBottom + 16f
@@ -356,7 +356,7 @@ private class NativeLoadingSplashView(context: Context) : View(context) {
         var y = top + 8f + padTop
 
         // Header: icon and title.
-        val iconSize = if (short) 52f else 66f
+        val iconSize = if (short) 40f else 66f
         val iconTop = y + (headerH - iconSize - 6f) / 2f
         paint.color = Color.rgb(0x4A, 0x1D, 0x08)
         rect.set(x, iconTop, x + iconSize + 6f, iconTop + iconSize + 6f)
@@ -370,7 +370,7 @@ private class NativeLoadingSplashView(context: Context) : View(context) {
             canvas.restore()
         }
         val textX = x + iconSize + 6f + 18f
-        val titleSize = if (short) 40f else 54f
+        val titleSize = if (short) 32f else 54f
         textPaint.typeface = pixelify
         textPaint.isFakeBoldText = true
         textPaint.textSize = titleSize

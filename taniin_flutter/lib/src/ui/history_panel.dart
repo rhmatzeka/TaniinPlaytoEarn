@@ -1,11 +1,9 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import '../chain/chain_client.dart';
 import '../chain/platform_bridge.dart';
 import '../state/farm_state.dart';
-import 'pixel_panel.dart';
+import 'kayu.dart';
 import 'pixel_art.dart';
 
 class HistoryPanel extends StatelessWidget {
@@ -21,163 +19,53 @@ class HistoryPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.sizeOf(context);
-    final compact = media.width < 560 || media.height < 720;
-    final margin = compact ? 28.0 : 92.0;
-    final maxWidth = math.min(
-      math.max(292.0, media.width - margin),
-      960.0,
-    );
-    final maxHeight = math.min(
-      math.max(420.0, media.height - margin),
-      620.0,
-    );
+    final compact = media.width < 760 || media.height < 600;
     return ListenableBuilder(
       listenable: farmState,
       builder: (context, _) {
-        return ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
-          child: PixelPanel(
-            color: const Color(0xFFA34A1C),
-            borderColor: const Color(0xFF633010),
-            padding: EdgeInsets.zero,
-            child: Column(
-              children: [
-                _PanelHeader(
-                  ikon: 'riwayat',
-                  title: 'Riwayat',
-                  onClose: onClose,
-                  compact: compact,
-                  farmState: farmState,
+        final history = farmState.history;
+        return KayuPanel(
+          title: 'Riwayat',
+          subtitle: 'Aksi dan transaksi terakhirmu',
+          leading: const PixelIcon('riwayat', size: 52),
+          maxWidth: 760,
+          onClose: onClose,
+          trailing: history.isEmpty
+              ? null
+              : KayuButton(
+                  label: 'Hapus semua',
+                  tone: KayuTone.bahaya,
+                  compact: true,
+                  onPressed: () {
+                    farmState.playClick();
+                    farmState.clearAllHistory();
+                    farmState.showMessage('Seluruh riwayat berhasil dihapus.');
+                  },
                 ),
-                Expanded(
-                  child: Padding(
-                    padding: compact
-                        ? const EdgeInsets.fromLTRB(14, 14, 14, 16)
-                        : const EdgeInsets.fromLTRB(30, 26, 30, 32),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF7A2D0E),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: const Color(0xFFE07B20),
-                          width: compact ? 4 : 5,
-                        ),
-                      ),
-                      child: Padding(
-                        padding: compact ? const EdgeInsets.all(10) : const EdgeInsets.all(18),
-                        child: farmState.history.isEmpty
-                            ? const Center(
-                                child: Text(
-                                  'Belum ada riwayat transaksi.',
-                                  style: TextStyle(
-                                    color: Color(0xFFE9C692),
-                                    fontSize: 18,
-                                    fontFamily: 'monospace',
-                                  ),
-                                ),
-                              )
-                            : ListView.separated(
-                                padding: EdgeInsets.zero,
-                                itemCount: farmState.history.length,
-                                separatorBuilder: (_, _) => SizedBox(height: compact ? 8 : 14),
-                                itemBuilder: (context, index) => _HistoryRow(
-                                  record: farmState.history[index],
-                                  farmState: farmState,
-                                  compact: compact,
-                                ),
-                              ),
-                      ),
-                    ),
+          child: history.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Text(
+                    'Belum ada riwayat. Tanam, panen, atau tukar koin dulu.',
+                    textAlign: TextAlign.center,
+                    style: Kayu.teks(17, color: Kayu.kremRedup),
                   ),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < history.length; i++) ...[
+                      if (i > 0) SizedBox(height: compact ? 8 : 12),
+                      _HistoryRow(
+                        record: history[i],
+                        farmState: farmState,
+                        compact: compact,
+                      ),
+                    ],
+                  ],
                 ),
-              ],
-            ),
-          ),
         );
       },
-    );
-  }
-}
-
-class _PanelHeader extends StatelessWidget {
-  const _PanelHeader({
-    required this.ikon,
-    required this.title,
-    required this.onClose,
-    required this.compact,
-    required this.farmState,
-  });
-
-  final String ikon;
-  final String title;
-  final VoidCallback onClose;
-  final bool compact;
-  final FarmStateController farmState;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: compact ? 76 : 116,
-      padding: compact
-          ? const EdgeInsets.fromLTRB(14, 10, 14, 10)
-          : const EdgeInsets.fromLTRB(24, 18, 22, 18),
-      decoration: BoxDecoration(
-        color: const Color(0xFFA94F1E),
-        border: Border(
-          bottom: BorderSide(
-            color: const Color(0xFF763513),
-            width: compact ? 4 : 5,
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          _YellowPixelDot(compact: compact),
-          SizedBox(width: compact ? 12 : 24),
-          PixelIcon(ikon, size: compact ? 40 : 52),
-          SizedBox(width: compact ? 12 : 22),
-          Expanded(
-            child: Text(
-              title,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: const Color(0xFFFFDE19),
-                fontSize: compact ? 24 : 42,
-              ),
-            ),
-          ),
-          if (farmState.history.isNotEmpty) ...[
-            GestureDetector(
-              onTap: () {
-                farmState.playClick();
-                farmState.clearAllHistory();
-                farmState.showMessage('Seluruh riwayat berhasil dihapus.');
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                margin: const EdgeInsets.only(right: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFA00500),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: const Color(0xFF5C0000), width: 2),
-                ),
-                child: Text(
-                  'Hapus semua',
-                  style: TextStyle(
-                    color: const Color(0xFFFFEDCD),
-                    fontSize: compact ? 12 : 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ],
-          PanelCloseButton(
-            onPressed: onClose,
-            dimension: compact ? 46 : 62,
-            iconSize: compact ? 30 : 44,
-          ),
-        ],
-      ),
     );
   }
 }
@@ -392,23 +280,6 @@ class _HistoryRow extends StatelessWidget {
           ? 'Membuka Etherscan ${shortTransactionHash(record.txHash)}'
           : 'Tidak bisa membuka Etherscan di perangkat ini.',
       success: opened,
-    );
-  }
-}
-
-class _YellowPixelDot extends StatelessWidget {
-  const _YellowPixelDot({required this.compact});
-
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFD51C),
-        borderRadius: BorderRadius.circular(compact ? 3 : 5),
-      ),
-      child: SizedBox.square(dimension: compact ? 12 : 20),
     );
   }
 }

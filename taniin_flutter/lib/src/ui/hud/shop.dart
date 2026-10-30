@@ -8,8 +8,12 @@ class _ShopPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final narrow = MediaQuery.sizeOf(context).width < 760;
+    final size = MediaQuery.sizeOf(context);
+    final narrow = size.width < 760;
+    // Sideways phones are short but wide: use the width, not the height.
+    final short = size.height < 600;
     return KayuPanel(
+      maxWidth: short ? 1180 : 1040,
       title: 'Toko Benih',
       leading: CropSprite(cropRow: farmState.cropSpriteRow(0), height: 52),
       subtitle: 'Satu paket berisi ${FarmStateController.seedBundleAmount} benih.',
@@ -22,7 +26,7 @@ class _ShopPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _ShopQuantity(farmState: farmState),
-          const SizedBox(height: 16),
+          SizedBox(height: short ? 10 : 16),
           LayoutBuilder(
             builder: (context, constraints) {
               final columns = constraints.maxWidth < 640 ? 1 : 2;

@@ -34,8 +34,13 @@ class _ProfilePanelState extends State<ProfilePanel> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        // Sideways phones are short: smaller header and padding.
+        final short = MediaQuery.sizeOf(context).height < 600;
         final width = (constraints.maxWidth - 28).clamp(320.0, 920.0);
-        final height = (constraints.maxHeight - 28).clamp(420.0, 720.0);
+        final height = (constraints.maxHeight - (short ? 16 : 28)).clamp(
+          240.0,
+          720.0,
+        );
         return Material(
           color: Colors.transparent,
           child: Container(
@@ -56,15 +61,17 @@ class _ProfilePanelState extends State<ProfilePanel> {
             ),
             child: Column(
               children: <Widget>[
-                _header(),
+                _header(short),
                 Expanded(
                   child: LayoutBuilder(
                     builder: (context, bodyConstraints) {
                       // Scroll rather than shrink, so text stays readable on phones.
                       return SingleChildScrollView(
                         child: Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
-                          child: _profileContent(),
+                          padding: short
+                              ? const EdgeInsets.fromLTRB(14, 12, 14, 14)
+                              : const EdgeInsets.fromLTRB(20, 18, 20, 24),
+                          child: _profileContent(short),
                         ),
                       );
                     },
@@ -78,11 +85,11 @@ class _ProfilePanelState extends State<ProfilePanel> {
     );
   }
 
-  Widget _profileContent() => Column(
+  Widget _profileContent(bool short) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: <Widget>[
-      _identityCard(),
-      const SizedBox(height: 20),
+      _identityCard(short),
+      SizedBox(height: short ? 12 : 20),
       LayoutBuilder(
         builder: (context, bodyConstraints) {
           if (bodyConstraints.maxWidth < 720) {
@@ -110,8 +117,8 @@ class _ProfilePanelState extends State<ProfilePanel> {
     ],
   );
 
-  Widget _header() => Container(
-    height: 80,
+  Widget _header(bool short) => Container(
+    height: short ? 56 : 80,
     padding: const EdgeInsets.only(left: 20, right: 12),
     decoration: const BoxDecoration(
       color: Kayu.kayu,
@@ -133,18 +140,13 @@ class _ProfilePanelState extends State<ProfilePanel> {
           ),
         ),
         const SizedBox(width: 12),
-        const Expanded(
+        Expanded(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text('Profil Petani', style: TextStyle(
-                fontFamily: 'Pixelify',
-                color: Kayu.emas,
-                fontSize: 26,
-                fontVariations: [FontVariation('wght', 700)],
-              )),
-              Text(
+              Text('Profil Petani', style: Kayu.judul(short ? 22 : 26)),
+              const Text(
                 'Level, quest harian, pencapaian, dan baju',
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -156,15 +158,15 @@ class _ProfilePanelState extends State<ProfilePanel> {
             ],
           ),
         ),
-        KayuCloseButton(onPressed: widget.onClose),
+        KayuCloseButton(onPressed: widget.onClose, compact: short),
       ],
     ),
   );
 
-  Widget _identityCard() {
+  Widget _identityCard(bool short) {
     final state = widget.farmState;
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: EdgeInsets.all(short ? 12 : 18),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: <Color>[Kayu.kayu, Kayu.kayuTua],
@@ -180,7 +182,7 @@ class _ProfilePanelState extends State<ProfilePanel> {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final compact = constraints.maxWidth < 540;
-          final avatar = _avatar(state);
+          final avatar = _avatar(state, short ? 64 : 96);
           final details = _identityDetails(state);
           return compact
               ? Column(
@@ -202,12 +204,12 @@ class _ProfilePanelState extends State<ProfilePanel> {
     );
   }
 
-  Widget _avatar(FarmStateController state) => Stack(
+  Widget _avatar(FarmStateController state, double size) => Stack(
     clipBehavior: Clip.none,
     children: <Widget>[
       Container(
-        width: 96,
-        height: 96,
+        width: size,
+        height: size,
         decoration: BoxDecoration(
           color: state.equippedCosmetic.color,
           borderRadius: BorderRadius.circular(22),
@@ -216,10 +218,10 @@ class _ProfilePanelState extends State<ProfilePanel> {
             BoxShadow(color: Color(0x55000000), offset: Offset(0, 5)),
           ],
         ),
-        child: const Icon(
+        child: Icon(
           Icons.agriculture,
           color: TaniinColors.darkSoil,
-          size: 52,
+          size: size * 0.54,
         ),
       ),
       Positioned(

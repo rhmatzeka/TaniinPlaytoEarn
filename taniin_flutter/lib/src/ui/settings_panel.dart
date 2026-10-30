@@ -1,11 +1,11 @@
-import 'dart:math' as math;
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 
 import '../app/app_update.dart';
 import '../chain/platform_bridge.dart';
 import '../state/farm_state.dart';
-import 'pixel_panel.dart';
+import 'kayu.dart';
 import 'pixel_art.dart';
 
 enum _SettingsSection { audio, about }
@@ -34,76 +34,68 @@ class _SettingsPanelState extends State<SettingsPanel> {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.sizeOf(context);
-    // Sideways phones are short: tighter padding so the settings stay visible.
+    // Sideways phones are short: skip the section titles, the tabs say it.
     final short = media.height < 600;
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        maxWidth: math.max(360.0, media.width - (short ? 32 : 80)),
-        maxHeight: math.max(300.0, media.height - (short ? 24 : 80)),
-      ),
-      child: SizedBox(
-        width: 1120,
-        height: 640,
-        child: PixelPanel(
-          color: const Color(0xFFA34A1C),
-          borderColor: const Color(0xFF633010),
-          padding: EdgeInsets.zero,
-          child: Column(
+    return KayuPanel(
+      title: 'Menu',
+      subtitle: 'Suara dan info game',
+      leading: const PixelIcon('menu', size: 52),
+      maxWidth: 760,
+      onClose: widget.onClose,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
             children: [
-              _MenuHeader(
-                title: 'Menu',
-                ikon: 'menu',
-                onClose: widget.onClose,
-              ),
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SizedBox(
-                      width: short ? 230 : 300,
-                      child: _SettingsSidebar(
-                        selectedSection: _selectedSection,
-                        onSelected: _selectSection,
-                        showLogout: farmState.isLoggedIn,
-                        onLogout: _logoutWallet,
-                      ),
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding: short
-                            ? const EdgeInsets.fromLTRB(16, 14, 16, 16)
-                            : const EdgeInsets.fromLTRB(32, 28, 32, 34),
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF7A2D0E),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: const Color(0xFFE07B20),
-                              width: 5,
-                            ),
-                          ),
-                          child: Padding(
-                            padding: short
-                                ? const EdgeInsets.fromLTRB(18, 14, 18, 14)
-                                : const EdgeInsets.fromLTRB(32, 26, 32, 28),
-                            child: ListView(
-                              padding: EdgeInsets.zero,
-                              children:
-                                  _selectedSection == _SettingsSection.audio
-                                  ? _buildAudioContent(short)
-                                  : _buildAboutContent(context),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+              _tab('Suara', Icons.volume_up, _SettingsSection.audio),
+              _tab('Tentang', Icons.info, _SettingsSection.about),
+              if (farmState.isLoggedIn)
+                KayuButton(
+                  label: 'Keluar',
+                  icon: Icons.logout,
+                  tone: KayuTone.bahaya,
+                  compact: true,
+                  onPressed: () {
+                    farmState.playClick();
+                    unawaited(_logoutWallet());
+                  },
                 ),
-              ),
             ],
           ),
-        ),
+          SizedBox(height: short ? 10 : 18),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: const Color(0xFF7A2D0E),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Kayu.rim, width: 3),
+            ),
+            child: Padding(
+              padding: short
+                  ? const EdgeInsets.fromLTRB(14, 12, 14, 12)
+                  : const EdgeInsets.fromLTRB(24, 20, 24, 22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: _selectedSection == _SettingsSection.audio
+                    ? _buildAudioContent(short)
+                    : _buildAboutContent(context, short),
+              ),
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _tab(String label, IconData icon, _SettingsSection section) {
+    final selected = _selectedSection == section;
+    return KayuButton(
+      label: label,
+      icon: icon,
+      tone: selected ? KayuTone.utama : KayuTone.kedua,
+      compact: true,
+      onPressed: () => _selectSection(section),
     );
   }
 
@@ -120,14 +112,14 @@ class _SettingsPanelState extends State<SettingsPanel> {
         value: farmState.musicEnabled,
         onChanged: farmState.setMusicEnabled,
       ),
-      const SizedBox(height: 18),
+      SizedBox(height: short ? 10 : 18),
       _VolumeSlider(
         title: 'Volume musik',
         value: farmState.musicVolume,
         enabled: farmState.musicEnabled,
         onChanged: farmState.setMusicVolume,
       ),
-      const SizedBox(height: 22),
+      SizedBox(height: short ? 12 : 22),
       _SettingSwitch(
         icon: Icons.surround_sound,
         title: 'Efek suara',
@@ -135,7 +127,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
         value: farmState.sfxEnabled,
         onChanged: farmState.setSfxEnabled,
       ),
-      const SizedBox(height: 18),
+      SizedBox(height: short ? 10 : 18),
       _VolumeSlider(
         title: 'Volume efek',
         value: farmState.sfxVolume,
@@ -145,10 +137,12 @@ class _SettingsPanelState extends State<SettingsPanel> {
     ];
   }
 
-  List<Widget> _buildAboutContent(BuildContext context) {
+  List<Widget> _buildAboutContent(BuildContext context, bool short) {
     return [
-      const _SettingsTitle(icon: Icons.info, title: 'Tentang'),
-      const SizedBox(height: 24),
+      if (!short) ...[
+        const _SettingsTitle(icon: Icons.info, title: 'Tentang'),
+        const SizedBox(height: 24),
+      ],
       _AboutCard(onGithubTap: _openGithub),
       const SizedBox(height: 18),
       _AboutInfoRow(
@@ -196,157 +190,6 @@ class _SettingsPanelState extends State<SettingsPanel> {
   Future<void> _logoutWallet() async {
     await farmState.logout();
     widget.onClose();
-  }
-}
-
-class _MenuHeader extends StatelessWidget {
-  const _MenuHeader({
-    required this.title,
-    required this.ikon,
-    required this.onClose,
-  });
-
-  final String title;
-  final String ikon;
-  final VoidCallback onClose;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 116,
-      padding: const EdgeInsets.fromLTRB(24, 18, 22, 18),
-      decoration: const BoxDecoration(
-        color: Color(0xFFA94F1E),
-        border: Border(bottom: BorderSide(color: Color(0xFF763513), width: 5)),
-      ),
-      child: Row(
-        children: [
-          const _YellowPixelDot(),
-          const SizedBox(width: 24),
-          PixelIcon(ikon, size: 52),
-          const SizedBox(width: 22),
-          Expanded(
-            child: Text(
-              title,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: const Color(0xFFFFDE19),
-                fontSize: 42,
-              ),
-            ),
-          ),
-          PanelCloseButton(onPressed: onClose),
-        ],
-      ),
-    );
-  }
-}
-
-class _SettingsSidebar extends StatelessWidget {
-  const _SettingsSidebar({
-    required this.selectedSection,
-    required this.onSelected,
-    required this.showLogout,
-    required this.onLogout,
-  });
-
-  final _SettingsSection selectedSection;
-  final ValueChanged<_SettingsSection> onSelected;
-  final bool showLogout;
-  final VoidCallback onLogout;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(color: Color(0xFF813411)),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(22, 28, 22, 22),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _SideTab(
-              icon: Icons.volume_up,
-              label: 'Suara',
-              selected: selectedSection == _SettingsSection.audio,
-              onTap: () => onSelected(_SettingsSection.audio),
-            ),
-            const SizedBox(height: 18),
-            _SideTab(
-              icon: Icons.info,
-              label: 'Tentang',
-              selected: selectedSection == _SettingsSection.about,
-              onTap: () => onSelected(_SettingsSection.about),
-            ),
-            if (showLogout) ...[
-              const SizedBox(height: 18),
-              _SidebarLogoutButton(onTap: onLogout),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SideTab extends StatelessWidget {
-  const _SideTab({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFFFFD51C) : const Color(0xFF8A3A12),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected ? const Color(0xFFFFF07A) : const Color(0xFFCC6D1D),
-            width: 4,
-          ),
-        ),
-        child: SizedBox(
-          width: double.infinity,
-          height: 104,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.start,
-            children: [
-              const SizedBox(width: 16),
-              Icon(
-                icon,
-                size: 42,
-                color: selected
-                    ? const Color(0xFF42B8E9)
-                    : const Color(0xFFFFD65A),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: selected
-                        ? const Color(0xFF3C250D)
-                        : const Color(0xFFFFF0CE),
-                    fontSize: 21,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 
@@ -532,44 +375,6 @@ class _AboutInfoRow extends StatelessWidget {
   }
 }
 
-class _SidebarLogoutButton extends StatelessWidget {
-  const _SidebarLogoutButton({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: const Color(0xFF832C20),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFFF8B63), width: 4),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.logout, color: Color(0xFFFFF0CE), size: 28),
-              const SizedBox(width: 12),
-              Text(
-                'Keluar',
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: const Color(0xFFFFF0CE),
-                  fontSize: 20,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _SettingSwitch extends StatelessWidget {
   const _SettingSwitch({
     required this.icon,
@@ -715,21 +520,6 @@ class _SettingRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: child,
       ),
-    );
-  }
-}
-
-class _YellowPixelDot extends StatelessWidget {
-  const _YellowPixelDot();
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFD51C),
-        borderRadius: BorderRadius.circular(5),
-      ),
-      child: const SizedBox.square(dimension: 20),
     );
   }
 }
