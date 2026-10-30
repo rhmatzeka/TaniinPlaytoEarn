@@ -1,4 +1,4 @@
-"""Village props for assets/images/dunia/, drawn pixel by pixel.
+"""Village props for assets/images/dekor/, drawn pixel by pixel.
 
 Every prop is built from shaded volumes (lit from the top left) instead of
 flat boxes, outlined with a darker tint of its own colour the way the
@@ -15,7 +15,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parent.parent
-OUT = ROOT / "assets" / "images" / "dunia"
+OUT = ROOT / "assets" / "images" / "dekor"
 FRAMES = 4
 
 
