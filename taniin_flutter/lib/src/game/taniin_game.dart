@@ -367,7 +367,7 @@ class TaniinGame extends FlameGame {
     canvas.restore();
   }
 
-  // About 12 tiles across the short side of the screen, at least 44 logical
+  // About 15 tiles across the short side of the screen, at least 34 logical
   // pixels per tile on phones. Snapped to whole multiples of the 16 px art in
   // physical pixels so every art pixel stays the same size.
   double get _devicePixelRatio {
@@ -381,7 +381,7 @@ class TaniinGame extends FlameGame {
     if (shortSide <= 0) {
       return 1 / ratio;
     }
-    final logicalTile = math.max(44.0, shortSide / 12);
+    final logicalTile = math.max(34.0, shortSide / 15);
     final physicalTile = math.max(
       16.0,
       (logicalTile * ratio / 16).round() * 16,

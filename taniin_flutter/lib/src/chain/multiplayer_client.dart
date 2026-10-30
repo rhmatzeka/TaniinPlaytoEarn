@@ -81,7 +81,6 @@ const double _shopTop = 16.2 * _tileSize;
 const double _shopBottom = 23.95 * _tileSize;
 const double _shopSafeX = 5.95 * _tileSize;
 const double _shopFrontY = 26.85 * _tileSize;
-const double _shopDoorX = 3.35 * _tileSize;
 
 class MultiplayerClient extends ChangeNotifier {
   MultiplayerClient(this.farmState) {
@@ -208,8 +207,8 @@ class MultiplayerClient extends ChangeNotifier {
               id: aiData['id']?.toString() ?? 'ai-agent',
               wallet: aiData['wallet']?.toString() ?? '',
               name: aiData['name']?.toString() ?? 'Pak Tani AI',
-              x: (aiData['x'] as num?)?.toDouble() ?? 200.0,
-              y: (aiData['y'] as num?)?.toDouble() ?? 350.0,
+              x: (aiData['x'] as num?)?.toDouble() ?? 18.18 * _tileSize,
+              y: (aiData['y'] as num?)?.toDouble() ?? _shopFrontY,
               anim: aiData['anim']?.toString() ?? 'idle',
             );
           }
@@ -600,7 +599,8 @@ class MultiplayerClient extends ChangeNotifier {
     // Plots: 4, 6, 8, 10, 12 at Y=19
     Offset target = Offset(aiAgent!.x, aiAgent!.y);
     if (action.intent == 'buy') {
-      target = const Offset(_shopDoorX, _shopFrontY);
+      // Road in front of the seed shop gate, same spot as the server AI.
+      target = const Offset(19.2 * _tileSize, _shopFrontY);
     } else if (action.intent == 'sell') {
       target = const Offset(31.0 * 128, 13.35 * 128);
     } else if (action.intent == 'withdraw') {

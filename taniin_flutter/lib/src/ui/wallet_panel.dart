@@ -1,11 +1,10 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import '../chain/chain_client.dart';
 import '../chain/platform_bridge.dart';
 import '../state/farm_state.dart';
-import 'pixel_panel.dart';
+import 'kayu.dart';
+import 'pixel_art.dart';
 
 class WalletPanel extends StatefulWidget {
   const WalletPanel({
@@ -40,8 +39,7 @@ class _WalletPanelState extends State<WalletPanel> {
     final compact = media.width < 560 || media.height < 720;
     final contentProminent = widget.prominent && !compact;
     final title =
-        widget.title ??
-        (farmState.isLoggedIn ? 'Akun Taniin' : 'Masuk');
+        widget.title ?? (farmState.isLoggedIn ? 'Akun Taniin' : 'Masuk');
     final subtitle =
         widget.subtitle ??
         (farmState.walletIsBackendSigner
@@ -49,125 +47,78 @@ class _WalletPanelState extends State<WalletPanel> {
             : farmState.isLoggedIn
             ? 'Wallet Sepolia ${shortAddress(farmState.walletAddress)}'
             : 'Simpan panen di Sepolia');
-    final margin = compact ? 28.0 : (widget.prominent ? 56.0 : 72.0);
-    final maxWidth = math.min(
-      math.max(292.0, media.width - margin),
-      widget.prominent ? 680.0 : 780.0,
-    );
-    final maxHeight = math.min(
-      math.max(420.0, media.height - margin),
-      widget.prominent ? 720.0 : 660.0,
-    );
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
-      child: PixelPanel(
-        color: const Color(0xFFA34A1C),
-        borderColor: const Color(0xFF633010),
-        padding: EdgeInsets.zero,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _WalletPanelHeader(
-              title: title,
-              subtitle: subtitle,
-              connected: farmState.isLoggedIn,
-              backendSigner: farmState.walletIsBackendSigner,
+    return KayuPanel(
+      title: title,
+      subtitle: subtitle,
+      leading: const PixelIcon('kunci', size: 52),
+      maxWidth: widget.prominent ? 680 : 720,
+      onClose: widget.showCloseButton ? widget.onClose : null,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _StatusBox(
+            text: farmState.chainStatus,
+            connected: farmState.isLoggedIn,
+            prominent: contentProminent,
+          ),
+          SizedBox(height: contentProminent ? 24 : 14),
+          if (!farmState.isLoggedIn) ...[
+            _WalletActionButton(
+              label: 'Masuk dengan Privy',
+              icon: Icons.login,
+              color: const Color(0xFFD68127),
               prominent: contentProminent,
-              compact: compact,
-              showCloseButton: widget.showCloseButton,
-              onClose: widget.onClose,
+              onPressed: farmState.canLogin ? _openLogin : null,
             ),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(
-                  compact ? 14 : 30,
-                  compact ? 14 : 26,
-                  compact ? 14 : 30,
-                  compact ? 16 : 32,
+            const SizedBox(height: 14),
+            Text(
+              farmState.canLogin
+                  ? 'Masuk pakai email, Google, atau wallet. Wallet Sepolia dibuat otomatis, '
+                        'dan progres tamumu ikut dibawa.'
+                  : 'Server login belum tersedia di build ini. Kamu tetap bisa main sebagai tamu.',
+              textAlign: TextAlign.center,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: const Color(0xFFE9C692)),
+            ),
+          ] else ...[
+            _AccountRow(farmState: farmState),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 12,
+              runSpacing: 10,
+              alignment: WrapAlignment.center,
+              children: [
+                _WalletActionButton(
+                  label: 'Sync Saldo',
+                  icon: Icons.refresh,
+                  color: const Color(0xFF2C8356),
+                  prominent: contentProminent,
+                  onPressed: _syncBalance,
                 ),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF7A2D0E),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: const Color(0xFFE07B20),
-                      width: compact ? 4 : 5,
-                    ),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.all(compact ? 14 : 18),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _StatusBox(
-                          text: farmState.chainStatus,
-                          connected: farmState.isLoggedIn,
-                          prominent: contentProminent,
-                        ),
-                        SizedBox(height: contentProminent ? 24 : 14),
-                        if (!farmState.isLoggedIn) ...[
-                          _WalletActionButton(
-                            label: 'Masuk dengan Privy',
-                            icon: Icons.login,
-                            color: const Color(0xFFD68127),
-                            prominent: contentProminent,
-                            onPressed: farmState.canLogin ? _openLogin : null,
-                          ),
-                          const SizedBox(height: 14),
-                          Text(
-                            farmState.canLogin
-                                ? 'Masuk pakai email, Google, atau wallet. Wallet Sepolia dibuat otomatis, '
-                                      'dan progres tamumu ikut dibawa.'
-                                : 'Server login belum tersedia di build ini. Kamu tetap bisa main sebagai tamu.',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(color: const Color(0xFFE9C692)),
-                          ),
-                        ] else ...[
-                          _AccountRow(farmState: farmState),
-                          const SizedBox(height: 14),
-                          Wrap(
-                            spacing: 12,
-                            runSpacing: 10,
-                            alignment: WrapAlignment.center,
-                            children: [
-                              _WalletActionButton(
-                                label: 'Sync Saldo',
-                                icon: Icons.refresh,
-                                color: const Color(0xFF2C8356),
-                                prominent: contentProminent,
-                                onPressed: _syncBalance,
-                              ),
-                              _WalletActionButton(
-                                label: 'Etherscan',
-                                icon: Icons.open_in_new,
-                                color: const Color(0xFF496A8A),
-                                prominent: contentProminent,
-                                onPressed: _openExplorer,
-                              ),
-                              _WalletActionButton(
-                                label: 'Keluar',
-                                icon: Icons.logout,
-                                color: const Color(0xFF8B2F23),
-                                prominent: contentProminent,
-                                onPressed: _logout,
-                              ),
-                            ],
-                          ),
-                        ],
-                        if (widget.showFacts) ...[
-                          const SizedBox(height: 16),
-                          _WalletFacts(farmState: farmState),
-                        ],
-                      ],
-                    ),
-                  ),
+                _WalletActionButton(
+                  label: 'Etherscan',
+                  icon: Icons.open_in_new,
+                  color: const Color(0xFF496A8A),
+                  prominent: contentProminent,
+                  onPressed: _openExplorer,
                 ),
-              ),
+                _WalletActionButton(
+                  label: 'Keluar',
+                  icon: Icons.logout,
+                  color: const Color(0xFF8B2F23),
+                  prominent: contentProminent,
+                  onPressed: _logout,
+                ),
+              ],
             ),
           ],
-        ),
+          if (widget.showFacts) ...[
+            const SizedBox(height: 16),
+            _WalletFacts(farmState: farmState),
+          ],
+        ],
       ),
     );
   }
@@ -175,7 +126,8 @@ class _WalletPanelState extends State<WalletPanel> {
   Future<void> _openLogin() async {
     farmState.playClick();
     final url = await farmState.prepareLoginUrl();
-    final opened = url.isNotEmpty && await PlatformBridge.openUrl(url, sameTab: true);
+    final opened =
+        url.isNotEmpty && await PlatformBridge.openUrl(url, sameTab: true);
     farmState.showMessage(
       opened ? 'Membuka halaman masuk...' : 'Halaman masuk tidak bisa dibuka.',
       success: opened,
@@ -203,136 +155,6 @@ class _WalletPanelState extends State<WalletPanel> {
     if (!opened) {
       farmState.showMessage('Tidak bisa membuka Etherscan.', success: false);
     }
-  }
-}
-
-class _WalletPanelHeader extends StatelessWidget {
-  const _WalletPanelHeader({
-    required this.title,
-    required this.subtitle,
-    required this.connected,
-    required this.backendSigner,
-    required this.prominent,
-    required this.compact,
-    required this.showCloseButton,
-    required this.onClose,
-  });
-
-  final String title;
-  final String subtitle;
-  final bool connected;
-  final bool backendSigner;
-  final bool prominent;
-  final bool compact;
-  final bool showCloseButton;
-  final VoidCallback onClose;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: BoxConstraints(minHeight: compact ? 76 : 96),
-      padding: EdgeInsets.fromLTRB(
-        compact ? 16 : 24,
-        compact ? 14 : 18,
-        compact ? 14 : 22,
-        compact ? 14 : 18,
-      ),
-      decoration: const BoxDecoration(
-        color: Color(0xFFA94F1E),
-        border: Border(bottom: BorderSide(color: Color(0xFF763513), width: 5)),
-      ),
-      child: Row(
-        children: [
-          const _HeaderDot(),
-          SizedBox(width: compact ? 12 : 20),
-          _WalletBadge(connected: connected, prominent: prominent),
-          SizedBox(width: compact ? 12 : 18),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: const Color(0xFFFFDE19),
-                    fontSize: prominent ? 42 : (compact ? 25 : 34),
-                    height: 1.02,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  maxLines: compact ? 2 : 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: backendSigner
-                        ? const Color(0xFFFFE184)
-                        : const Color(0xFFA9EFA7),
-                    fontSize: prominent ? 20 : (compact ? 12 : 16),
-                    height: 1.15,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (showCloseButton) ...[
-            SizedBox(width: compact ? 10 : 16),
-            PanelCloseButton(
-              onPressed: onClose,
-              dimension: compact ? 46 : 62,
-              iconSize: compact ? 30 : 44,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _HeaderDot extends StatelessWidget {
-  const _HeaderDot();
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFDE19),
-        borderRadius: BorderRadius.circular(3),
-      ),
-      child: const SizedBox.square(dimension: 10),
-    );
-  }
-}
-
-class _WalletBadge extends StatelessWidget {
-  const _WalletBadge({required this.connected, required this.prominent});
-
-  final bool connected;
-  final bool prominent;
-
-  @override
-  Widget build(BuildContext context) {
-    final dimension = prominent ? 64.0 : 46.0;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: connected ? const Color(0xFF70E084) : const Color(0xFFFFD51C),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF4C230B), width: 3),
-      ),
-      child: SizedBox.square(
-        dimension: dimension,
-        child: Center(
-          child: Icon(
-            connected ? Icons.check : Icons.account_balance_wallet,
-            color: const Color(0xFF3A2614),
-            size: prominent ? 37 : 27,
-          ),
-        ),
-      ),
-    );
   }
 }
 
@@ -397,17 +219,17 @@ class _AccountRow extends StatelessWidget {
             child: Text(
               shortAddress(farmState.walletAddress),
               overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: const Color(0xFFFFF0D4),
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(color: const Color(0xFFFFF0D4)),
             ),
           ),
           const SizedBox(width: 8),
           Text(
             'via $method',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: const Color(0xFFE9C692),
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: const Color(0xFFE9C692)),
           ),
         ],
       ),

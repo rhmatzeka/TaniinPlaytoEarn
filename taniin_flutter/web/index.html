@@ -170,6 +170,11 @@
       to { transform: translateX(290%); }
     }
 
+    .boot__card--pendek { padding: 14px 26px 16px; }
+    .boot__card--pendek .boot__icon { width: 40px; height: 40px; }
+    .boot__card--pendek .boot__title { font-size: 32px; }
+    .boot__card--pendek .boot__soil { margin: 10px 0; }
+
     @media (prefers-reduced-motion: reduce) {
       .boot__bar span { animation: none; width: 100%; }
       .boot { transition: none; }
@@ -204,6 +209,8 @@
         else canvasW = Math.max(w, 1280);
         var s = w / canvasW;
         card.style.zoom = s;
+        // Short canvas (sideways phones): smaller logo, like the Flutter card.
+        card.classList.toggle('boot__card--pendek', h / s < 600);
         card.style.width = Math.min(660, canvasW - 32) + 'px';
       }
       fit();

@@ -12,16 +12,20 @@ const MAX_AI_QUEUE = 20;
 const MAX_CHAT_LENGTH = 300;
 const MAP_MIN = 0;
 const MAP_MAX = 8192;
+// World coordinates match the Flutter game: 128 px per tile.
+const TILE = 128;
+const AI_SPAWN = { x: 18.18 * TILE, y: 26.85 * TILE };
 let aiState = {
   id: "ai-agent",
   wallet: AI_WALLET_ADDRESS,
   name: "Pak Tani AI",
-  x: 200,
-  y: 350,
-  targetX: 200,
-  targetY: 350,
+  x: AI_SPAWN.x,
+  y: AI_SPAWN.y,
+  targetX: AI_SPAWN.x,
+  targetY: AI_SPAWN.y,
+  path: [],
   status: "idle", // idle, walking, planting, harvesting
-  speed: 80, // pixels per second
+  speed: 2.6 * TILE, // world pixels per second
   inventory: {
     seeds: { Kentang: 5, Bawang: 0, Stroberi: 0, Bit: 0 },
     crops: { Kentang: 0, Bawang: 0, Stroberi: 0, Bit: 0 },
@@ -33,19 +37,63 @@ let io;
 let aiInterval;
 const players = {}; // id -> { wallet, name, x, y, anim }
 
-// Target positions on map (approximate pixels)
+// Where Pak Tani AI stands for each job, in front of the building or in the
+// field corridor (same spots as the client's offline AI).
 const HOTSPOTS = {
-  shop: { x: 144, y: 160 },
-  sell: { x: 384, y: 160 },
-  swap: { x: 624, y: 160 },
-  plots: [
-    { x: 160, y: 320 }, // Plot 1
-    { x: 224, y: 320 }, // Plot 2
-    { x: 288, y: 320 }, // Plot 3
-    { x: 352, y: 320 }, // Plot 4
-    { x: 416, y: 320 }  // Plot 5
-  ]
+  shop: { x: 19.2 * TILE, y: 26.85 * TILE },
+  sell: { x: 31.0 * TILE, y: 13.35 * TILE },
+  swap: { x: 10.85 * TILE, y: 13.15 * TILE },
+  plots: [4, 6, 8, 10, 12].map((tileX) => ({ x: (tileX + 1) * TILE, y: 20 * TILE })),
 };
+
+// Road network used to route around the fenced field and the houses.
+const ROUTE = {
+  innerY: 21.65 * TILE, // corridor inside the field fence
+  outerY: 26.85 * TILE, // main road below the shop
+  gateX: 5.0 * TILE, // field gate
+  mainRoadX: 18.5 * TILE, // north-south road
+  fenceX: 14.0 * TILE,
+  fenceY: 23.0 * TILE,
+};
+
+function insideField(point) {
+  return point.x < ROUTE.fenceX && point.y < ROUTE.fenceY;
+}
+
+// Waypoints from start to target along the roads, mirroring
+// MultiplayerClient._calculateAiPath in the Flutter app.
+function aiPath(start, target) {
+  const path = [];
+  const startInside = insideField(start);
+  const targetInside = insideField(target);
+  if (startInside && targetInside) {
+    path.push({ x: start.x, y: ROUTE.innerY }, { x: target.x, y: ROUTE.innerY });
+  } else if (startInside) {
+    path.push(
+      { x: start.x, y: ROUTE.innerY },
+      { x: ROUTE.gateX, y: ROUTE.innerY },
+      { x: ROUTE.gateX, y: ROUTE.outerY },
+      { x: ROUTE.mainRoadX, y: ROUTE.outerY },
+      { x: ROUTE.mainRoadX, y: target.y },
+    );
+  } else if (targetInside) {
+    path.push(
+      { x: start.x, y: ROUTE.outerY },
+      { x: ROUTE.mainRoadX, y: ROUTE.outerY },
+      { x: ROUTE.gateX, y: ROUTE.outerY },
+      { x: ROUTE.gateX, y: ROUTE.innerY },
+      { x: target.x, y: ROUTE.innerY },
+    );
+  } else {
+    path.push(
+      { x: start.x, y: ROUTE.outerY },
+      { x: ROUTE.mainRoadX, y: ROUTE.outerY },
+      { x: ROUTE.mainRoadX, y: target.y },
+    );
+  }
+  path.push({ x: target.x, y: target.y });
+  return path;
+}
 
 const chatLimiter = createChatLimiter(CHAT_INTERVAL_MS);
 const sessionCache = new Map();
@@ -131,8 +179,8 @@ function initMultiplayer(server) {
       if (!socket.connected) return;
       players[socket.id] = {
         ...identity,
-        x: finiteCoordinate(payload.x, 200),
-        y: finiteCoordinate(payload.y, 300),
+        x: finiteCoordinate(payload.x, 18.5 * TILE),
+        y: finiteCoordinate(payload.y, 28.5 * TILE),
         anim: normalizeAnimation(payload.anim),
         skinId: normalizeSkin(payload.skinId)
       };
@@ -304,9 +352,17 @@ function updateAiAgent() {
 
   // Move towards target
   if (aiState.status === "walking") {
-    const dx = aiState.targetX - aiState.x;
-    const dy = aiState.targetY - aiState.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
+    let waypoint = aiState.path[0] || { x: aiState.targetX, y: aiState.targetY };
+    let dx = waypoint.x - aiState.x;
+    let dy = waypoint.y - aiState.y;
+    let distance = Math.sqrt(dx * dx + dy * dy);
+    while (distance <= 5 && aiState.path.length > 1) {
+      aiState.path.shift();
+      waypoint = aiState.path[0];
+      dx = waypoint.x - aiState.x;
+      dy = waypoint.y - aiState.y;
+      distance = Math.sqrt(dx * dx + dy * dy);
+    }
 
     if (distance > 5) {
       const step = (aiState.speed * 0.1); // 100ms step
@@ -322,6 +378,7 @@ function updateAiAgent() {
       // Reached destination
       aiState.x = aiState.targetX;
       aiState.y = aiState.targetY;
+      aiState.path = [];
       aiState.status = "idle";
       io.emit("ai_moved", {
         x: aiState.x,
@@ -356,6 +413,7 @@ function executeAiAction(action) {
   aiState.status = "walking";
   aiState.targetX = destination.x;
   aiState.targetY = destination.y;
+  aiState.path = aiPath({ x: aiState.x, y: aiState.y }, destination);
 
   aiState.onReachedTarget = async () => {
     aiState.status = "busy";
@@ -425,6 +483,8 @@ function executeAiAction(action) {
 }
 
 module.exports = {
+  HOTSPOTS,
+  aiPath,
   chatKey,
   createChatLimiter,
   initMultiplayer,
