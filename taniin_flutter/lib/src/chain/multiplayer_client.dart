@@ -22,6 +22,20 @@ class RemotePlayer {
   double y;
   String anim;
   String skinId;
+  int facingDirection = 0; // 0: down, 1: up, 2: side
+  bool flipLeft = false;
+}
+
+/// Sprite row (0 down, 1 up, 2 side) and mirroring for a move of (dx, dy);
+/// null when the move is too small to tell.
+({int row, bool flipLeft})? _facingFor(double dx, double dy) {
+  if (dx.abs() < 0.5 && dy.abs() < 0.5) {
+    return null;
+  }
+  if (dy.abs() > dx.abs()) {
+    return (row: dy < 0 ? 1 : 0, flipLeft: false);
+  }
+  return (row: 2, flipLeft: dx < 0);
 }
 
 class AiAgentState {
@@ -245,6 +259,11 @@ class MultiplayerClient extends ChangeNotifier {
     // Determine the API server URL
     final apiHost = _resolveHost();
     _connectedHost = apiHost;
+    if (apiHost.isEmpty) {
+      // Chain config not loaded yet (or no server): start() connects later.
+      // An empty URL makes socket.io throw on a null hostname.
+      return;
+    }
 
     debugPrint('[multiplayer] Connecting to WebSocket: $apiHost');
 
@@ -337,9 +356,18 @@ class MultiplayerClient extends ChangeNotifier {
           final id = data['id']?.toString() ?? '';
           if (remotePlayers.containsKey(id)) {
             final p = remotePlayers[id]!;
-            p.x = (data['x'] as num?)?.toDouble() ?? p.x;
-            p.y = (data['y'] as num?)?.toDouble() ?? p.y;
-            p.anim = data['anim']?.toString() ?? p.anim;
+            final x = (data['x'] as num?)?.toDouble() ?? p.x;
+            final y = (data['y'] as num?)?.toDouble() ?? p.y;
+            final facing = _facingFor(x - p.x, y - p.y);
+            if (facing != null) {
+              p
+                ..facingDirection = facing.row
+                ..flipLeft = facing.flipLeft;
+            }
+            p
+              ..x = x
+              ..y = y
+              ..anim = data['anim']?.toString() ?? p.anim;
             notifyListeners();
           }
         }
@@ -357,9 +385,24 @@ class MultiplayerClient extends ChangeNotifier {
 
       _socket?.on('ai_moved', (data) {
         if (data is Map && aiAgent != null) {
-          aiAgent!.x = (data['x'] as num?)?.toDouble() ?? aiAgent!.x;
-          aiAgent!.y = (data['y'] as num?)?.toDouble() ?? aiAgent!.y;
-          aiAgent!.anim = data['anim']?.toString() ?? aiAgent!.anim;
+          final ai = aiAgent!;
+          final x = (data['x'] as num?)?.toDouble() ?? ai.x;
+          final y = (data['y'] as num?)?.toDouble() ?? ai.y;
+          ai.anim = data['anim']?.toString() ?? ai.anim;
+          final facing = _facingFor(x - ai.x, y - ai.y);
+          if (facing != null) {
+            ai
+              ..facingDirection = facing.row
+              ..flipLeft = facing.flipLeft;
+          } else if (ai.anim == 'idle') {
+            // Arrived: face the camera like the offline AI does.
+            ai
+              ..facingDirection = 0
+              ..flipLeft = false;
+          }
+          ai
+            ..x = x
+            ..y = y;
           notifyListeners();
         }
       });
@@ -740,7 +783,6 @@ class MultiplayerClient extends ChangeNotifier {
           return;
         }
 
-
         if (action.intent == 'plant') {
           onAiPlanted?.call(
             action.plotNum - 1,
@@ -812,7 +854,8 @@ class MultiplayerClient extends ChangeNotifier {
             ChatMessage(
               sender: aiAgent!.name,
               wallet: aiAgent!.wallet,
-              text: 'Payout ETH hanya bisa lewat Rumah Swap setelah kamu masuk dengan Privy.',
+              text:
+                  'Payout ETH hanya bisa lewat Rumah Swap setelah kamu masuk dengan Privy.',
               time: time,
             ),
           );

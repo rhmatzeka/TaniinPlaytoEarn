@@ -308,7 +308,10 @@ class TaniinGame extends FlameGame {
         'assets/game/Tileset/Cute_Fantasy_Free/Player/Player.png',
       );
       final duniaNames = <String>{
-        'kupu', 'burung', 'bebek', 'ikan',
+        'kupu',
+        'burung',
+        'bebek',
+        'ikan',
         for (final deco in decorations) deco.asset,
         for (final villager in _life.villagers) ...[
           'warga_${villager.spec.id}_jalan',
@@ -381,15 +384,11 @@ class TaniinGame extends FlameGame {
     _drawBackgroundDecorations(canvas);
     _drawFarmPlots(canvas);
     _drawPlotActionMarkers(canvas);
-    _drawShopNpc(canvas);
-    _drawRemotePlayers(canvas);
-    _drawAiAgent(canvas);
-    _drawVillagers(canvas);
-    _drawPlayer(canvas);
+    _drawActors(canvas);
     map?.drawForeground(canvas, _cameraX, _cameraY, _tile, viewport);
     _drawFlyers(canvas);
-    _drawVillagerTalk(canvas);
     _drawHouseSigns(canvas);
+    _drawTags(canvas);
     canvas.restore();
   }
 
@@ -776,8 +775,6 @@ class TaniinGame extends FlameGame {
 
   void _drawBackgroundDecorations(Canvas canvas) {
     _drawWaterLife(canvas);
-    _drawDecorations(canvas);
-    _drawAnimals(canvas);
     _drawBirdShadows(canvas);
   }
 
@@ -957,8 +954,8 @@ class TaniinGame extends FlameGame {
     }
   }
 
-  void _drawAnimals(Canvas canvas) {
-    for (final animal in _animals) {
+  void _drawAnimal(Canvas canvas, FarmAnimal animal) {
+    {
       final sheet = switch (animal.kind) {
         AnimalKind.chicken => _chicken,
         AnimalKind.chickenRed => _chickenRed,
@@ -967,7 +964,7 @@ class TaniinGame extends FlameGame {
         AnimalKind.maleCow => _maleCow,
       };
       if (sheet == null) {
-        continue;
+        return;
       }
       final size = animal.size;
       // Feet sit near the bottom of each frame; the sheets carry their own
@@ -979,7 +976,7 @@ class TaniinGame extends FlameGame {
         size,
       );
       if (_isOffscreen(target)) {
-        continue;
+        return;
       }
       final frame = animal.frame();
       final edge = animal.kind.frameSize.toDouble();
@@ -1050,11 +1047,11 @@ class TaniinGame extends FlameGame {
     canvas.restore();
   }
 
-  void _drawDecorations(Canvas canvas) {
-    for (final deco in decorations) {
+  void _drawDecoration(Canvas canvas, Prop deco) {
+    {
       final image = _dunia[deco.asset];
       if (image == null) {
-        continue;
+        return;
       }
       _drawSpriteAt(
         canvas,
@@ -1134,14 +1131,14 @@ class TaniinGame extends FlameGame {
     }
   }
 
-  void _drawVillagers(Canvas canvas) {
+  void _drawVillager(Canvas canvas, Villager villager) {
     const size = _characterSize;
-    for (final villager in _life.villagers) {
+    {
       final sheet = villager.walking
           ? _dunia['warga_${villager.spec.id}_jalan']
           : _dunia['warga_${villager.spec.id}_diam'];
       if (sheet == null) {
-        continue;
+        return;
       }
       final footX = villager.x - _cameraX;
       final footY = villager.y - _cameraY;
@@ -1152,7 +1149,7 @@ class TaniinGame extends FlameGame {
         size,
       );
       if (_isOffscreen(target)) {
-        continue;
+        return;
       }
       _paint
         ..style = PaintingStyle.fill
@@ -1187,6 +1184,28 @@ class TaniinGame extends FlameGame {
     }
   }
 
+  /// Everything that stands on the ground, drawn back to front by the y of
+  /// its feet so nearer things cover farther ones.
+  void _drawActors(Canvas canvas) {
+    final actors = <(double, VoidCallback)>[
+      for (final deco in decorations)
+        (deco.y * _tile, () => _drawDecoration(canvas, deco)),
+      for (final animal in _animals)
+        (animal.y, () => _drawAnimal(canvas, animal)),
+      for (final villager in _life.villagers)
+        (villager.y, () => _drawVillager(canvas, villager)),
+      for (final player in multiplayerClient.remotePlayers.values)
+        (player.y, () => _drawRemotePlayer(canvas, player)),
+      if (multiplayerClient.aiAgent case final ai?)
+        (ai.y, () => _drawAiAgent(canvas)),
+      (_shopNpcYTile * _tile, () => _drawShopNpc(canvas)),
+      (_playerY, () => _drawPlayer(canvas)),
+    ]..sort((a, b) => a.$1.compareTo(b.$1));
+    for (final (_, draw) in actors) {
+      draw();
+    }
+  }
+
   void _drawFlyers(Canvas canvas) {
     final butterfly = _dunia['kupu'];
     if (butterfly != null) {
@@ -1217,7 +1236,28 @@ class TaniinGame extends FlameGame {
     }
   }
 
-  void _drawVillagerTalk(Canvas canvas) {
+  /// Name tags and speech bubbles, drawn after everything else so no sprite
+  /// covers them.
+  void _drawTags(Canvas canvas) {
+    multiplayerClient.remotePlayers.forEach((_, player) {
+      _drawNameTag(
+        canvas,
+        player.name,
+        player.x,
+        player.y - _characterSize * 0.7,
+        const Color(0xFF6FB7FF),
+      );
+    });
+    final ai = multiplayerClient.aiAgent;
+    if (ai != null) {
+      _drawNameTag(
+        canvas,
+        ai.name,
+        ai.x,
+        ai.y - _characterSize * 0.7,
+        const Color(0xFF52E07A),
+      );
+    }
     for (final villager in _life.villagers) {
       final bubble = villager.bubble;
       if (!villager.near && bubble == null) {
@@ -1872,14 +1912,14 @@ class TaniinGame extends FlameGame {
     rects.add(Rect.fromLTWH(x, y, w, h));
   }
 
-  void _drawRemotePlayers(Canvas canvas) {
+  void _drawRemotePlayer(Canvas canvas, RemotePlayer player) {
     const playerSize = _characterSize;
     final idleS = _idleSheet;
     final walkS = _walkSheet;
 
     if (idleS == null) return;
 
-    multiplayerClient.remotePlayers.forEach((id, player) {
+    {
       final isWalking = player.anim == 'walk';
       final sheet = isWalking ? (walkS ?? idleS) : idleS;
 
@@ -1914,31 +1954,33 @@ class TaniinGame extends FlameGame {
       final frame = isWalking ? _walkFrame : ((_clock * 1000) ~/ 240) % 6;
       final frameIndex = frame % columns;
 
-      // Determine facing direction row for remote player (down=0, up=1, side=2)
-      int row = 0;
-      if (isWalking) {
-        row = 0;
-      }
-
       final source = Rect.fromLTWH(
         (frameIndex * frameW).toDouble(),
-        (row * frameH).toDouble(),
+        (player.facingDirection * frameH).toDouble(),
         frameW.toDouble(),
         frameH.toDouble(),
       );
 
-      canvas.drawImageRect(sheet, source, target, remotePaint);
+      if (player.flipLeft) {
+        canvas.save();
+        canvas.translate(target.center.dx, target.center.dy);
+        canvas.scale(-1, 1);
+        canvas.drawImageRect(
+          sheet,
+          source,
+          Rect.fromCenter(
+            center: Offset.zero,
+            width: playerSize,
+            height: playerSize,
+          ),
+          remotePaint,
+        );
+        canvas.restore();
+      } else {
+        canvas.drawImageRect(sheet, source, target, remotePaint);
+      }
       _drawSkinBadge(canvas, target, player.skinId);
-
-      // Draw Name tag
-      _drawNameTag(
-        canvas,
-        player.name,
-        player.x,
-        player.y - playerSize * 0.7,
-        const Color(0xFF6FB7FF),
-      );
-    });
+    }
   }
 
   Paint _skinPaint(String skinId) {
@@ -2045,15 +2087,6 @@ class TaniinGame extends FlameGame {
       canvas.drawImageRect(sheet, source, target, _pixelPaint);
     }
     canvas.restore();
-
-    // Draw Name tag
-    _drawNameTag(
-      canvas,
-      ai.name,
-      ai.x,
-      ai.y - playerSize * 0.7,
-      const Color(0xFF52E07A),
-    );
   }
 
   void _drawNameTag(
