@@ -293,6 +293,29 @@
       }
     };
   </script>
+  <script>
+    // Privy login over the game (contracts/masuk/game-login.jsx). The bundle
+    // is only fetched when the player presses "Masuk", or when Privy sends
+    // them back here from Google with privy_oauth_* in the URL.
+    (function () {
+      function load() {
+        return import('/masuk/login.js');
+      }
+      window.taniinOpenLogin = function (state) {
+        load().then(function (login) {
+          login.open(state);
+        }).catch(function () {
+          window.dispatchEvent(new CustomEvent('taniin-login-failed'));
+        });
+        return true;
+      };
+      if (/[?&]privy_oauth_/.test(window.location.search)) {
+        load().then(function (login) {
+          login.resume();
+        }).catch(function () {});
+      }
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

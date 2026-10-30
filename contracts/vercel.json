@@ -56,7 +56,7 @@
       ]
     },
     {
-      "source": "/masuk/(chunk|masuk)-(.*).js",
+      "source": "/masuk/(chunk|masuk|login)-(.*).js",
       "headers": [
         {
           "key": "Cache-Control",

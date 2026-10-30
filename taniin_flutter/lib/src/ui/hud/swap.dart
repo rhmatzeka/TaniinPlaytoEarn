@@ -240,10 +240,7 @@ class _NeedLogin extends StatelessWidget {
             label: 'Masuk dengan Privy',
             icon: Icons.login,
             onPressed: farmState.canLogin
-                ? () async {
-                    final url = await farmState.prepareLoginUrl();
-                    await PlatformBridge.openUrl(url, sameTab: true);
-                  }
+                ? () => farmState.startLogin()
                 : null,
           ),
         ],

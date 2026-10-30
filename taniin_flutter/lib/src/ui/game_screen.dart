@@ -53,6 +53,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     PlatformBridge.setAuthCallbackHandler(
       (fragment) => unawaited(_farmState.handleAuthFragment(fragment)),
     );
+    PlatformBridge.listenInPageLogin(
+      onAuth: (fragment) => unawaited(_farmState.handleAuthFragment(fragment)),
+      onFailed: () => unawaited(_farmState.fallBackToLoginPage()),
+    );
     _game = TaniinGame(_farmState, _multiplayerClient);
     _game.walkingNotifier.addListener(_syncWalkAudio);
     _syncAudio();
