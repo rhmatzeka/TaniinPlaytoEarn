@@ -9,6 +9,7 @@ import '../chain/multiplayer_client.dart';
 import '../state/farm_state.dart';
 import '../ui/taniin_theme.dart';
 import 'farm_animals.dart';
+import 'farm_life.dart';
 import 'tmx_map.dart';
 
 class TaniinGame extends FlameGame {
@@ -74,6 +75,9 @@ class TaniinGame extends FlameGame {
   ui.Image? _maleCow;
   ui.Image? _chickenRed;
   final List<FarmAnimal> _animals = _spawnAnimals();
+  final FarmLife _life = FarmLife(tile: _tile);
+  // Sprites from assets/images/dunia/, keyed by file name.
+  final Map<String, ui.Image> _dunia = {};
   ui.Image? _shopNpcSheet;
 
   double _clock = 0;
@@ -303,6 +307,20 @@ class TaniinGame extends FlameGame {
       _shopNpcSheet = await _tryLoadImage(
         'assets/game/Tileset/Cute_Fantasy_Free/Player/Player.png',
       );
+      final duniaNames = <String>{
+        'kupu', 'burung', 'bebek', 'ikan',
+        for (final deco in decorations) deco.asset,
+        for (final villager in _life.villagers) ...[
+          'warga_${villager.spec.id}_jalan',
+          'warga_${villager.spec.id}_diam',
+        ],
+      };
+      for (final name in duniaNames) {
+        final image = await _tryLoadImage('assets/images/dunia/$name.png');
+        if (image != null) {
+          _dunia[name] = image;
+        }
+      }
     } finally {
       loadingComplete.value = true;
     }
@@ -325,6 +343,11 @@ class TaniinGame extends FlameGame {
     for (final animal in _animals) {
       animal.update(dt, _animalBlocked);
     }
+    _life.update(
+      dt,
+      Offset(_playerX, _playerY),
+      Size(_worldWidth, _worldHeight),
+    );
 
     // Broadcast player coordinates to WebSocket server
     multiplayerClient.sendMove(_playerX, _playerY, _moving ? 'walk' : 'idle');
@@ -361,8 +384,11 @@ class TaniinGame extends FlameGame {
     _drawShopNpc(canvas);
     _drawRemotePlayers(canvas);
     _drawAiAgent(canvas);
+    _drawVillagers(canvas);
     _drawPlayer(canvas);
     map?.drawForeground(canvas, _cameraX, _cameraY, _tile, viewport);
+    _drawFlyers(canvas);
+    _drawVillagerTalk(canvas);
     _drawHouseSigns(canvas);
     canvas.restore();
   }
@@ -421,6 +447,7 @@ class TaniinGame extends FlameGame {
     if (_collisionRects.isEmpty) {
       _addFallbackCollisionRects(_collisionRects);
     }
+    _collisionRects.addAll(_life.decorationBlocks());
     for (final animal in _animals) {
       animal.settle(_animalBlocked);
     }
@@ -748,7 +775,10 @@ class TaniinGame extends FlameGame {
   }
 
   void _drawBackgroundDecorations(Canvas canvas) {
+    _drawWaterLife(canvas);
+    _drawDecorations(canvas);
     _drawAnimals(canvas);
+    _drawBirdShadows(canvas);
   }
 
   void _drawFarmPlots(Canvas canvas) {
@@ -974,6 +1004,277 @@ class TaniinGame extends FlameGame {
         canvas.drawImageRect(sheet, source, target, _pixelPaint);
       }
     }
+  }
+
+  /// Draws [source] of [image] with its bottom centre at world ([x], [y]).
+  /// [scale] is world px per art px; the map uses 8 (16 px art per tile).
+  void _drawSpriteAt(
+    Canvas canvas,
+    ui.Image image,
+    Rect source,
+    double x,
+    double y, {
+    double scale = _tile / 16,
+    bool flip = false,
+    double angle = 0,
+  }) {
+    final width = source.width * scale;
+    final height = source.height * scale;
+    final target = Rect.fromLTWH(
+      x - width / 2 - _cameraX,
+      y - height - _cameraY,
+      width,
+      height,
+    );
+    if (_isOffscreen(target)) {
+      return;
+    }
+    if (!flip && angle == 0) {
+      canvas.drawImageRect(image, source, target, _pixelPaint);
+      return;
+    }
+    canvas.save();
+    canvas.translate(target.center.dx, target.center.dy);
+    if (angle != 0) {
+      canvas.rotate(angle);
+    }
+    if (flip) {
+      canvas.scale(-1, 1);
+    }
+    canvas.drawImageRect(
+      image,
+      source,
+      Rect.fromCenter(center: Offset.zero, width: width, height: height),
+      _pixelPaint,
+    );
+    canvas.restore();
+  }
+
+  void _drawDecorations(Canvas canvas) {
+    for (final deco in decorations) {
+      final image = _dunia[deco.asset];
+      if (image == null) {
+        continue;
+      }
+      _drawSpriteAt(
+        canvas,
+        image,
+        Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
+        deco.x * _tile,
+        deco.y * _tile,
+      );
+    }
+  }
+
+  void _drawWaterLife(Canvas canvas) {
+    final ripple = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = _tile * 0.035;
+    for (final jump in _life.fish) {
+      // Splash rings where the fish leaves and re-enters the water.
+      for (final start in const [0.0, 0.75]) {
+        final age = jump.t - start;
+        if (age < 0 || age > 0.45) {
+          continue;
+        }
+        final grow = age / 0.45;
+        ripple.color = Color.fromRGBO(235, 248, 255, 0.85 * (1 - grow));
+        final centre = jump.origin - Offset(_cameraX, _cameraY);
+        canvas.drawOval(
+          Rect.fromCenter(
+            center: centre,
+            width: _tile * (0.25 + grow * 0.6),
+            height: _tile * (0.1 + grow * 0.22),
+          ),
+          ripple,
+        );
+      }
+      final fish = _dunia['ikan'];
+      if (fish != null && jump.arc < 1) {
+        final at = jump.position;
+        _drawSpriteAt(
+          canvas,
+          fish,
+          const Rect.fromLTWH(0, 0, 8, 5),
+          at.dx,
+          at.dy,
+          flip: !jump.left,
+          angle: jump.angle,
+        );
+      }
+    }
+    final duck = _dunia['bebek'];
+    if (duck != null) {
+      for (final d in _life.ducks) {
+        _drawSpriteAt(
+          canvas,
+          duck,
+          Rect.fromLTWH(d.frame * 14.0, 0, 14, 11),
+          d.x,
+          d.y + _tile * 0.2,
+          flip: d.facingRight,
+        );
+      }
+    }
+  }
+
+  void _drawBirdShadows(Canvas canvas) {
+    _paint
+      ..style = PaintingStyle.fill
+      ..color = const Color(0x2E000000);
+    for (final bird in _life.birds) {
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: Offset(bird.x - _cameraX, bird.y - _cameraY),
+          width: _tile * 0.5,
+          height: _tile * 0.14,
+        ),
+        _paint,
+      );
+    }
+  }
+
+  void _drawVillagers(Canvas canvas) {
+    const size = _characterSize;
+    for (final villager in _life.villagers) {
+      final sheet = villager.walking
+          ? _dunia['warga_${villager.spec.id}_jalan']
+          : _dunia['warga_${villager.spec.id}_diam'];
+      if (sheet == null) {
+        continue;
+      }
+      final footX = villager.x - _cameraX;
+      final footY = villager.y - _cameraY;
+      final target = Rect.fromLTWH(
+        footX - size * 0.5,
+        footY - size * 0.78,
+        size,
+        size,
+      );
+      if (_isOffscreen(target)) {
+        continue;
+      }
+      _paint
+        ..style = PaintingStyle.fill
+        ..color = const Color(0x50000000);
+      canvas.drawOval(
+        Rect.fromLTRB(
+          footX - _tile * 0.32,
+          footY - _tile * 0.03,
+          footX + _tile * 0.32,
+          footY + _tile * 0.14,
+        ),
+        _paint,
+      );
+      final columns = math.max(1, sheet.width ~/ 32);
+      final frame = villager.walking
+          ? (villager.animClock * 10).floor() % columns
+          : (villager.animClock * 4).floor() % columns;
+      final row = switch (villager.facing) {
+        Facing.down => 0,
+        Facing.up => 1,
+        Facing.left || Facing.right => 2,
+      };
+      _drawSpriteAt(
+        canvas,
+        sheet,
+        Rect.fromLTWH(frame * 32.0, row * 32.0, 32, 32),
+        villager.x,
+        villager.y + size * 0.22,
+        scale: size / 32,
+        flip: villager.facing == Facing.left,
+      );
+    }
+  }
+
+  void _drawFlyers(Canvas canvas) {
+    final butterfly = _dunia['kupu'];
+    if (butterfly != null) {
+      for (final b in _life.butterflies) {
+        _drawSpriteAt(
+          canvas,
+          butterfly,
+          Rect.fromLTWH(b.wingsOpen ? 0 : 8, b.color * 8.0, 8, 8),
+          b.x,
+          b.y - _tile * 0.55 + b.lift,
+          scale: _tile / 26,
+          flip: b.flipped,
+        );
+      }
+    }
+    final bird = _dunia['burung'];
+    if (bird != null) {
+      for (final b in _life.birds) {
+        _drawSpriteAt(
+          canvas,
+          bird,
+          Rect.fromLTWH(b.wingsUp ? 0 : 12, 0, 12, 7),
+          b.x,
+          b.y - b.altitude,
+          flip: b.direction < 0,
+        );
+      }
+    }
+  }
+
+  void _drawVillagerTalk(Canvas canvas) {
+    for (final villager in _life.villagers) {
+      final bubble = villager.bubble;
+      if (!villager.near && bubble == null) {
+        continue;
+      }
+      final tagY = villager.y - _characterSize * 0.7;
+      _drawNameTag(
+        canvas,
+        villager.spec.name,
+        villager.x,
+        tagY,
+        const Color(0xFFFFDE19),
+      );
+      if (bubble != null) {
+        _drawSpeechBubble(canvas, bubble, villager.x, tagY - _tile * 0.4);
+      }
+    }
+  }
+
+  /// Cream speech bubble whose tail points down at world ([x], [bottom]).
+  void _drawSpeechBubble(Canvas canvas, String text, double x, double bottom) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: const TextStyle(
+          color: Color(0xFF3A1E0C),
+          fontSize: 30,
+          height: 1.25,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      textAlign: TextAlign.center,
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: _tile * 4.2);
+    final width = painter.width + 36;
+    final height = painter.height + 24;
+    final left = x - width / 2 - _cameraX;
+    final top = bottom - height - _cameraY;
+    final box = RRect.fromRectAndRadius(
+      Rect.fromLTWH(left, top, width, height),
+      const Radius.circular(14),
+    );
+    final tail = Path()
+      ..moveTo(x - _cameraX - 14, top + height - 2)
+      ..lineTo(x - _cameraX, top + height + 18)
+      ..lineTo(x - _cameraX + 14, top + height - 2)
+      ..close();
+    final border = Paint()
+      ..color = const Color(0xFF4A1D08)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5;
+    final fill = Paint()..color = const Color(0xFFFFF0D4);
+    canvas.drawRRect(box, border);
+    canvas.drawPath(tail, border);
+    canvas.drawRRect(box, fill);
+    canvas.drawPath(tail, fill);
+    painter.paint(canvas, Offset(left + 18, top + 12));
   }
 
   bool _animalBlocked(Rect footprint) {
