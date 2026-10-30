@@ -1,4 +1,4 @@
-"""Generates the extra world sprites in assets/images/dunia/.
+"""Generates the extra world sprites in assets/images/dunia/ and dekor/.
 
 Villagers are palette swaps of the farmer sheets (assets/images/walk.png and
 idle.png, 32 px frames); wildlife is drawn pixel by pixel at the map's 16 px

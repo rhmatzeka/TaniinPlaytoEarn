@@ -78,6 +78,7 @@ flutter:
     - assets/game/Tileset/pixel_16_woods v2 free/
     - assets/images/
     - assets/images/dunia/
+    - assets/images/dekor/
     - assets/ui/
 
   fonts:

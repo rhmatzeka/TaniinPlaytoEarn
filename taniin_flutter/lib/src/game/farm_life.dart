@@ -116,14 +116,16 @@ class FarmLife {
 
 /// A placed prop. [x], [y] are the tile coordinates of its bottom centre;
 /// [block] is its collision box relative to that point, in tiles. Animated
-/// props are a horizontal strip of [frames] equal frames played at [fps].
+/// props are a horizontal strip of [frameWidth] px frames played at [fps];
+/// an image that isn't such a strip is drawn whole.
+/// Sprite: `assets/images/dekor/<asset>.png`.
 class Prop {
   const Prop(
     this.asset,
     this.x,
     this.y, {
     this.block,
-    this.frames = 1,
+    this.frameWidth = 0,
     this.fps = 0,
   });
 
@@ -131,7 +133,7 @@ class Prop {
   final double x;
   final double y;
   final Rect? block;
-  final int frames;
+  final int frameWidth;
   final double fps;
 }
 
@@ -142,7 +144,7 @@ const decorations = <Prop>[
     14.5,
     22.4,
     block: Rect.fromLTRB(-0.2, -0.3, 0.2, 0),
-    frames: 4,
+    frameWidth: 26,
     fps: 3,
   ),
   // Haystack and stacked bales by the field yard.
@@ -155,7 +157,7 @@ const decorations = <Prop>[
     28.6,
     14.7,
     block: Rect.fromLTRB(-0.4, -0.5, 0.4, 0),
-    frames: 4,
+    frameWidth: 16,
     fps: 2.5,
   ),
   // Village well beside the swap house.
@@ -164,7 +166,7 @@ const decorations = <Prop>[
     14.0,
     13.7,
     block: Rect.fromLTRB(-0.95, -0.7, 0.95, 0),
-    frames: 4,
+    frameWidth: 36,
     fps: 3,
   ),
   // Market stall on the south side of the main road.
@@ -173,7 +175,7 @@ const decorations = <Prop>[
     22.0,
     30.0,
     block: Rect.fromLTRB(-1.6, -0.8, 1.6, 0),
-    frames: 4,
+    frameWidth: 56,
     fps: 4,
   ),
   // Flower beds along the main road.
@@ -182,7 +184,7 @@ const decorations = <Prop>[
     10.5,
     28.8,
     block: Rect.fromLTRB(-1.0, -0.5, 1.0, 0),
-    frames: 4,
+    frameWidth: 36,
     fps: 2.5,
   ),
   Prop(
@@ -190,7 +192,7 @@ const decorations = <Prop>[
     29.5,
     28.9,
     block: Rect.fromLTRB(-1.0, -0.5, 1.0, 0),
-    frames: 4,
+    frameWidth: 36,
     fps: 2.5,
   ),
 ];

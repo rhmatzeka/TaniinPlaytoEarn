@@ -78,6 +78,8 @@ class TaniinGame extends FlameGame {
   final FarmLife _life = FarmLife(tile: _tile);
   // Sprites from assets/images/dunia/, keyed by file name.
   final Map<String, ui.Image> _dunia = {};
+  // Prop sprites from assets/images/dekor/, keyed by file name.
+  final Map<String, ui.Image> _dekor = {};
   ui.Image? _shopNpcSheet;
 
   double _clock = 0;
@@ -307,12 +309,17 @@ class TaniinGame extends FlameGame {
       _shopNpcSheet = await _tryLoadImage(
         'assets/game/Tileset/Cute_Fantasy_Free/Player/Player.png',
       );
+      for (final name in {for (final deco in decorations) deco.asset}) {
+        final image = await _tryLoadImage('assets/images/dekor/$name.png');
+        if (image != null) {
+          _dekor[name] = image;
+        }
+      }
       final duniaNames = <String>{
         'kupu',
         'burung',
         'bebek',
         'ikan',
-        for (final deco in decorations) deco.asset,
         for (final villager in _life.villagers) ...[
           'warga_${villager.spec.id}_jalan',
           'warga_${villager.spec.id}_diam',
@@ -1049,14 +1056,20 @@ class TaniinGame extends FlameGame {
 
   void _drawDecoration(Canvas canvas, Prop deco) {
     {
-      final image = _dunia[deco.asset];
+      final image = _dekor[deco.asset];
       if (image == null) {
         return;
       }
-      final width = image.width / deco.frames;
+      // Only slice images that really are strips of frameWidth frames; any
+      // other image (an older single-frame sprite, say) is drawn whole.
+      final isStrip = deco.frameWidth > 0 && image.width % deco.frameWidth == 0;
+      final frames = isStrip ? image.width ~/ deco.frameWidth : 1;
+      final width = isStrip
+          ? deco.frameWidth.toDouble()
+          : image.width.toDouble();
       // Offset by position so neighbouring props don't move in lockstep.
-      final frame = deco.frames > 1
-          ? (_clock * deco.fps + deco.x * 0.37).floor() % deco.frames
+      final frame = frames > 1
+          ? (_clock * deco.fps + deco.x * 0.37).floor() % frames
           : 0;
       _drawSpriteAt(
         canvas,

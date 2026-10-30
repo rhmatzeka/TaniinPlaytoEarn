@@ -29,7 +29,16 @@
       ]
     },
     {
-      "source": "/main/(assets|canvaskit)/(.*)",
+      "source": "/main/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, no-cache"
+        }
+      ]
+    },
+    {
+      "source": "/main/canvaskit/(.*)",
       "headers": [
         {
           "key": "Cache-Control",
