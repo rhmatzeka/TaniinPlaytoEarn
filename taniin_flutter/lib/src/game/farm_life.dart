@@ -115,32 +115,84 @@ class FarmLife {
 }
 
 /// A placed prop. [x], [y] are the tile coordinates of its bottom centre;
-/// [block] is its collision box relative to that point, in tiles.
+/// [block] is its collision box relative to that point, in tiles. Animated
+/// props are a horizontal strip of [frames] equal frames played at [fps].
 class Prop {
-  const Prop(this.asset, this.x, this.y, {this.block});
+  const Prop(
+    this.asset,
+    this.x,
+    this.y, {
+    this.block,
+    this.frames = 1,
+    this.fps = 0,
+  });
 
   final String asset;
   final double x;
   final double y;
   final Rect? block;
+  final int frames;
+  final double fps;
 }
 
 const decorations = <Prop>[
-  // Scarecrow watching the plots.
-  Prop('orangan', 14.5, 22.4, block: Rect.fromLTRB(-0.2, -0.3, 0.2, 0)),
-  // Hay by the field yard.
-  Prop('jerami', 6.2, 16.9, block: Rect.fromLTRB(-0.42, -0.5, 0.42, 0)),
-  Prop('jerami_tumpuk', 7.4, 17.0, block: Rect.fromLTRB(-0.5, -0.5, 0.5, 0)),
-  // Crates and a barrel outside the buyer's house.
-  Prop('peti', 28.4, 13.5, block: Rect.fromLTRB(-0.42, -0.6, 0.42, 0)),
-  Prop('tong', 28.6, 14.7, block: Rect.fromLTRB(-0.36, -0.5, 0.36, 0)),
+  // Scarecrow watching the plots, a crow on its arm.
+  Prop(
+    'orangan',
+    14.5,
+    22.4,
+    block: Rect.fromLTRB(-0.2, -0.3, 0.2, 0),
+    frames: 4,
+    fps: 3,
+  ),
+  // Haystack and stacked bales by the field yard.
+  Prop('jerami', 5.8, 17.0, block: Rect.fromLTRB(-0.5, -0.5, 0.5, 0)),
+  Prop('jerami_tumpuk', 7.6, 17.0, block: Rect.fromLTRB(-0.8, -0.6, 0.8, 0)),
+  // A crate of produce and a rain barrel outside the buyer's house.
+  Prop('peti', 28.4, 13.5, block: Rect.fromLTRB(-0.45, -0.6, 0.45, 0)),
+  Prop(
+    'tong',
+    28.6,
+    14.7,
+    block: Rect.fromLTRB(-0.4, -0.5, 0.4, 0),
+    frames: 4,
+    fps: 2.5,
+  ),
   // Village well beside the swap house.
-  Prop('sumur', 14.0, 13.7, block: Rect.fromLTRB(-0.8, -0.7, 0.8, 0)),
+  Prop(
+    'sumur',
+    14.0,
+    13.7,
+    block: Rect.fromLTRB(-0.95, -0.7, 0.95, 0),
+    frames: 4,
+    fps: 3,
+  ),
   // Market stall on the south side of the main road.
-  Prop('kios', 22.0, 30.0, block: Rect.fromLTRB(-1.4, -0.8, 1.4, 0)),
+  Prop(
+    'kios',
+    22.0,
+    30.0,
+    block: Rect.fromLTRB(-1.6, -0.8, 1.6, 0),
+    frames: 4,
+    fps: 4,
+  ),
   // Flower beds along the main road.
-  Prop('bunga', 10.5, 28.8, block: Rect.fromLTRB(-0.9, -0.5, 0.9, 0)),
-  Prop('bunga_2', 29.5, 28.9, block: Rect.fromLTRB(-0.9, -0.5, 0.9, 0)),
+  Prop(
+    'bunga',
+    10.5,
+    28.8,
+    block: Rect.fromLTRB(-1.0, -0.5, 1.0, 0),
+    frames: 4,
+    fps: 2.5,
+  ),
+  Prop(
+    'bunga_2',
+    29.5,
+    28.9,
+    block: Rect.fromLTRB(-1.0, -0.5, 1.0, 0),
+    frames: 4,
+    fps: 2.5,
+  ),
 ];
 
 class VillagerSpec {
