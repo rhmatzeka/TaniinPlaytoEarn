@@ -75,7 +75,7 @@
 
     .boot__card {
       box-sizing: border-box;
-      width: min(660px, 100%);
+      width: 660px;
       padding: 26px;
       background: #a34a1c;
       border: 5px solid #4a1d08;
@@ -170,24 +170,6 @@
       to { transform: translateX(290%); }
     }
 
-    @media (max-width: 480px) {
-      .boot__card { padding: 18px; }
-      .boot__head { gap: 12px; }
-      .boot__icon { width: 52px; height: 52px; }
-      .boot__title { font-size: 40px; }
-      .boot__sub { font-size: 15px; }
-      .boot__soil { height: 56px; padding-bottom: 9px; }
-      .boot__soil i {
-        width: 32px;
-        height: 32px;
-        background-size: 448px 256px;
-      }
-      .boot__soil i:nth-child(4n + 1) { background-position: 0 -32px; }
-      .boot__soil i:nth-child(4n + 2) { background-position: 0 -96px; }
-      .boot__soil i:nth-child(4n + 3) { background-position: 0 -160px; }
-      .boot__soil i:nth-child(4n + 4) { background-position: 0 -224px; }
-    }
-
     @media (prefers-reduced-motion: reduce) {
       .boot__bar span { animation: none; width: 100%; }
       .boot { transition: none; }
@@ -209,6 +191,25 @@
       <div class="boot__label">Memuat game…</div>
     </div>
   </div>
+  <script>
+    // Size the boot card on the same design canvas as the Flutter loading
+    // screen (lib/src/ui/physical_viewport.dart) so the hand-over lines up.
+    (function () {
+      var card = document.querySelector('.boot__card');
+      if (!card) return;
+      function fit() {
+        var w = window.innerWidth, h = window.innerHeight, canvasW;
+        if (h > w * 1.1) canvasW = 600;
+        else if (h < 520) canvasW = w * 560 / h;
+        else canvasW = Math.max(w, 1280);
+        var s = w / canvasW;
+        card.style.zoom = s;
+        card.style.width = Math.min(660, canvasW - 32) + 'px';
+      }
+      fit();
+      window.addEventListener('resize', fit);
+    })();
+  </script>
   <script>
     window.taniinLastEthereumError = '';
 

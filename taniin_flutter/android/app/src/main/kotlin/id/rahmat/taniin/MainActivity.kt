@@ -311,14 +311,14 @@ private class NativeLoadingSplashView(context: Context) : View(context) {
         val density = resources.displayMetrics.density
         val logicalW = width / density
         val logicalH = height / density
-        val canvasW = if (logicalH > logicalW) {
-            600f
-        } else {
-            maxOf(logicalW, if (logicalH < 520f) 1024f else 1280f)
+        val canvasW = when {
+            logicalH > logicalW * 1.1f -> 600f
+            logicalH < 520f -> logicalW * 560f / logicalH
+            else -> maxOf(logicalW, 1280f)
         }
         val u = width / canvasW
         val canvasH = height / u
-        val short = canvasH < 560f
+        val short = canvasH < 600f
         val cardW = minOf(canvasW - 32f, 660f)
         val pad = 26f
         val padTop = if (short) 14f else pad

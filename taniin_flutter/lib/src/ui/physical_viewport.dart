@@ -5,7 +5,9 @@ import 'package:flutter/widgets.dart';
 /// Lays HUD and panels out on a fixed design canvas and scales it to the
 /// screen, so sizes follow the screen's logical size rather than its pixel
 /// density. Landscape screens get at least 1280 design pixels of width
-/// (desktops at 1280+ render 1:1); portrait phones get a 600-wide canvas.
+/// (desktops at 1280+ render 1:1); portrait phones get a 600-wide canvas and
+/// sideways phones a 560-tall one. web/index.html (boot card) and
+/// MainActivity.kt (native loading card) mirror these rules.
 class PhysicalViewport extends StatelessWidget {
   const PhysicalViewport({
     required this.child,
@@ -14,9 +16,10 @@ class PhysicalViewport extends StatelessWidget {
   });
 
   static const double landscapeMinWidth = 1280;
-  // Phones held sideways are short; a narrower canvas keeps the HUD large.
-  static const double shortLandscapeMinWidth = 1024;
+  // Phones held sideways are short: their canvas is sized by height instead,
+  // so the HUD keeps the same share of the screen on any phone.
   static const double shortLandscapeMaxHeight = 520;
+  static const double shortLandscapeCanvasHeight = 560;
   static const double portraitWidth = 600;
 
   final Widget child;
@@ -36,12 +39,9 @@ class PhysicalViewport extends StatelessWidget {
         }
         final canvasWidth = isPortrait(logical)
             ? portraitWidth
-            : math.max(
-                logical.width,
-                logical.height < shortLandscapeMaxHeight
-                    ? shortLandscapeMinWidth
-                    : landscapeMinWidth,
-              );
+            : logical.height < shortLandscapeMaxHeight
+            ? logical.width * shortLandscapeCanvasHeight / logical.height
+            : math.max(logical.width, landscapeMinWidth);
         final scale = logical.width / canvasWidth;
         final canvas = Size(canvasWidth, logical.height / scale);
         return FittedBox(
