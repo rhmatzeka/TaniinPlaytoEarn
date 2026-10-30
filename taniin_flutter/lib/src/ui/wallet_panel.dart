@@ -125,13 +125,7 @@ class _WalletPanelState extends State<WalletPanel> {
 
   Future<void> _openLogin() async {
     farmState.playClick();
-    final url = await farmState.prepareLoginUrl();
-    final opened =
-        url.isNotEmpty && await PlatformBridge.openUrl(url, sameTab: true);
-    farmState.showMessage(
-      opened ? 'Membuka halaman masuk...' : 'Halaman masuk tidak bisa dibuka.',
-      success: opened,
-    );
+    final opened = await farmState.startLogin();
     if (opened && widget.showCloseButton) {
       widget.onClose();
     }

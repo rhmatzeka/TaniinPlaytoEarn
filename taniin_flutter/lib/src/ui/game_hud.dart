@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -6,7 +7,6 @@ import 'package:flutter/material.dart';
 import '../game/taniin_game.dart';
 import '../state/farm_state.dart';
 import '../chain/multiplayer_client.dart';
-import '../chain/platform_bridge.dart';
 import 'physical_viewport.dart';
 import 'web_input_capability.dart'
     if (dart.library.js_interop) 'web_input_capability_web.dart'
@@ -383,6 +383,11 @@ class GameHud extends StatelessWidget {
 
   void _showWalletDialog(BuildContext context) {
     farmState.playClick();
+    // Signed out: "Masuk" goes straight to the Privy login.
+    if (!farmState.isLoggedIn && farmState.canLogin) {
+      unawaited(farmState.startLogin());
+      return;
+    }
     showDialog<void>(
       context: context,
       barrierColor: const Color(0xAA000000),

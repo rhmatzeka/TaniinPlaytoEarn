@@ -1015,6 +1015,46 @@ class FarmStateController extends ChangeNotifier {
     );
   }
 
+  /// Starts a Privy login. On the web the Privy window opens over the game;
+  /// if that is unavailable (or on Android) the `/masuk` page opens instead.
+  Future<bool> startLogin() async {
+    if (kIsWeb) {
+      final state = newCodeVerifier();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_loginStateKey, state);
+      if (PlatformBridge.openInPageLogin(state)) {
+        showMessage('Membuka login Privy...');
+        return true;
+      }
+      return _openLoginPage(
+        PlatformBridge.loginUrl(chainConfig, forApp: false, state: state),
+      );
+    }
+    return _openLoginPage(await prepareLoginUrl());
+  }
+
+  /// The in-page login could not load: use the `/masuk` page after all.
+  Future<void> fallBackToLoginPage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final state = prefs.getString(_loginStateKey) ?? '';
+    if (state.isEmpty) {
+      return;
+    }
+    await _openLoginPage(
+      PlatformBridge.loginUrl(chainConfig, forApp: false, state: state),
+    );
+  }
+
+  Future<bool> _openLoginPage(String url) async {
+    final opened =
+        url.isNotEmpty && await PlatformBridge.openUrl(url, sameTab: true);
+    showMessage(
+      opened ? 'Membuka halaman masuk...' : 'Halaman masuk tidak bisa dibuka.',
+      success: opened,
+    );
+    return opened;
+  }
+
   /// Handles the `#session=`, `#code=` or `#fundTx=` fragment from the login page.
   Future<void> handleAuthFragment(String fragment) async {
     final fund = FundCallback.fromFragment(fragment);

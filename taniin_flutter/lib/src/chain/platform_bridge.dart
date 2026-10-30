@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'browser_url.dart';
+import 'browser_url.dart' as browser_url;
 import 'chain_client.dart';
 
 class PlatformBridge {
@@ -46,6 +47,20 @@ class PlatformBridge {
 
   /// On web, the login page redirects back to the game with a URL fragment.
   static String launchAuthFragment() => kIsWeb ? takeBrowserFragment() : '';
+
+  /// Web: opens the Privy login over the game instead of leaving for /masuk.
+  static bool openInPageLogin(String state) =>
+      kIsWeb && browser_url.openInPageLogin(state);
+
+  /// Web: results of [openInPageLogin].
+  static void listenInPageLogin({
+    required void Function(String fragment) onAuth,
+    required void Function() onFailed,
+  }) {
+    if (kIsWeb) {
+      browser_url.listenInPageLogin(onAuth: onAuth, onFailed: onFailed);
+    }
+  }
 
   static Future<ChainConfig> loadChainConfig() async {
     if (kIsWeb) {
