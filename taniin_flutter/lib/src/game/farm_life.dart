@@ -29,12 +29,42 @@ class FarmLife {
           waypoints: [for (final p in _lakePoints) _at(p)],
           tile: tile,
           random: math.Random(_random.nextInt(1 << 30)),
+          female: i == 1,
+          ducklings: i == 1 ? 3 : 0,
         ),
       Duck(
         waypoints: [for (final p in _riverPoints) _at(p)],
         tile: tile,
         random: math.Random(_random.nextInt(1 << 30)),
+        female: true,
+        ducklings: 2,
       ),
+      Duck(
+        waypoints: [for (final p in _riverPoints) _at(p)],
+        tile: tile,
+        random: math.Random(_random.nextInt(1 << 30)),
+      ),
+    ];
+    fishShadows = [
+      for (final points in [
+        _lakePoints,
+        _lakePoints,
+        _riverPoints,
+        _riverPoints,
+      ])
+        FishShadow(
+          waypoints: [for (final p in points) _at(p)],
+          tile: tile,
+          random: math.Random(_random.nextInt(1 << 30)),
+        ),
+    ];
+    dragonflies = [
+      for (var i = 0; i < _dragonflyHomes.length; i++)
+        Dragonfly(home: _at(_dragonflyHomes[i]), tile: tile, phase: i * 2.1),
+    ];
+    leaves = [
+      for (var i = 0; i < 3; i++)
+        DriftLeaf(tile: tile, start: _riverStartX + i * 9, phase: i * 1.7),
     ];
     _nextBird = 2 + _random.nextDouble() * 4;
     _nextFish = 1.5 + _random.nextDouble() * 3;
@@ -45,6 +75,9 @@ class FarmLife {
   late final List<Villager> villagers;
   late final List<Butterfly> butterflies;
   late final List<Duck> ducks;
+  late final List<FishShadow> fishShadows;
+  late final List<Dragonfly> dragonflies;
+  late final List<DriftLeaf> leaves;
   final List<Bird> birds = [];
   final List<FishJump> fish = [];
   double _nextBird = 0;
@@ -61,6 +94,15 @@ class FarmLife {
     }
     for (final duck in ducks) {
       duck.update(dt);
+    }
+    for (final shadow in fishShadows) {
+      shadow.update(dt);
+    }
+    for (final dragonfly in dragonflies) {
+      dragonfly.update(dt);
+    }
+    for (final leaf in leaves) {
+      leaf.update(dt);
     }
 
     _nextBird -= dt;
@@ -195,6 +237,77 @@ const decorations = <Prop>[
     frameWidth: 36,
     fps: 2.5,
   ),
+  // A cart of produce by the road, south of the plots.
+  Prop('gerobak', 16.8, 29.9, block: Rect.fromLTRB(-0.9, -0.5, 1.0, 0)),
+  // Notice board at the crossroads.
+  Prop(
+    'papan_pengumuman',
+    29.5,
+    25.9,
+    block: Rect.fromLTRB(-0.7, -0.3, 0.7, 0),
+    frameWidth: 28,
+    fps: 2,
+  ),
+  // Washing drying in the east yard.
+  Prop(
+    'jemuran',
+    38.3,
+    17.8,
+    block: Rect.fromLTRB(-1.3, -0.25, 1.3, 0),
+    frameWidth: 44,
+    fps: 2.5,
+  ),
+  // Chicken coop by the roadside hens.
+  Prop('kandang_ayam', 38.5, 31.9, block: Rect.fromLTRB(-1.0, -0.6, 1.0, 0)),
+  // Bamboo fence along the lake shore.
+  Prop('pagar_bambu', 4.2, 29.7, block: Rect.fromLTRB(-0.62, -0.3, 0.62, 0)),
+  Prop('pagar_bambu', 5.45, 29.7, block: Rect.fromLTRB(-0.62, -0.3, 0.62, 0)),
+  Prop('pagar_bambu', 6.7, 29.7, block: Rect.fromLTRB(-0.62, -0.3, 0.62, 0)),
+];
+
+/// Something floating in or growing out of the water, drawn under the ducks.
+/// [asset] is a path under assets/images/ without the extension.
+class WaterProp {
+  const WaterProp(
+    this.asset,
+    this.x,
+    this.y, {
+    this.frameWidth = 0,
+    this.fps = 0,
+  });
+
+  final String asset;
+  final double x;
+  final double y;
+  final int frameWidth;
+  final double fps;
+}
+
+const waterProps = <WaterProp>[
+  // Lily pads, some in bloom.
+  WaterProp('alam/teratai_1', 6.0, 10.4),
+  WaterProp('alam/teratai_1', 21.0, 9.8),
+  WaterProp('alam/teratai_1', 12.0, 33.8),
+  WaterProp('alam/teratai_2', 15.0, 10.6),
+  WaterProp('alam/teratai_2', 3.0, 30.6),
+  WaterProp('alam/teratai_2', 30.6, 6.2),
+  WaterProp('alam/teratai_3', 19.0, 10.6),
+  WaterProp('alam/teratai_3', 9.0, 31.4),
+  // Frogs sitting on their pads.
+  WaterProp('satwa/katak', 17.0, 10.4, frameWidth: 16, fps: 1.2),
+  WaterProp('satwa/katak', 2.6, 33.2, frameWidth: 16, fps: 1.2),
+  // Reeds and cattails at the banks.
+  WaterProp('alam/alang_1', 8.5, 8.7, frameWidth: 16, fps: 2.5),
+  WaterProp('alam/alang_1', 20.5, 8.6, frameWidth: 16, fps: 2.5),
+  WaterProp('alam/alang_1', 14.5, 10.95, frameWidth: 16, fps: 2.5),
+  WaterProp('alam/alang_1', 28.4, 10.9, frameWidth: 16, fps: 2.5),
+  WaterProp('alam/alang_1', 6.5, 30.9, frameWidth: 16, fps: 2.5),
+  WaterProp('alam/alang_1', 1.6, 29.6, frameWidth: 16, fps: 2.5),
+  WaterProp('alam/alang_1', 29.4, 6.0, frameWidth: 16, fps: 2.5),
+  WaterProp('alam/alang_2', 3.5, 10.9, frameWidth: 16, fps: 2.5),
+  WaterProp('alam/alang_2', 17.8, 8.6, frameWidth: 16, fps: 2.5),
+  WaterProp('alam/alang_2', 12.8, 32.6, frameWidth: 16, fps: 2.5),
+  WaterProp('alam/alang_2', 31.4, 7.0, frameWidth: 16, fps: 2.5),
 ];
 
 class VillagerSpec {
@@ -408,7 +521,7 @@ class Butterfly {
 
   final Offset home;
 
-  /// Row of assets/images/dunia/kupu.png.
+  /// Row of assets/images/satwa/kupu_kupu.png.
   final int color;
   final double tile;
   final math.Random random;
@@ -417,7 +530,8 @@ class Butterfly {
   late Offset _target;
   double _clock = 0;
 
-  bool get wingsOpen => (_clock * 9).floor().isEven;
+  /// Column of satwa/kupu_kupu.png: open, half, closed, half.
+  int get wingFrame => (_clock * 12).floor() % 4;
   bool get flipped => _target.dx < x;
 
   /// Small bob so the flight looks fluttery.
@@ -458,7 +572,9 @@ class Bird {
   double _clock;
 
   double get altitude => tile * 2.6;
-  bool get wingsUp => (_clock * 5).floor().isEven;
+
+  /// Column of satwa/burung_terbang.png.
+  int get wingFrame => (_clock * 8).floor() % 4;
 
   void update(double dt) {
     _clock += dt;
@@ -484,7 +600,13 @@ const _riverPoints = <Offset>[
 ];
 
 class Duck {
-  Duck({required this.waypoints, required this.tile, required this.random}) {
+  Duck({
+    required this.waypoints,
+    required this.tile,
+    required this.random,
+    this.female = false,
+    this.ducklings = 0,
+  }) {
     final start = waypoints[random.nextInt(waypoints.length)];
     x = start.dx;
     y = start.dy;
@@ -494,15 +616,35 @@ class Duck {
   final List<Offset> waypoints;
   final double tile;
   final math.Random random;
+
+  /// Row 1 of satwa/bebek_renang.png (brown hen) instead of row 0 (drake).
+  final bool female;
+
+  /// How many ducklings paddle behind, along [trail].
+  final int ducklings;
   double x = 0;
   double y = 0;
   late Offset _target;
   double _rest = 0;
   double _clock = 0;
+  double _trailClock = 0;
+
+  /// Where the duck has been, newest first, for the ducklings to follow.
+  final List<Offset> trail = <Offset>[];
 
   /// The sheet faces left.
   bool facingRight = false;
-  int get frame => (_clock * 2).floor() % 2;
+  int get frame => (_clock * 3).floor() % 4;
+  double get clock => _clock;
+
+  /// Position of duckling [index], a few strokes behind the one before.
+  Offset ducklingAt(int index) {
+    final at = (index + 1) * 5;
+    if (trail.isEmpty) {
+      return Offset(x + (facingRight ? -1 : 1) * tile * 0.5 * (index + 1), y);
+    }
+    return trail[math.min(at, trail.length - 1)];
+  }
 
   void update(double dt) {
     _clock += dt;
@@ -522,8 +664,122 @@ class Duck {
     if (delta.dx.abs() > 1) {
       facingRight = delta.dx > 0;
     }
+    _trailClock += dt;
+    if (ducklings > 0 && _trailClock > 0.12) {
+      _trailClock = 0;
+      trail.insert(0, Offset(x, y));
+      if (trail.length > (ducklings + 1) * 5 + 1) {
+        trail.removeLast();
+      }
+    }
   }
 }
+
+/// A fish gliding under the surface, seen only as a dark shape.
+class FishShadow {
+  FishShadow({
+    required this.waypoints,
+    required this.tile,
+    required this.random,
+  }) {
+    final start = waypoints[random.nextInt(waypoints.length)];
+    x = start.dx + (random.nextDouble() - 0.5) * tile;
+    y = start.dy + (random.nextDouble() - 0.5) * tile * 0.4;
+    _pick();
+  }
+
+  final List<Offset> waypoints;
+  final double tile;
+  final math.Random random;
+  double x = 0;
+  double y = 0;
+  late Offset _target;
+  double _clock = 0;
+  bool facingRight = false;
+
+  int get frame => (_clock * 4).floor() % 2;
+
+  void _pick() {
+    final base = waypoints[random.nextInt(waypoints.length)];
+    _target =
+        base +
+        Offset(
+          (random.nextDouble() - 0.5) * tile * 1.6,
+          (random.nextDouble() - 0.5) * tile * 0.5,
+        );
+  }
+
+  void update(double dt) {
+    _clock += dt;
+    final delta = _target - Offset(x, y);
+    final step = tile * 0.7 * dt;
+    if (delta.distance <= step) {
+      _pick();
+      return;
+    }
+    x += delta.dx / delta.distance * step;
+    y += delta.dy / delta.distance * step;
+    if (delta.dx.abs() > 1) {
+      facingRight = delta.dx > 0;
+    }
+  }
+}
+
+/// A dragonfly hovering over the reeds, darting now and then.
+class Dragonfly {
+  Dragonfly({required this.home, required this.tile, required double phase})
+    : _clock = phase;
+
+  final Offset home;
+  final double tile;
+  double _clock;
+
+  Offset get position {
+    final dart = math.sin(_clock * 0.9) > 0.85 ? 0.6 : 0.0;
+    return home +
+        Offset(
+          (math.sin(_clock * 0.7) * 1.3 + dart) * tile,
+          math.cos(_clock * 1.1) * 0.5 * tile - tile * 0.6,
+        );
+  }
+
+  int get frame => (_clock * 24).floor() % 2;
+  bool get facingRight => math.cos(_clock * 0.7) > 0;
+
+  void update(double dt) => _clock += dt;
+}
+
+/// A leaf floating down the river and starting again upstream.
+class DriftLeaf {
+  DriftLeaf({required this.tile, required double start, required double phase})
+    : x = start * tile,
+      _clock = phase;
+
+  final double tile;
+  double x;
+  double _clock;
+
+  double get y => (_riverY + math.sin(_clock * 0.8) * 0.35) * tile;
+  double get spin => math.sin(_clock * 0.6) * 0.5;
+
+  void update(double dt) {
+    _clock += dt;
+    x += tile * 0.32 * dt;
+    if (x > _riverEndX * tile) {
+      x = _riverStartX * tile;
+    }
+  }
+}
+
+const _riverY = 9.35;
+const _riverStartX = 1.0;
+const _riverEndX = 28.6;
+
+const _dragonflyHomes = <Offset>[
+  Offset(9, 9.6),
+  Offset(18, 9.4),
+  Offset(9.5, 31.8),
+];
 
 class FishJump {
   FishJump({required this.origin, required this.tile, required this.left});

@@ -705,6 +705,254 @@ def barrel():
     return strip(frames)
 
 
+# --- More village props ---------------------------------------------------------
+
+BAMBOO = ramp("#2e3a10", "#56661a", "#86942a", "#b4c048", "#dce27a")
+ROPE = ramp("#6a4a2a", "#a8885a", "#d8c094")
+BATIK = ramp("#3a1a0c", "#7a3a14", "#b8662a", "#e8a24a")
+
+
+def wheel(im, cx, cy, r):
+    px = im.load()
+    for y in range(round(cy - r) - 1, round(cy + r) + 2):
+        for x in range(round(cx - r) - 1, round(cx + r) + 2):
+            d = math.hypot(x + 0.5 - cx, y + 0.5 - cy)
+            if r - 1.4 <= d <= r:
+                px[x, y] = WOOD[5] if (x - cx) + (y - cy) < 0 else WOOD[2]
+    for a in range(0, 360, 45):
+        for k in range(1, int(r - 1)):
+            x = round(cx + math.cos(math.radians(a)) * k)
+            y = round(cy + math.sin(math.radians(a)) * k)
+            px[x, y] = WOOD[3]
+    blob(im, cx, cy, 1.4, 1.4, IRON, seed=1)
+
+
+def cart():
+    im = canvas(40, 28)
+    # Shafts reaching forward to the ground.
+    line(im, [(1, 21), (12, 14)], WOOD[4])
+    line(im, [(2, 22), (13, 15)], WOOD[2])
+    # Load: a heap of produce and a sack under straw.
+    blob(im, 24, 9, 9.5, 5.6, STRAW, rough=0.3, seed=4, clip=lambda x, y: y <= 12)
+    for i in range(16):
+        x = 15 + int(noise(i, 1, 4) * 18)
+        y = 5 + int(noise(i, 2, 4) * 7)
+        dot(im, x, y, STRAW[4] if i % 2 else STRAW[1])
+    for i, (x, y, produce) in enumerate(((18, 9, PUMPKIN), (22, 7.5, PUMPKIN), (27, 8, CABBAGE), (31, 9.5, TOMATO), (25, 10.5, CORN))):
+        fruit(im, x, y, 2.2, produce, seed=i, stem=LEAF[2] if produce is not CABBAGE else None)
+    blob(im, 34, 8, 3.2, 4.0, BURLAP, seed=6)
+    line(im, [(32, 5), (36, 5)], BURLAP[0])
+    # Bed of planks with side rails.
+    for y in range(12, 19):
+        for x in range(12, 38):
+            plank = (y - 12) // 2
+            v = 0.72 - (y - 12) * 0.05 + (noise(plank, x // 9, 7) - 0.5) * 0.18
+            if (y - 12) % 2 == 1 and y > 13:
+                v -= 0.25
+            dot(im, x, y, tone(WOOD[1:], v))
+    line(im, [(12, 12), (37, 12)], WOOD[6])
+    for x in (12, 24, 37):
+        line(im, [(x, 12), (x, 18)], WOOD[2] if x != 12 else WOOD[5])
+    wheel(im, 27, 20, 6.4)
+    # Prop stick at the front.
+    line(im, [(14, 18), (14, 25)], WOOD[3])
+    outline(im)
+    return ground(im, (8, 22, 38, 28))
+
+
+def bamboo_fence():
+    im = canvas(20, 20)
+    for i, x in enumerate((2, 7, 12, 17)):
+        top = 2 + (i % 2) * 2
+        for y in range(top, 18):
+            dot(im, x, y, BAMBOO[3])
+            dot(im, x + 1, y, BAMBOO[2])
+            if (y - top) % 5 == 4:
+                dot(im, x, y, BAMBOO[1])
+                dot(im, x + 1, y, BAMBOO[1])
+        dot(im, x, top, BAMBOO[4])
+        dot(im, x + 1, top, BAMBOO[1])
+    for y in (7, 13):
+        line(im, [(0, y), (19, y)], BAMBOO[3])
+        line(im, [(0, y + 1), (19, y + 1)], BAMBOO[1])
+        for x in (2, 7, 12, 17):
+            dot(im, x, y, ROPE[2])
+            dot(im, x + 1, y + 1, ROPE[1])
+    outline(im)
+    return ground(im, (0, 15, 20, 20))
+
+
+def clothesline():
+    frames = []
+    for f in range(FRAMES):
+        im = canvas(44, 30)
+        # Bamboo posts.
+        for x in (2, 41):
+            for y in range(4, 28):
+                dot(im, x, y, BAMBOO[3])
+                dot(im, x + 1, y, BAMBOO[2])
+                if y % 6 == 3:
+                    dot(im, x, y, BAMBOO[1])
+                    dot(im, x + 1, y, BAMBOO[1])
+            dot(im, x, 4, BAMBOO[4])
+        # Sagging rope.
+        def rope_y(x):
+            u = (x - 3) / 38
+            return 6 + round(math.sin(u * math.pi) * 3)
+        for x in range(3, 41):
+            dot(im, x, rope_y(x), ROPE[1])
+        w = sway(f)
+        w2 = sway(f, 0.3)
+        # A shirt.
+        sx = 7
+        top = rope_y(sx + 4) + 1
+        for y in range(top, top + 9):
+            for x in range(sx + 1, sx + 8):
+                dx = w if y > top + 5 else 0
+                dot(im, x + dx, y, tone(DENIM, 0.8 - (x - sx) * 0.07))
+        for y in range(top, top + 4):
+            dot(im, sx, y, DENIM[2])
+            dot(im, sx + 8, y, DENIM[1])
+            dot(im, sx - 1, y + 1, DENIM[2])
+            dot(im, sx + 9, y + 1, DENIM[1])
+        line(im, [(sx + 3, top), (sx + 5, top)], DENIM[0])
+        # A batik sarong, long and swinging most.
+        bx = 19
+        top = rope_y(bx + 4) + 1
+        for y in range(top, top + 14):
+            dx = w2 if y > top + 6 else 0
+            dx += w2 if y > top + 11 else 0
+            for x in range(bx, bx + 9):
+                pattern = (x + y * 2) % 6 in (0, 1) or (x - y) % 5 == 0
+                c = BATIK[3] if pattern else BATIK[1]
+                if x == bx:
+                    c = BATIK[2]
+                dot(im, x + dx, y, c)
+        line(im, [(bx, top + 13 + w2 * 2), (bx + 8, top + 13 + w2 * 2)], BATIK[0])
+        # A towel.
+        tx = 32
+        top = rope_y(tx + 3) + 1
+        for y in range(top, top + 7):
+            dx = w if y > top + 4 else 0
+            for x in range(tx, tx + 6):
+                c = CLOTH_RED[3] if (y - top) % 3 else CLOTH_CREAM[3]
+                dot(im, x + dx, y, c)
+        # Pegs.
+        for x in (sx + 2, sx + 6, bx + 1, bx + 7, tx + 1, tx + 4):
+            dot(im, x, rope_y(x), WOOD[5])
+            dot(im, x, rope_y(x) - 1, WOOD[4])
+        outline(im)
+        # A basket of laundry below.
+        basket(im, 30, 25, 8, CLOTH_CREAM, seed=9)
+        outline(im)
+        frames.append(ground(im, (0, 24, 44, 30)))
+    return strip(frames)
+
+
+def chicken_coop():
+    im = canvas(36, 34)
+    px = im.load()
+    # Legs.
+    for x in (6, 28):
+        for y in (24, 25, 26, 27, 28, 29, 30):
+            dot(im, x, y, WOOD[3])
+            dot(im, x + 1, y, WOOD[2])
+    # House body of vertical planks.
+    for y in range(11, 25):
+        for x in range(5, 31):
+            plank = (x - 5) // 3
+            v = 0.7 - (x - 5) * 0.012 + (noise(plank, 0, 12) - 0.5) * 0.2 - (y - 11) * 0.01
+            if (x - 5) % 3 == 0:
+                v -= 0.22
+            dot(im, x, y, tone(WOOD[1:], v))
+    # Door with straw nest and an egg.
+    for y in range(15, 24):
+        for x in range(13, 21):
+            dot(im, x, y, WOOD[0])
+    blob(im, 17, 22, 3.6, 1.6, STRAW, seed=13, clip=lambda x, y: y <= 23)
+    blob(im, 16, 20.5, 1.2, 1.5, CLOTH_CREAM[1:], seed=14)
+    line(im, [(12, 14), (21, 14)], WOOD[5])
+    line(im, [(12, 14), (12, 24)], WOOD[5])
+    line(im, [(21, 14), (21, 24)], WOOD[2])
+    # Little window.
+    for y in range(15, 18):
+        for x in range(25, 28):
+            dot(im, x, y, WOOD[0])
+    dot(im, 25, 15, STRAW[3])
+    # Ramp down to the ground.
+    for i in range(9):
+        x0 = 15 + i
+        y = 25 + i
+        if y >= im.height - 2:
+            break
+        line(im, [(x0 - 2, y), (x0 + 3, y)], WOOD[4] if i % 2 else WOOD[3])
+    # Roof: red tiles like the houses, with a thick overhang.
+    for row in range(5):
+        y0 = 2 + row * 2
+        half = 9 + row * 2.6
+        cx = 18
+        for x in range(round(cx - half), round(cx + half) + 1):
+            for d in range(2):
+                v = 0.85 - d * 0.3 - (x - cx + half) / (2 * half) * 0.3
+                if (x + row * 2) % 4 == 0 and d == 1:
+                    v -= 0.2
+                dot(im, x, y0 + d, tone(ROOF, v))
+    line(im, [(2, 12), (34, 12)], ROOF[1])
+    line(im, [(10, 1), (26, 1)], ROOF[5])
+    # A hen peeking from the door.
+    grid(im, [".r.", "WWW", "WkW", "WWo"], {"r": CLOTH_RED[3], "W": CLOTH_CREAM[4], "k": INK, "o": BILL_ORANGE}, 15, 16)
+    outline(im)
+    return ground(im, (3, 27, 33, 34))
+
+
+BILL_ORANGE = hexc("#f0a020")
+
+
+def notice_board():
+    frames = []
+    for f in range(FRAMES):
+        im = canvas(28, 30)
+        # Posts and a little roof.
+        for x in (4, 22):
+            for y in range(5, 28):
+                dot(im, x, y, WOOD[4])
+                dot(im, x + 1, y, WOOD[2])
+        for row in range(3):
+            y = 1 + row
+            for x in range(1 - row, 28 + row - 1):
+                if 0 <= x < 28:
+                    dot(im, x, y, tone(ROOF, 0.85 - row * 0.25 - x * 0.008))
+        line(im, [(0, 4), (27, 4)], ROOF[1])
+        # Cork-coloured board.
+        for y in range(7, 20):
+            for x in range(3, 25):
+                v = 0.55 + (noise(x, y, 15) - 0.5) * 0.2
+                dot(im, x, y, tone(BURLAP, v))
+        line(im, [(3, 7), (24, 7)], WOOD[5])
+        line(im, [(3, 20), (24, 20)], WOOD[2])
+        # Notices pinned up; the loose corner of one lifts in the wind.
+        notes = [(5, 9, 6, 7, CLOTH_CREAM), (12, 8, 5, 5, ramp("#c8a020", "#f0d050", "#fff0a0", "#fffad0")), (18, 10, 5, 6, CLOTH_CREAM), (11, 14, 6, 5, ramp("#8ab0d0", "#b8d8f0", "#e0f0ff", "#ffffff"))]
+        for i, (x0, y0, w, h, colors) in enumerate(notes):
+            for y in range(y0, y0 + h):
+                for x in range(x0, x0 + w):
+                    dot(im, x, y, colors[2] if (y - y0) % 2 else colors[3])
+                if y > y0 and (y - y0) % 2 == 0:
+                    line(im, [(x0 + 1, y), (x0 + w - 2, y)], colors[0] if i != 1 else WOOD[2])
+            dot(im, x0 + w // 2, y0, CLOTH_RED[3])
+        lift = (0, 1, 2, 1)[f]
+        for k in range(lift):
+            dot(im, 23 - k, 16 - k, CLOTH_CREAM[3])
+            dot(im, 22 - k, 15 - k, CLOTH_CREAM[2])
+        # A small wheat-sheaf symbol on the top notice.
+        dot(im, 14, 9, STRAW[1])
+        dot(im, 14, 10, STRAW[1])
+        dot(im, 13, 9, STRAW[2])
+        dot(im, 15, 9, STRAW[2])
+        outline(im)
+        frames.append(ground(im, (2, 25, 26, 30)))
+    return strip(frames)
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     hay_heap().save(OUT / "jerami.png")
@@ -724,6 +972,11 @@ def main():
     well().save(OUT / "sumur.png")
     crate().save(OUT / "peti.png")
     barrel().save(OUT / "tong.png")
+    cart().save(OUT / "gerobak.png")
+    bamboo_fence().save(OUT / "pagar_bambu.png")
+    clothesline().save(OUT / "jemuran.png")
+    chicken_coop().save(OUT / "kandang_ayam.png")
+    notice_board().save(OUT / "papan_pengumuman.png")
 
 
 if __name__ == "__main__":

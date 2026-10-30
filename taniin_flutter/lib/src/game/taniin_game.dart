@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flame/game.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -80,6 +81,9 @@ class TaniinGame extends FlameGame {
   final Map<String, ui.Image> _dunia = {};
   // Prop sprites from assets/images/dekor/, keyed by file name.
   final Map<String, ui.Image> _dekor = {};
+  // Wildlife and nature sprites, keyed by path under assets/images/
+  // ('satwa/...', 'alam/...').
+  final Map<String, ui.Image> _art = {};
   ui.Image? _shopNpcSheet;
 
   double _clock = 0;
@@ -296,6 +300,7 @@ class TaniinGame extends FlameGame {
     try {
       _tmxMap = await _tryLoadMap();
       _buildCollisionRects();
+      _applyDebugSpawn();
       _idleSheet = await _tryLoadImage('assets/images/idle.png');
       _walkSheet = await _tryLoadImage('assets/images/walk.png');
       _cropSheet = await _tryLoadImage('assets/images/spring_crops.png');
@@ -315,11 +320,14 @@ class TaniinGame extends FlameGame {
           _dekor[name] = image;
         }
       }
+      for (final name in {..._artNames, for (final p in waterProps) p.asset}) {
+        final image = await _tryLoadImage('assets/images/$name.png');
+        if (image != null) {
+          _art[name] = image;
+        }
+      }
+      _applyTileArt();
       final duniaNames = <String>{
-        'kupu',
-        'burung',
-        'bebek',
-        'ikan',
         for (final villager in _life.villagers) ...[
           'warga_${villager.spec.id}_jalan',
           'warga_${villager.spec.id}_diam',
@@ -333,6 +341,86 @@ class TaniinGame extends FlameGame {
       }
     } finally {
       loadingComplete.value = true;
+    }
+  }
+
+  /// `--dart-define=TANIIN_DEBUG_SPAWN=x,y` starts the player at that tile,
+  /// for checking a corner of the map in local builds. Empty in releases.
+  static const _debugSpawn = String.fromEnvironment('TANIIN_DEBUG_SPAWN');
+
+  void _applyDebugSpawn() {
+    final parts = _debugSpawn.split(',');
+    if (parts.length != 2) {
+      return;
+    }
+    final x = double.tryParse(parts[0]);
+    final y = double.tryParse(parts[1]);
+    if (x != null && y != null) {
+      _playerX = x * _tile;
+      _playerY = y * _tile;
+      _lastSafePlayerPosition = Offset(_playerX, _playerY);
+    }
+  }
+
+  static const _artNames = <String>{
+    'satwa/bebek_renang',
+    'satwa/anak_bebek',
+    'satwa/ikan_lompat',
+    'satwa/ikan_bayang',
+    'satwa/kupu_kupu',
+    'satwa/burung_terbang',
+    'satwa/capung',
+    'alam/daun_hanyut',
+    'alam/batu_air',
+    'alam/tunggul_1',
+    'alam/tunggul_2',
+    'alam/tunggul_3',
+    'alam/tunggul_besar',
+    'alam/batu_kecil_1',
+    'alam/batu_kecil_2',
+    'alam/batu_kecil_3',
+    'alam/batu_besar_1',
+    'alam/batu_besar_2',
+    'alam/batu_besar_3',
+    'alam/semak_buah',
+    'alam/semak_bunga',
+    'alam/semak_pakis',
+    'alam/semak_kuning',
+  };
+
+  /// Swaps the map's plain rocks, stumps and bushes for varied, mossy art.
+  void _applyTileArt() {
+    final map = _tmxMap;
+    if (map == null) {
+      return;
+    }
+    List<ui.Image> art(List<String> names) => [
+      for (final name in names) ?_art['alam/$name'],
+    ];
+    void put(int gid, TileArt tileArt) {
+      if (tileArt.variants.isNotEmpty) {
+        map.tileArt[gid] = tileArt;
+      }
+    }
+
+    final stumps = TileArt(art(['tunggul_1', 'tunggul_2', 'tunggul_3']));
+    for (final gid in const [367, 368, 606]) {
+      put(gid, stumps);
+    }
+    put(607, TileArt(art(['batu_kecil_1', 'batu_kecil_2', 'batu_kecil_3'])));
+    put(608, TileArt(art(['batu_besar_1', 'batu_besar_2', 'batu_besar_3'])));
+    put(
+      756,
+      TileArt(
+        art(['semak_buah', 'semak_bunga', 'semak_pakis', 'semak_kuning']),
+      ),
+    );
+    put(823, TileArt(art(['batu_air']), frameWidth: 20, fps: 3));
+    final bigStump = art(['tunggul_besar']);
+    if (bigStump.isNotEmpty) {
+      // The two-tile stump: the left half draws the whole thing.
+      map.tileArt[800] = TileArt(bigStump, anchorDx: 1.0);
+      map.tileArt[801] = const TileArt.skip();
     }
   }
 
@@ -385,15 +473,22 @@ class TaniinGame extends FlameGame {
     if (map == null) {
       _drawFallbackWorld(canvas, viewport);
     } else {
-      map.drawBackground(canvas, _cameraX, _cameraY, _tile, viewport);
+      map.drawBackground(
+        canvas,
+        _cameraX,
+        _cameraY,
+        _tile,
+        viewport,
+        time: _clock,
+      );
     }
 
     _drawBackgroundDecorations(canvas);
     _drawFarmPlots(canvas);
     _drawPlotActionMarkers(canvas);
-    _drawActors(canvas);
-    map?.drawForeground(canvas, _cameraX, _cameraY, _tile, viewport);
+    _drawActors(canvas, viewport);
     _drawFlyers(canvas);
+    _drawNight(canvas, viewport);
     _drawHouseSigns(canvas);
     _drawTags(canvas);
     canvas.restore();
@@ -781,6 +876,7 @@ class TaniinGame extends FlameGame {
   }
 
   void _drawBackgroundDecorations(Canvas canvas) {
+    _drawWaterEffects(canvas);
     _drawWaterLife(canvas);
     _drawBirdShadows(canvas);
   }
@@ -1082,6 +1178,7 @@ class TaniinGame extends FlameGame {
   }
 
   void _drawWaterLife(Canvas canvas) {
+    _drawWaterPlants(canvas);
     final ripple = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = _tile * 0.035;
@@ -1104,13 +1201,13 @@ class TaniinGame extends FlameGame {
           ripple,
         );
       }
-      final fish = _dunia['ikan'];
+      final fish = _art['satwa/ikan_lompat'];
       if (fish != null && jump.arc < 1) {
         final at = jump.position;
         _drawSpriteAt(
           canvas,
           fish,
-          const Rect.fromLTWH(0, 0, 8, 5),
+          Rect.fromLTWH((jump.t * 10).floor() % 2 * 13.0, 0, 13, 8),
           at.dx,
           at.dy,
           flip: !jump.left,
@@ -1118,19 +1215,266 @@ class TaniinGame extends FlameGame {
         );
       }
     }
-    final duck = _dunia['bebek'];
-    if (duck != null) {
-      for (final d in _life.ducks) {
+    // Ducks, the hens trailed by their ducklings.
+    final duck = _art['satwa/bebek_renang'];
+    final duckling = _art['satwa/anak_bebek'];
+    for (final d in _life.ducks) {
+      if (duckling != null) {
+        for (var i = d.ducklings - 1; i >= 0; i--) {
+          final at = d.ducklingAt(i);
+          _drawSpriteAt(
+            canvas,
+            duckling,
+            Rect.fromLTWH(((d.clock * 3).floor() + i) % 4 * 11.0, 0, 11, 9),
+            at.dx,
+            at.dy + _tile * 0.22,
+            flip: d.facingRight,
+          );
+        }
+      }
+      if (duck != null) {
         _drawSpriteAt(
           canvas,
           duck,
-          Rect.fromLTWH(d.frame * 14.0, 0, 14, 11),
+          Rect.fromLTWH(d.frame * 20.0, d.female ? 15 : 0, 20, 15),
           d.x,
-          d.y + _tile * 0.2,
+          d.y + _tile * 0.3,
           flip: d.facingRight,
         );
       }
     }
+  }
+
+  /// Lily pads, frogs, reeds, drifting leaves and fish under the surface.
+  void _drawWaterPlants(Canvas canvas) {
+    final shadow = _art['satwa/ikan_bayang'];
+    if (shadow != null) {
+      for (final f in _life.fishShadows) {
+        _drawSpriteAt(
+          canvas,
+          shadow,
+          Rect.fromLTWH(f.frame * 12.0, 0, 12, 6),
+          f.x,
+          f.y + _tile * 0.15,
+          flip: f.facingRight,
+        );
+      }
+    }
+    final leaf = _art['alam/daun_hanyut'];
+    if (leaf != null) {
+      for (final l in _life.leaves) {
+        _drawSpriteAt(
+          canvas,
+          leaf,
+          const Rect.fromLTWH(0, 0, 7, 5),
+          l.x,
+          l.y,
+          angle: l.spin,
+        );
+      }
+    }
+    for (final prop in _sortedWaterProps) {
+      final image = _art[prop.asset];
+      if (image == null) {
+        continue;
+      }
+      final isStrip = prop.frameWidth > 0 && image.width % prop.frameWidth == 0;
+      final frames = isStrip ? image.width ~/ prop.frameWidth : 1;
+      final width = isStrip
+          ? prop.frameWidth.toDouble()
+          : image.width.toDouble();
+      final frame = frames > 1
+          ? (_clock * prop.fps + prop.x * 0.53).floor() % frames
+          : 0;
+      _drawSpriteAt(
+        canvas,
+        image,
+        Rect.fromLTWH(frame * width, 0, width, image.height.toDouble()),
+        prop.x * _tile,
+        prop.y * _tile,
+      );
+    }
+  }
+
+  static final List<WaterProp> _sortedWaterProps = [...waterProps]
+    ..sort((a, b) => a.y.compareTo(b.y));
+
+  /// Light glinting on the river, lake and sea: short streaks that fade in
+  /// and out (drifting with the current) and the odd sparkle, all on the
+  /// 16 px art grid. Banks are left alone.
+  void _drawWaterEffects(Canvas canvas) {
+    final map = _tmxMap;
+    if (map == null) {
+      return;
+    }
+    final view = _visibleViewport;
+    final px = _tile / 16;
+    final firstCol = (_cameraX / _tile).floor() - 1;
+    final lastCol = ((_cameraX + view.width) / _tile).ceil() + 1;
+    final firstRow = (_cameraY / _tile).floor() - 1;
+    final lastRow = ((_cameraY + view.height) / _tile).ceil() + 1;
+    _paint.style = PaintingStyle.fill;
+    for (final (col, row) in map.waterCells) {
+      if (col < firstCol || col > lastCol || row < firstRow || row > lastRow) {
+        continue;
+      }
+      final sea = col < 2 || (row >= 28 && col < 14);
+      final flowX = row >= 8 && row <= 10 && col < 29 ? 1.0 : 0.0;
+      final flowY = col >= 29 && col <= 31 && row < 8 ? 1.0 : 0.0;
+      // Keep clear of the grassy edge drawn inside bank tiles.
+      final left = map.isWaterCell(col - 1, row) ? 0 : 5;
+      final right = map.isWaterCell(col + 1, row) ? 16 : 11;
+      final top = map.isWaterCell(col, row - 1) ? 1 : 6;
+      final bottom = map.isWaterCell(col, row + 1) ? 15 : 10;
+      if (right - left < 4 || bottom - top < 2) {
+        continue;
+      }
+      final cellX = col * _tile - _cameraX;
+      final cellY = row * _tile - _cameraY;
+      final hash = _cellHash(col, row);
+      final streaks = sea ? 4 : 3;
+      for (var i = 0; i < streaks; i++) {
+        final t = _clock * (sea ? 0.32 : 0.45) + ((hash >> (i * 5)) % 97) / 97;
+        final cycle = t.floor();
+        final life = t - cycle;
+        final alpha = math.sin(life * math.pi);
+        final r = _cellHash(hash + i * 31, cycle);
+        final length = sea ? 4 + r % 4 : 2 + r % 3;
+        final span = math.max(1, right - left - length);
+        final ax = left + r % span + (flowX * life * 4).floor();
+        final ay = top + (r ~/ 7) % (bottom - top) + (flowY * life * 4).floor();
+        if (ax + length > right || ay >= bottom) {
+          continue;
+        }
+        _paint.color = Color.fromRGBO(230, 248, 255, 0.78 * alpha);
+        canvas.drawRect(
+          Rect.fromLTWH(cellX + ax * px, cellY + ay * px, length * px, px),
+          _paint,
+        );
+        if (ay + 1 < bottom) {
+          _paint.color = Color.fromRGBO(16, 70, 120, 0.3 * alpha);
+          canvas.drawRect(
+            Rect.fromLTWH(
+              cellX + (ax + 1) * px,
+              cellY + (ay + 1) * px,
+              (length - 1) * px,
+              px,
+            ),
+            _paint,
+          );
+        }
+      }
+      // A sparkle now and then.
+      final s = _clock * 0.7 + (hash % 991) / 991;
+      final glint = s - s.floor();
+      if (hash % 2 == 0 && glint < 0.14) {
+        final r = _cellHash(hash, s.floor());
+        final gx = left + 2 + r % math.max(1, right - left - 4);
+        final gy = top + 1 + (r ~/ 5) % math.max(1, bottom - top - 2);
+        final a = math.sin(glint / 0.14 * math.pi);
+        _paint.color = Color.fromRGBO(255, 255, 255, 0.95 * a);
+        canvas.drawRect(
+          Rect.fromLTWH(cellX + gx * px, cellY + gy * px, px, px),
+          _paint,
+        );
+        _paint.color = Color.fromRGBO(255, 255, 255, 0.45 * a);
+        for (final (dx, dy) in const [(-1, 0), (1, 0), (0, -1), (0, 1)]) {
+          canvas.drawRect(
+            Rect.fromLTWH(
+              cellX + (gx + dx) * px,
+              cellY + (gy + dy) * px,
+              px,
+              px,
+            ),
+            _paint,
+          );
+        }
+      }
+    }
+  }
+
+  static int _cellHash(int a, int b) {
+    var h = (a * 374761393 + b * 668265263) & 0x7fffffff;
+    h = ((h ^ (h >> 13)) * 1274126177) & 0x7fffffff;
+    return h ^ (h >> 16);
+  }
+
+  /// Hour of day forced with `?jam=21` on the web, to preview the night.
+  static final double? _forcedHour = kIsWeb
+      ? double.tryParse(Uri.base.queryParameters['jam'] ?? '')
+      : null;
+
+  /// 0 in daylight, 1 at night; dusk 17:30-19:00 and dawn 05:00-06:30 local.
+  double get _nightAmount {
+    final now = DateTime.now();
+    final hour = _forcedHour ?? now.hour + now.minute / 60;
+    if (hour >= 19 || hour < 5) {
+      return 1;
+    }
+    if (hour >= 17.5) {
+      return (hour - 17.5) / 1.5;
+    }
+    if (hour < 6.5) {
+      return 1 - (hour - 5) / 1.5;
+    }
+    return 0;
+  }
+
+  /// Night: a dark blue veil, then warm flickering light round every lamp.
+  void _drawNight(Canvas canvas, Size viewport) {
+    final night = _nightAmount;
+    final map = _tmxMap;
+    if (night <= 0 || map == null) {
+      return;
+    }
+    _paint
+      ..style = PaintingStyle.fill
+      ..color = Color.fromRGBO(16, 20, 56, 0.52 * night);
+    canvas.drawRect(Offset.zero & viewport, _paint);
+    final glow = Paint();
+    map.forEachVisibleSprite(_cameraX, _cameraY, _tile, viewport, (sprite) {
+      if (sprite.gid != 624) {
+        return;
+      }
+      final seed = (sprite.x * 7 + sprite.y * 13).toDouble();
+      var flicker =
+          0.84 +
+          0.09 * math.sin(_clock * 11 + seed) +
+          0.07 * math.sin(_clock * 23.7 + seed * 1.7);
+      if (math.sin(_clock * 0.9 + seed) > 0.97) {
+        flicker *= 0.55;
+      }
+      final strength = night * flicker;
+      final centre = Offset(
+        (sprite.x - map.minTileX + 0.5) * _tile - _cameraX,
+        (sprite.y - map.minTileY + 0.6) * _tile - _cameraY,
+      );
+      final radius = _tile * 2.8;
+      glow.shader = ui.Gradient.radial(
+        centre,
+        radius,
+        [
+          Color.fromRGBO(255, 220, 150, 0.5 * strength),
+          Color.fromRGBO(255, 170, 80, 0.16 * strength),
+          const Color.fromRGBO(255, 150, 60, 0),
+        ],
+        const [0, 0.45, 1],
+      );
+      canvas.drawCircle(centre, radius, glow);
+      // A pool of light on the ground under the lamp.
+      final pool = Rect.fromCenter(
+        center: centre + Offset(0, _tile * 2.3),
+        width: _tile * 2.6,
+        height: _tile * 0.9,
+      );
+      glow.shader = ui.Gradient.radial(pool.center, pool.width / 2, [
+        Color.fromRGBO(255, 210, 130, 0.28 * strength),
+        const Color.fromRGBO(255, 200, 120, 0),
+      ]);
+      canvas.drawOval(pool, glow);
+      _paint.color = Color.fromRGBO(255, 244, 200, 0.85 * strength);
+      canvas.drawCircle(centre, _tile * 0.12, _paint);
+    });
   }
 
   void _drawBirdShadows(Canvas canvas) {
@@ -1204,8 +1548,23 @@ class TaniinGame extends FlameGame {
 
   /// Everything that stands on the ground, drawn back to front by the y of
   /// its feet so nearer things cover farther ones.
-  void _drawActors(Canvas canvas) {
+  void _drawActors(Canvas canvas, Size viewport) {
+    final map = _tmxMap;
     final actors = <(double, VoidCallback)>[
+      // Trees, lamps, rocks and house fronts from the map, by their foot.
+      if (map != null)
+        for (final sprite in _visibleMapSprites(map, viewport))
+          (
+            sprite.sortRow * _tile + sprite.order * 1e-4,
+            () => map.drawSprite(
+              canvas,
+              sprite,
+              _cameraX,
+              _cameraY,
+              _tile,
+              time: _clock,
+            ),
+          ),
       for (final deco in decorations)
         (deco.y * _tile, () => _drawDecoration(canvas, deco)),
       for (final animal in _animals)
@@ -1224,31 +1583,52 @@ class TaniinGame extends FlameGame {
     }
   }
 
+  List<MapSprite> _visibleMapSprites(TmxMap map, Size viewport) {
+    final visible = <MapSprite>[];
+    map.forEachVisibleSprite(_cameraX, _cameraY, _tile, viewport, visible.add);
+    return visible;
+  }
+
   void _drawFlyers(Canvas canvas) {
-    final butterfly = _dunia['kupu'];
+    final butterfly = _art['satwa/kupu_kupu'];
     if (butterfly != null) {
       for (final b in _life.butterflies) {
         _drawSpriteAt(
           canvas,
           butterfly,
-          Rect.fromLTWH(b.wingsOpen ? 0 : 8, b.color * 8.0, 8, 8),
+          Rect.fromLTWH(b.wingFrame * 11.0, b.color * 9.0, 11, 9),
           b.x,
           b.y - _tile * 0.55 + b.lift,
-          scale: _tile / 26,
+          scale: _tile / 20,
           flip: b.flipped,
         );
       }
     }
-    final bird = _dunia['burung'];
+    final bird = _art['satwa/burung_terbang'];
     if (bird != null) {
       for (final b in _life.birds) {
         _drawSpriteAt(
           canvas,
           bird,
-          Rect.fromLTWH(b.wingsUp ? 0 : 12, 0, 12, 7),
+          Rect.fromLTWH(b.wingFrame * 15.0, 0, 15, 11),
           b.x,
           b.y - b.altitude,
           flip: b.direction < 0,
+        );
+      }
+    }
+    final dragonfly = _art['satwa/capung'];
+    if (dragonfly != null) {
+      for (final d in _life.dragonflies) {
+        final at = d.position;
+        _drawSpriteAt(
+          canvas,
+          dragonfly,
+          Rect.fromLTWH(d.frame * 13.0, 0, 13, 7),
+          at.dx,
+          at.dy,
+          scale: _tile / 20,
+          flip: d.facingRight,
         );
       }
     }

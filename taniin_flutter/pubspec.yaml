@@ -79,6 +79,8 @@ flutter:
     - assets/images/
     - assets/images/dunia/
     - assets/images/dekor/
+    - assets/images/satwa/
+    - assets/images/alam/
     - assets/ui/
 
   fonts:
