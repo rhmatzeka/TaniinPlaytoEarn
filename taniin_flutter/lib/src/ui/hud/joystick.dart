@@ -1,8 +1,6 @@
 part of '../game_hud.dart';
 
-double _joystickRadius(bool compact) => compact ? 72 : 82;
-
-double _mobileWebJoystickRadius(Size viewportSize, double viewportScale) {
+double _touchJoystickRadius(Size viewportSize, double viewportScale) {
   final logicalSize = math
       .min(viewportSize.shortestSide * 0.34, 132.0)
       .clamp(112.0, 132.0)

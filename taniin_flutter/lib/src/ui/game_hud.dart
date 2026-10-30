@@ -72,7 +72,6 @@ class GameHud extends StatelessWidget {
                     : (constraints.maxWidth / logicalViewport.width)
                           .clamp(1.0, 4.0)
                           .toDouble();
-                final mobileWebTouchLayout = kIsWeb && showTouchJoystick;
                 const showMiniMap = true;
                 final miniMapWidth = portrait
                     ? 150.0
@@ -85,65 +84,20 @@ class GameHud extends StatelessWidget {
                     : (constraints.maxWidth * 0.112)
                           .clamp(236.0, 286.0)
                           .toDouble();
+                // Touch screens (phone web and the Android app) share one
+                // layout: the stick sits in the bottom-left corner.
                 final joystickRadius = showTouchJoystick
-                    ? mobileWebTouchLayout
-                          ? _mobileWebJoystickRadius(
-                              logicalViewport,
-                              viewportScale,
-                            )
-                          : _joystickRadius(compact)
+                    ? _touchJoystickRadius(logicalViewport, viewportScale)
                     : 0.0;
                 final joystickSize = joystickRadius * 2.2;
-                final joystickBaseX = showTouchJoystick
-                    ? (constraints.maxWidth * 0.145)
-                          .clamp(
-                            compact ? 270.0 : 320.0,
-                            compact ? 340.0 : 390.0,
-                          )
-                          .toDouble()
-                    : 0.0;
-                final joystickBaseY = showTouchJoystick
-                    ? constraints.maxHeight -
-                          (constraints.maxHeight * 0.31)
-                              .clamp(
-                                compact ? 270.0 : 300.0,
-                                compact ? 320.0 : 350.0,
-                              )
-                              .toDouble()
-                    : 0.0;
-                final joystickMargin = mobileWebTouchLayout
-                    ? 22.0 * viewportScale
-                    : 16.0;
-                final joystickLeft = showTouchJoystick
-                    ? (mobileWebTouchLayout
-                              ? joystickMargin
-                              : joystickBaseX - joystickSize * 0.5)
-                          .clamp(
-                            16.0,
-                            math.max(
-                              16.0,
-                              constraints.maxWidth - joystickSize - 16,
-                            ),
-                          )
-                          .toDouble()
-                    : 0.0;
-                final joystickTop = showTouchJoystick && portrait
+                final joystickMargin = 22.0 * viewportScale;
+                final joystickLeft = joystickMargin;
+                final joystickTop = portrait
                     ? constraints.maxHeight - joystickSize - 120
-                    : showTouchJoystick
-                    ? (mobileWebTouchLayout
-                              ? constraints.maxHeight -
-                                    joystickSize -
-                                    joystickMargin
-                              : joystickBaseY - joystickSize * 0.5)
-                          .clamp(
-                            16.0,
-                            math.max(
-                              16.0,
-                              constraints.maxHeight - joystickSize - 16,
-                            ),
-                          )
-                          .toDouble()
-                    : 0.0;
+                    : math.max(
+                        16.0,
+                        constraints.maxHeight - joystickSize - joystickMargin,
+                      );
                 return Stack(
                   children: [
                     Positioned.fill(
@@ -256,8 +210,11 @@ class GameHud extends StatelessWidget {
                       ),
                     ),
                     Positioned(
+                      // Sideways touch screens: start right of the stick.
                       left: portrait
                           ? edge
+                          : showTouchJoystick
+                          ? joystickLeft + joystickSize + 16
                           : compact
                           ? 194
                           : 260,

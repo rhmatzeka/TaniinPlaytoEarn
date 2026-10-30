@@ -125,7 +125,7 @@ class _LoadingOverlayState extends State<LoadingOverlay>
         ? _controller.value
         : math.min(_controller.value, 0.92);
     final size = MediaQuery.sizeOf(context);
-    final short = size.height < 560;
+    final short = size.height < 600;
     final still = MediaQuery.of(context).disableAnimations;
     final elapsed = still ? Duration.zero : _elapsed;
     final tip =

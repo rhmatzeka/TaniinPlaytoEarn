@@ -1,12 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Launch splash before Flutter starts: the loading screen's green with the
-     app icon in the middle. -->
+<!-- Plain loading green until the native loading card (MainActivity) draws
+     over it; a system-sized app icon here looked huge on sideways phones. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/loading_background" />
-
-    <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@mipmap/ic_launcher" />
-    </item>
 </layer-list>
