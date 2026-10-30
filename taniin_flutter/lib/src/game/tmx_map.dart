@@ -7,6 +7,49 @@ import 'package:xml/xml.dart';
 
 const int _gidMask = 0x1fffffff;
 
+/// Replacement art for one kind of map tile. A variant is picked by tile
+/// position; its bottom centre sits on the bottom edge of the tile, [anchorDx]
+/// tiles from the tile's left edge. A [skip] entry draws nothing because a
+/// partner tile draws the whole object.
+class TileArt {
+  const TileArt(
+    this.variants, {
+    this.anchorDx = 0.5,
+    this.frameWidth = 0,
+    this.fps = 0,
+  }) : skip = false;
+
+  const TileArt.skip()
+    : variants = const <ui.Image>[],
+      anchorDx = 0,
+      frameWidth = 0,
+      fps = 0,
+      skip = true;
+
+  final List<ui.Image> variants;
+  final double anchorDx;
+
+  /// Variants that are strips of [frameWidth] px frames play at [fps].
+  final int frameWidth;
+  final double fps;
+  final bool skip;
+}
+
+/// A map tile that stands on the ground (trees, lamps, rocks, house fronts),
+/// drawn in depth order with the actors. [sortRow] is the row of the
+/// object's foot, in tiles from the top of the map.
+class MapSprite {
+  const MapSprite(this.x, this.y, this.gid, this.sortRow, this.order);
+
+  final int x;
+  final int y;
+  final int gid;
+  final double sortRow;
+
+  /// Paint order among sprites sharing a [sortRow] (layer, then row).
+  final int order;
+}
+
 class TmxMap {
   TmxMap._();
 
@@ -14,6 +57,11 @@ class TmxMap {
   final List<_MapLayer> _layers = <_MapLayer>[];
   final Map<int, int> _bridgeTiles = <int, int>{};
   final Map<int, int> _waterTiles = <int, int>{};
+  final List<MapSprite> _sprites = <MapSprite>[];
+  final List<int> _firstGids = <int>[];
+
+  /// Art drawn instead of the tileset image for some tile ids.
+  final Map<int, TileArt> tileArt = <int, TileArt>{};
   final Paint _pixelPaint = Paint()
     ..isAntiAlias = false
     ..filterQuality = FilterQuality.none;
@@ -71,6 +119,13 @@ class TmxMap {
   }
 
   void _loadLayers(XmlElement root) {
+    _firstGids
+      ..clear()
+      ..addAll([
+        for (final element in root.findElements('tileset'))
+          _intAttr(element, 'firstgid', 1),
+      ])
+      ..sort();
     _layers.clear();
     var minX = 1 << 30;
     var minY = 1 << 30;
@@ -143,6 +198,118 @@ class TmxMap {
   int get tileColumns => maxTileX - minTileX + 1;
 
   int get tileRows => maxTileY - minTileY + 1;
+
+  /// Water cells as (column, row) from the top-left of the map.
+  Iterable<(int, int)> get waterCells sync* {
+    for (final key in _waterTiles.keys) {
+      if (!_bridgeTiles.containsKey(key)) {
+        yield (key ~/ 1000000 - minTileX, key % 1000000 - minTileY);
+      }
+    }
+  }
+
+  bool isWaterCell(int column, int row) =>
+      _waterTiles.containsKey(_tileKey(column + minTileX, row + minTileY));
+
+  /// Standing tiles, in paint order.
+  List<MapSprite> get sprites => _sprites;
+
+  void forEachVisibleSprite(
+    double cameraX,
+    double cameraY,
+    double targetTileSize,
+    Size viewport,
+    void Function(MapSprite sprite) visit,
+  ) {
+    final firstX = minTileX + (cameraX / targetTileSize).floor() - 3;
+    final lastX =
+        minTileX + ((cameraX + viewport.width) / targetTileSize).floor() + 3;
+    final firstY = minTileY + (cameraY / targetTileSize).floor() - 2;
+    final lastY =
+        minTileY + ((cameraY + viewport.height) / targetTileSize).floor() + 6;
+    for (final sprite in _sprites) {
+      if (sprite.x >= firstX &&
+          sprite.x <= lastX &&
+          sprite.y >= firstY &&
+          sprite.y <= lastY) {
+        visit(sprite);
+      }
+    }
+  }
+
+  void drawSprite(
+    Canvas canvas,
+    MapSprite sprite,
+    double cameraX,
+    double cameraY,
+    double targetTileSize, {
+    double time = 0,
+  }) {
+    final left = (sprite.x - minTileX) * targetTileSize - cameraX;
+    final top = (sprite.y - minTileY) * targetTileSize - cameraY;
+    if (!_drawArt(
+      canvas,
+      sprite.gid,
+      sprite.x,
+      sprite.y,
+      left,
+      top,
+      targetTileSize,
+      time,
+    )) {
+      _drawTile(canvas, sprite.gid, left, top, targetTileSize);
+    }
+  }
+
+  /// Draws [tileArt] for [gid] if there is any; false means draw the tile.
+  bool _drawArt(
+    Canvas canvas,
+    int gid,
+    int tileX,
+    int tileY,
+    double left,
+    double top,
+    double targetTileSize,
+    double time,
+  ) {
+    final art = tileArt[gid];
+    if (art == null) {
+      return false;
+    }
+    if (art.skip || art.variants.isEmpty) {
+      return true;
+    }
+    final hash = (tileX * 73856093) ^ (tileY * 19349663);
+    final image = art.variants[hash.abs() % art.variants.length];
+    final isStrip = art.frameWidth > 0 && image.width % art.frameWidth == 0;
+    final frames = isStrip ? image.width ~/ art.frameWidth : 1;
+    final sourceWidth = isStrip
+        ? art.frameWidth.toDouble()
+        : image.width.toDouble();
+    final frame = frames > 1
+        ? (time * art.fps + tileX * 0.37).floor() % frames
+        : 0;
+    final scale = targetTileSize / tileWidth;
+    final width = sourceWidth * scale;
+    final height = image.height * scale;
+    canvas.drawImageRect(
+      image,
+      Rect.fromLTWH(
+        frame * sourceWidth,
+        0,
+        sourceWidth,
+        image.height.toDouble(),
+      ),
+      Rect.fromLTWH(
+        left + art.anchorDx * targetTileSize - width / 2,
+        top + targetTileSize - height,
+        width,
+        height,
+      ),
+      _pixelPaint,
+    );
+    return true;
+  }
 
   Size miniMapRasterSize({int scale = 1}) {
     final safeScale = math.max(1, scale);
@@ -250,19 +417,18 @@ class TmxMap {
     double cameraX,
     double cameraY,
     double targetTileSize,
-    Size viewport,
-  ) {
-    _drawLayers(canvas, cameraX, cameraY, targetTileSize, viewport, false);
-  }
-
-  void drawForeground(
-    Canvas canvas,
-    double cameraX,
-    double cameraY,
-    double targetTileSize,
-    Size viewport,
-  ) {
-    _drawLayers(canvas, cameraX, cameraY, targetTileSize, viewport, true);
+    Size viewport, {
+    double time = 0,
+  }) {
+    _drawLayers(
+      canvas,
+      cameraX,
+      cameraY,
+      targetTileSize,
+      viewport,
+      false,
+      time,
+    );
   }
 
   void drawMiniMap(Canvas canvas, Rect bounds, double targetTileSize) {
@@ -318,6 +484,121 @@ class TmxMap {
     for (final layer in _layers) {
       layer.buildDrawIndex(minTileY, maxTileY);
     }
+    _buildSprites();
+  }
+
+  /// Collects the standing tiles and gives each the row of its object's foot.
+  /// Trees and lamps are followed down their column (through tiles of the
+  /// same kind) to the trunk or base tile; canopy columns with no trunk of
+  /// their own borrow the nearest trunk on the same row. Houses use the bottom
+  /// of their column; anything else stands on its own row.
+  void _buildSprites() {
+    final entries = <(_Tile, int)>[];
+    final cells = <int, List<int>>{};
+    for (var index = 0; index < _layers.length; index++) {
+      final layer = _layers[index];
+      for (final tile in layer.tiles) {
+        if (_isDrawnInForeground(layer.name, tile.gid)) {
+          entries.add((tile, index));
+          cells
+              .putIfAbsent(_tileKey(tile.x, tile.y), () => <int>[])
+              .add(tile.gid);
+        }
+      }
+    }
+    bool has(int x, int y, bool Function(int gid) test) =>
+        cells[_tileKey(x, y)]?.any(test) ?? false;
+    // Tiles of one object come from one tileset; overlapping objects from
+    // other sheets must not join the column.
+    int sheet(int gid) =>
+        _firstGids.lastWhere((g) => g <= gid, orElse: () => 0);
+    final bottoms = <(int, int, int), int>{};
+    int columnBottom(int x, int y, int gid) {
+      final kind = _standingKind(gid);
+      final group = sheet(gid);
+      bool same(int other) =>
+          _standingKind(other) == kind && sheet(other) == group;
+      bool foot(int other) => same(other) && _isFootTile(other);
+      return bottoms.putIfAbsent((x, y, group), () {
+        var bottom = y;
+        while (!(kind != _Standing.house && has(x, bottom, foot)) &&
+            has(x, bottom + 1, same)) {
+          bottom++;
+        }
+        return bottom;
+      });
+    }
+
+    entries.sort((a, b) {
+      final byLayer = a.$2.compareTo(b.$2);
+      if (byLayer != 0) {
+        return byLayer;
+      }
+      final byRow = a.$1.y.compareTo(b.$1.y);
+      return byRow != 0 ? byRow : a.$1.x.compareTo(b.$1.x);
+    });
+    _sprites.clear();
+    for (var order = 0; order < entries.length; order++) {
+      final tile = entries[order].$1;
+      final kind = _standingKind(tile.gid);
+      var foot = tile.y;
+      if (kind != _Standing.alone) {
+        final group = sheet(tile.gid);
+        bool same(int other) =>
+            _standingKind(other) == kind && sheet(other) == group;
+        bool isFoot(int other) => same(other) && _isFootTile(other);
+        foot = columnBottom(tile.x, tile.y, tile.gid);
+        if (kind == _Standing.tree && !has(tile.x, foot, isFoot)) {
+          search:
+          for (var step = 1; step <= 2; step++) {
+            for (final direction in const [-1, 1]) {
+              final x = tile.x + direction * step;
+              final bottom = columnBottom(x, tile.y, tile.gid);
+              if (has(x, tile.y, same) && has(x, bottom, isFoot)) {
+                foot = bottom;
+                break search;
+              }
+            }
+          }
+        }
+      }
+      _sprites.add(
+        MapSprite(tile.x, tile.y, tile.gid, foot - minTileY + 0.72, order),
+      );
+    }
+  }
+
+  void _drawTile(
+    Canvas canvas,
+    int gid,
+    double left,
+    double top,
+    double targetTileSize,
+  ) {
+    final tileset = _findTileset(gid);
+    if (tileset == null) {
+      return;
+    }
+    final scale = targetTileSize / tileWidth;
+    final localId = gid - tileset.firstGid;
+    final sourceX = (localId % tileset.columns) * tileset.tileWidth;
+    final sourceY = (localId ~/ tileset.columns) * tileset.tileHeight;
+    canvas.drawImageRect(
+      tileset.image,
+      Rect.fromLTWH(
+        sourceX.toDouble(),
+        sourceY.toDouble(),
+        tileset.tileWidth.toDouble(),
+        tileset.tileHeight.toDouble(),
+      ),
+      Rect.fromLTWH(
+        left,
+        top,
+        tileset.tileWidth * scale,
+        tileset.tileHeight * scale,
+      ),
+      _pixelPaint,
+    );
   }
 
   void _buildCollisionTileIndexes() {
@@ -343,6 +624,7 @@ class TmxMap {
     double targetTileSize,
     Size viewport,
     bool foreground,
+    double time,
   ) {
     final scale = targetTileSize / tileWidth;
     final firstTileX = math.max(
@@ -379,6 +661,20 @@ class TmxMap {
           }
           if (tile.x > lastTileX) {
             break;
+          }
+          final screenLeft = (tile.x - minTileX) * targetTileSize - cameraX;
+          final screenTop = (tile.y - minTileY) * targetTileSize - cameraY;
+          if (_drawArt(
+            canvas,
+            tile.gid,
+            tile.x,
+            tile.y,
+            screenLeft,
+            screenTop,
+            targetTileSize,
+            time,
+          )) {
+            continue;
           }
           final tileset = _findTileset(tile.gid);
           if (tileset == null) {
@@ -558,6 +854,9 @@ bool _isRightTreeFootTile(int gid) {
   };
 }
 
+/// Maple-sheet stumps, placed on their own rather than under a canopy.
+bool _isStumpTile(int gid) => gid == 367 || gid == 368;
+
 bool _isOakTreeLeftOuterFootTile(int gid) => gid == 1427;
 
 bool _isOakTreeLeftTrunkFootTile(int gid) => gid == 1428;
@@ -604,6 +903,24 @@ bool _isWoodTreeFootTile(int gid) {
 }
 
 bool _isLampTile(int gid) => gid == 624 || gid == 631 || gid == 638;
+
+enum _Standing { tree, lamp, house, alone }
+
+_Standing _standingKind(int gid) {
+  if (_isMapleTreeTile(gid) || _isWoodTreeTile(gid)) {
+    return _Standing.tree;
+  }
+  if (_isLampTile(gid)) {
+    return _Standing.lamp;
+  }
+  if (_isHouseTile(gid)) {
+    return _Standing.house;
+  }
+  return _Standing.alone;
+}
+
+bool _isFootTile(int gid) =>
+    _isMapleTreeFootTile(gid) || _isWoodTreeFootTile(gid) || gid == 638;
 
 bool _isSmallObstacleTile(int gid) {
   return switch (gid) {
@@ -761,6 +1078,10 @@ void _appendTreeFootCollision(
   }
   if (_isOakTreeRightTrunkFootTile(gid)) {
     _addInsetRect(rects, left, top, size, 0.00, 0.52, 0.50, 0.95);
+    return;
+  }
+  if (_isStumpTile(gid)) {
+    _addInsetRect(rects, left, top, size, 0.22, 0.52, 0.78, 0.92);
     return;
   }
   if (_isLeftTreeFootTile(gid)) {

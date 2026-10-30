@@ -1,8 +1,8 @@
 """Generates the extra world sprites in assets/images/dunia/ and dekor/.
 
 Villagers are palette swaps of the farmer sheets (assets/images/walk.png and
-idle.png, 32 px frames); wildlife is drawn pixel by pixel at the map's 16 px
-art scale, and the village props come from tool/aset_dekor.py. Run from
+idle.png, 32 px frames). Village props come from tool/aset_dekor.py and
+wildlife, water plants, rocks and stumps from tool/aset_alam.py. Run from
 taniin_flutter/:
 
     python3 tool/aset_dunia.py
@@ -12,6 +12,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
+import aset_alam
 import aset_dekor
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -103,145 +104,11 @@ def villagers():
             out.save(OUT / f"warga_{name}_{kind}.png")
 
 
-# --- Pixel maps -------------------------------------------------------------
-
-
-def paint(rows, palette):
-    height = len(rows)
-    width = max(len(r) for r in rows)
-    image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    px = image.load()
-    for y, row in enumerate(rows):
-        for x, ch in enumerate(row):
-            if ch in palette:
-                px[x, y] = palette[ch]
-    return image
-
-
-def strip(frames):
-    width = sum(f.width for f in frames)
-    height = max(f.height for f in frames)
-    out = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    x = 0
-    for f in frames:
-        out.alpha_composite(f, (x, 0))
-        x += f.width
-    return out
-
-
-def stack(rows_of_frames):
-    rows = [strip(r) for r in rows_of_frames]
-    out = Image.new("RGBA", (max(r.width for r in rows), sum(r.height for r in rows)))
-    y = 0
-    for r in rows:
-        out.alpha_composite(r, (0, y))
-        y += r.height
-    return out
-
-
-OUTLINE = hexc("#2a1606")
-
-
-def butterflies():
-    open_ = [
-        "........",
-        ".OO..OO.",
-        "OWWOOWWO",
-        "OWLBBLWO",
-        ".OWBBWO.",
-        ".OWBBWO.",
-        "..O..O..",
-        "........",
-    ]
-    closed = [
-        "........",
-        "..O..O..",
-        "..OWWO..",
-        "..OLLO..",
-        "..OBBO..",
-        "...BB...",
-        "........",
-        "........",
-    ]
-    colors = [("#fff7e6", "#f2c94c"), ("#ffd23f", "#f08a24"), ("#ff8fb1", "#ffffff"), ("#7cc7ff", "#2f6fd6")]
-    rows = []
-    for wing, light in colors:
-        pal = {"O": OUTLINE, "W": hexc(wing), "L": hexc(light), "B": hexc("#3b2416")}
-        rows.append([paint(open_, pal), paint(closed, pal)])
-    stack(rows).save(OUT / "kupu.png")
-
-
-def birds():
-    up = [
-        "OO........OO",
-        ".OO......OO.",
-        "..OObbbbOO..",
-        "...ObbbbbOy.",
-        "....OOOOO...",
-        "............",
-        "............",
-    ]
-    down = [
-        "............",
-        "............",
-        "...ObbbbO...",
-        "..OObbbbbOy.",
-        ".OO.OOOOO.OO",
-        "OO.......OO.",
-        "............",
-    ]
-    pal = {"O": hexc("#2a1a10"), "b": hexc("#8a5a34"), "y": hexc("#f0b030")}
-    strip([paint(up, pal), paint(down, pal)]).save(OUT / "burung.png")
-
-
-def ducks():
-    base = [
-        "...OOO........",
-        "..OGGGO.......",
-        ".YYGkGO.......",
-        "..OGGGO..OO...",
-        "...OWWOOOWWO..",
-        "..OWWWWWWWWWO.",
-        "..OWWWwwWWWWWO",
-        "...OWWWWWWWWO.",
-        "....OOOOOOOO..",
-    ]
-    ripple_a = "..r.r..r.r..r."
-    ripple_b = ".r..r.r..r.r.."
-    pal = {
-        "O": hexc("#2a1a10"),
-        "G": hexc("#2f8a4a"),
-        "Y": hexc("#f0a020"),
-        "k": hexc("#101010"),
-        "W": hexc("#f4f1e6"),
-        "w": hexc("#c9c2ae"),
-        "r": hexc("#d8f2ff"),
-    }
-    f0 = paint(["." * 14] + base + [ripple_a], pal)
-    f1 = paint(base + [ripple_b, "." * 14], pal)
-    strip([f0, f1]).save(OUT / "bebek.png")
-
-
-def fish():
-    rows = [
-        "..OOO.O.",
-        ".OoooOoO",
-        "OkoooooO",
-        ".OoooOoO",
-        "..OOO.O.",
-    ]
-    pal = {"O": hexc("#5a2a10"), "o": hexc("#f08a3a"), "k": hexc("#101010")}
-    paint(rows, pal).save(OUT / "ikan.png")
-
-
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     villagers()
-    butterflies()
-    birds()
-    ducks()
-    fish()
     aset_dekor.main()
+    aset_alam.main()
 
 
 if __name__ == "__main__":
