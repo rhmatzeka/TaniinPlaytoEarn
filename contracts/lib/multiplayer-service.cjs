@@ -37,60 +37,112 @@ let io;
 let aiInterval;
 const players = {}; // id -> { wallet, name, x, y, anim }
 
-// Where Pak Tani AI stands for each job, in front of the building or in the
-// field corridor (same spots as the client's offline AI).
+// Where Pak Tani AI stands for each job: on the road in front of each
+// building, and at the bottom edge of each plot.
 const HOTSPOTS = {
   shop: { x: 19.2 * TILE, y: 26.85 * TILE },
-  sell: { x: 31.0 * TILE, y: 13.35 * TILE },
-  swap: { x: 10.85 * TILE, y: 13.15 * TILE },
-  plots: [4, 6, 8, 10, 12].map((tileX) => ({ x: (tileX + 1) * TILE, y: 20 * TILE })),
+  sell: { x: 31.5 * TILE, y: 16.6 * TILE },
+  swap: { x: 11.0 * TILE, y: 14.6 * TILE },
+  plots: [4, 6, 8, 10, 12].map((tileX) => ({ x: (tileX + 1) * TILE, y: 23.7 * TILE })),
 };
 
-// Road network used to route around the fenced field and the houses.
-const ROUTE = {
-  innerY: 21.65 * TILE, // corridor inside the field fence
-  outerY: 26.85 * TILE, // main road below the shop
-  gateX: 5.0 * TILE, // field gate
-  mainRoadX: 18.5 * TILE, // north-south road
-  fenceX: 14.0 * TILE,
-  fenceY: 23.0 * TILE,
+// Village roads as junctions (tiles) and straight segments between them,
+// traced from assets/game/map.tmx. Mirrored in the Flutter client
+// (MultiplayerClient road graph) for the offline AI.
+const ROAD_NODES = {
+  mainWest: [5, 26.85],
+  mainMid: [26.5, 26.85],
+  mainEast: [34.6, 26.85],
+  buyerRoad: [26.5, 16.6],
+  eastRoad: [34.6, 16.6],
+  middleEast: [26.5, 14.6],
+  bridgeSouth: [23.5, 14.6],
+  middleWest: [5.5, 14.6],
+  northMid: [23.5, 4.6],
+  northWest: [5, 4.6],
+  northEast: [34.6, 3.6],
 };
+const ROAD_EDGES = [
+  ["mainWest", "mainMid"],
+  ["mainMid", "mainEast"],
+  ["mainMid", "buyerRoad"],
+  ["buyerRoad", "eastRoad"],
+  ["mainEast", "eastRoad"],
+  ["buyerRoad", "middleEast"],
+  ["middleEast", "bridgeSouth"],
+  ["bridgeSouth", "middleWest"],
+  ["bridgeSouth", "northMid"],
+  ["northMid", "northWest"],
+  ["eastRoad", "northEast"],
+];
 
-function insideField(point) {
-  return point.x < ROUTE.fenceX && point.y < ROUTE.fenceY;
+function nodePoint(name) {
+  const [x, y] = ROAD_NODES[name];
+  return { x: x * TILE, y: y * TILE };
 }
 
-// Waypoints from start to target along the roads, mirroring
-// MultiplayerClient._calculateAiPath in the Flutter app.
-function aiPath(start, target) {
-  const path = [];
-  const startInside = insideField(start);
-  const targetInside = insideField(target);
-  if (startInside && targetInside) {
-    path.push({ x: start.x, y: ROUTE.innerY }, { x: target.x, y: ROUTE.innerY });
-  } else if (startInside) {
-    path.push(
-      { x: start.x, y: ROUTE.innerY },
-      { x: ROUTE.gateX, y: ROUTE.innerY },
-      { x: ROUTE.gateX, y: ROUTE.outerY },
-      { x: ROUTE.mainRoadX, y: ROUTE.outerY },
-      { x: ROUTE.mainRoadX, y: target.y },
-    );
-  } else if (targetInside) {
-    path.push(
-      { x: start.x, y: ROUTE.outerY },
-      { x: ROUTE.mainRoadX, y: ROUTE.outerY },
-      { x: ROUTE.gateX, y: ROUTE.outerY },
-      { x: ROUTE.gateX, y: ROUTE.innerY },
-      { x: target.x, y: ROUTE.innerY },
-    );
-  } else {
-    path.push(
-      { x: start.x, y: ROUTE.outerY },
-      { x: ROUTE.mainRoadX, y: ROUTE.outerY },
-      { x: ROUTE.mainRoadX, y: target.y },
-    );
+function distance(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+// Closest point on the road network to `point`, with the segment it lies on.
+function nearestRoad(point) {
+  let best = null;
+  for (const [from, to] of ROAD_EDGES) {
+    const a = nodePoint(from);
+    const b = nodePoint(to);
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const t = Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / (dx * dx + dy * dy)));
+    const onRoad = { x: a.x + dx * t, y: a.y + dy * t };
+    const gap = distance(point, onRoad);
+    if (!best || gap < best.gap) best = { point: onRoad, from, to, gap };
   }
+  return best;
+}
+
+// Waypoints from start to target: onto the nearest road, along the shortest
+// road route, then off the road to the target.
+function aiPath(start, target) {
+  const from = nearestRoad(start);
+  const to = nearestRoad(target);
+  const path = [];
+  if (from.gap > 1) path.push(from.point);
+  const sameSegment =
+    (from.from === to.from && from.to === to.to) || (from.from === to.to && from.to === to.from);
+  if (!sameSegment) {
+    // Dijkstra over the junctions, entering from both ends of the start segment.
+    const dist = {};
+    const prev = {};
+    const open = new Set(Object.keys(ROAD_NODES));
+    for (const name of open) dist[name] = Infinity;
+    dist[from.from] = distance(from.point, nodePoint(from.from));
+    dist[from.to] = distance(from.point, nodePoint(from.to));
+    while (open.size) {
+      let current = null;
+      for (const name of open) if (current === null || dist[name] < dist[current]) current = name;
+      open.delete(current);
+      for (const [a, b] of ROAD_EDGES) {
+        const next = a === current ? b : b === current ? a : null;
+        if (!next || !open.has(next)) continue;
+        const via = dist[current] + distance(nodePoint(current), nodePoint(next));
+        if (via < dist[next]) {
+          dist[next] = via;
+          prev[next] = current;
+        }
+      }
+    }
+    const exitA = dist[to.from] + distance(nodePoint(to.from), to.point);
+    const exitB = dist[to.to] + distance(nodePoint(to.to), to.point);
+    let node = exitA <= exitB ? to.from : to.to;
+    const junctions = [];
+    while (node) {
+      junctions.unshift(nodePoint(node));
+      node = prev[node];
+    }
+    path.push(...junctions);
+  }
+  path.push(to.point);
   path.push({ x: target.x, y: target.y });
   return path;
 }

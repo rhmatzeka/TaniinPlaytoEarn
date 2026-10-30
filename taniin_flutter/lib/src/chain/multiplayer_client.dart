@@ -75,12 +75,109 @@ class LocalAiAction {
 }
 
 const double _tileSize = 128.0;
-const double _shopLeft = 1.1 * _tileSize;
-const double _shopRight = 5.25 * _tileSize;
-const double _shopTop = 16.2 * _tileSize;
-const double _shopBottom = 23.95 * _tileSize;
-const double _shopSafeX = 5.95 * _tileSize;
 const double _shopFrontY = 26.85 * _tileSize;
+
+// Village roads as junctions (tiles) and the straight segments between them,
+// traced from assets/game/map.tmx. Mirrors ROAD_NODES / ROAD_EDGES in
+// contracts/lib/multiplayer-service.cjs so offline and online AI walk alike.
+const Map<String, Offset> _roadNodes = {
+  'mainWest': Offset(5, 26.85),
+  'mainMid': Offset(26.5, 26.85),
+  'mainEast': Offset(34.6, 26.85),
+  'buyerRoad': Offset(26.5, 16.6),
+  'eastRoad': Offset(34.6, 16.6),
+  'middleEast': Offset(26.5, 14.6),
+  'bridgeSouth': Offset(23.5, 14.6),
+  'middleWest': Offset(5.5, 14.6),
+  'northMid': Offset(23.5, 4.6),
+  'northWest': Offset(5, 4.6),
+  'northEast': Offset(34.6, 3.6),
+};
+const List<(String, String)> _roadEdges = [
+  ('mainWest', 'mainMid'),
+  ('mainMid', 'mainEast'),
+  ('mainMid', 'buyerRoad'),
+  ('buyerRoad', 'eastRoad'),
+  ('mainEast', 'eastRoad'),
+  ('buyerRoad', 'middleEast'),
+  ('middleEast', 'bridgeSouth'),
+  ('bridgeSouth', 'middleWest'),
+  ('bridgeSouth', 'northMid'),
+  ('northMid', 'northWest'),
+  ('eastRoad', 'northEast'),
+];
+
+Offset _roadPoint(String name) => _roadNodes[name]! * _tileSize;
+
+/// Closest point on the road network to [point], with its segment.
+({Offset point, String from, String to, double gap}) _nearestRoad(
+  Offset point,
+) {
+  ({Offset point, String from, String to, double gap})? best;
+  for (final (from, to) in _roadEdges) {
+    final a = _roadPoint(from);
+    final b = _roadPoint(to);
+    final d = b - a;
+    final t =
+        (((point.dx - a.dx) * d.dx + (point.dy - a.dy) * d.dy) /
+                (d.dx * d.dx + d.dy * d.dy))
+            .clamp(0.0, 1.0);
+    final onRoad = a + d * t;
+    final gap = (point - onRoad).distance;
+    if (best == null || gap < best.gap) {
+      best = (point: onRoad, from: from, to: to, gap: gap);
+    }
+  }
+  return best!;
+}
+
+/// Waypoints from [start] to [target]: onto the nearest road, along the
+/// shortest road route, then off the road to the target.
+@visibleForTesting
+List<Offset> aiRoadPath(Offset start, Offset target) {
+  final from = _nearestRoad(start);
+  final to = _nearestRoad(target);
+  final path = <Offset>[if (from.gap > 1) from.point];
+  final sameSegment =
+      (from.from == to.from && from.to == to.to) ||
+      (from.from == to.to && from.to == to.from);
+  if (!sameSegment) {
+    final dist = {for (final name in _roadNodes.keys) name: double.infinity};
+    final prev = <String, String>{};
+    final open = {..._roadNodes.keys};
+    dist[from.from] = (from.point - _roadPoint(from.from)).distance;
+    dist[from.to] = (from.point - _roadPoint(from.to)).distance;
+    while (open.isNotEmpty) {
+      final current = open.reduce((a, b) => dist[a]! <= dist[b]! ? a : b);
+      open.remove(current);
+      for (final (a, b) in _roadEdges) {
+        final next = a == current ? b : (b == current ? a : null);
+        if (next == null || !open.contains(next)) {
+          continue;
+        }
+        final via =
+            dist[current]! + (_roadPoint(current) - _roadPoint(next)).distance;
+        if (via < dist[next]!) {
+          dist[next] = via;
+          prev[next] = current;
+        }
+      }
+    }
+    final exitA = dist[to.from]! + (_roadPoint(to.from) - to.point).distance;
+    final exitB = dist[to.to]! + (_roadPoint(to.to) - to.point).distance;
+    String? node = exitA <= exitB ? to.from : to.to;
+    final junctions = <Offset>[];
+    while (node != null) {
+      junctions.insert(0, _roadPoint(node));
+      node = prev[node];
+    }
+    path.addAll(junctions);
+  }
+  path
+    ..add(to.point)
+    ..add(target);
+  return path;
+}
 
 class MultiplayerClient extends ChangeNotifier {
   MultiplayerClient(this.farmState) {
@@ -602,12 +699,15 @@ class MultiplayerClient extends ChangeNotifier {
       // Road in front of the seed shop gate, same spot as the server AI.
       target = const Offset(19.2 * _tileSize, _shopFrontY);
     } else if (action.intent == 'sell') {
-      target = const Offset(31.0 * 128, 13.35 * 128);
+      // Road in front of the buyer's red house.
+      target = const Offset(31.5 * _tileSize, 16.6 * _tileSize);
     } else if (action.intent == 'withdraw') {
-      target = const Offset(10.85 * 128, 13.15 * 128);
+      // Middle road in front of the swap house.
+      target = const Offset(11.0 * _tileSize, 14.6 * _tileSize);
     } else if (action.intent == 'plant' || action.intent == 'harvest') {
-      final plotX = (4 + (action.plotNum - 1) * 2) * 128.0;
-      target = Offset(plotX + 128, 19 * 128.0 + 128); // center of plot
+      // Bottom edge of the plot, reached from the main road.
+      final plotX = (4 + (action.plotNum - 1) * 2) * _tileSize;
+      target = Offset(plotX + _tileSize, 23.7 * _tileSize);
     }
 
     // Move AI to target visually in client frame-rate
@@ -793,138 +893,9 @@ class MultiplayerClient extends ChangeNotifier {
   void _moveLocalAiTo(Offset finalTarget, VoidCallback onArrival) {
     if (aiAgent == null) return;
 
-    final current = Offset(aiAgent!.x, aiAgent!.y);
-    final safeCurrent = _pushOutOfShopBounds(current);
-    if (safeCurrent != current) {
-      aiAgent!
-        ..x = safeCurrent.dx
-        ..y = safeCurrent.dy;
-      notifyListeners();
-    }
-
-    // Generate waypoints path to follow the roads and avoid fences/obstacles
-    final waypoints = _calculateAiPath(
-      Offset(aiAgent!.x, aiAgent!.y),
-      finalTarget,
-    );
+    // Follow the roads so the AI never cuts through houses or fences.
+    final waypoints = aiRoadPath(Offset(aiAgent!.x, aiAgent!.y), finalTarget);
     _followWaypoints(waypoints, 0, onArrival);
-  }
-
-  List<Offset> _calculateAiPath(Offset start, Offset target) {
-    final path = <Offset>[];
-
-    const innerY = 21.65 * 128.0; // Inner corridor below field decorations.
-    const outerY = _shopFrontY; // Front road below the shop and fence
-    const gateX =
-        5.0 * 128.0; // Gate X coordinate (below Plot 1, next to lake/lake-path)
-    const mainRoadX = 18.5 * 128.0; // Vertical main road X
-
-    final safeStart = _moveOutOfShopBounds(start, path);
-
-    // Define areas based on the horizontal fence at Y = 23.0 * 128 and vertical fence at X = 14.0 * 128.
-    // Use safeStart so a character already clipped into the shop routes from the escape point.
-    final startInside =
-        safeStart.dx < 14.0 * 128.0 && safeStart.dy < 23.0 * 128.0;
-    final targetInside = target.dx < 14.0 * 128.0 && target.dy < 23.0 * 128.0;
-
-    if (startInside && targetInside) {
-      // Both inside the fence: walk along the lower inner corridor.
-      path.add(Offset(safeStart.dx, innerY));
-      path.add(Offset(target.dx, innerY));
-      path.add(target);
-    } else if (startInside && !targetInside) {
-      if (_isShopFrontTarget(target)) {
-        return _calculateShopPathFromInside(safeStart, target);
-      }
-
-      // Inside to outside: use the gate, then the nearest outside road.
-      path.add(Offset(safeStart.dx, innerY));
-      path.add(const Offset(gateX, innerY));
-      path.add(const Offset(gateX, outerY));
-      path.add(const Offset(mainRoadX, outerY));
-      path.add(Offset(mainRoadX, target.dy));
-      path.add(target);
-    } else if (!startInside && targetInside) {
-      // Outside to Inside: go to main road, walk left along road to gateX, go up, then to target
-      path.add(Offset(safeStart.dx, outerY));
-      path.add(const Offset(mainRoadX, outerY));
-      path.add(const Offset(gateX, outerY));
-      path.add(const Offset(gateX, innerY));
-      path.add(Offset(target.dx, innerY));
-      path.add(target);
-    } else {
-      // Both outside: walk along the front road and avoid crossing the shop.
-      path.add(Offset(safeStart.dx, outerY));
-      if (target.dy == outerY && target.dx < _shopRight) {
-        path.add(const Offset(_shopSafeX, outerY));
-      } else {
-        path.add(const Offset(mainRoadX, outerY));
-        path.add(Offset(mainRoadX, target.dy));
-      }
-      path.add(target);
-    }
-
-    return path;
-  }
-
-  List<Offset> _calculateShopPathFromInside(Offset start, Offset target) {
-    const lowerOpenY = 25.6 * _tileSize;
-
-    return <Offset>[
-      Offset(start.dx, lowerOpenY),
-      Offset(target.dx, _shopFrontY),
-      target,
-    ];
-  }
-
-  bool _isShopFrontTarget(Offset target) {
-    return target.dx >= _shopLeft &&
-        target.dx <= _shopRight &&
-        (target.dy - _shopFrontY).abs() < 2.0;
-  }
-
-  Offset _moveOutOfShopBounds(Offset start, List<Offset> path) {
-    if (!_isInsideShopBounds(start)) {
-      return start;
-    }
-
-    final safe = _pushOutOfShopBounds(start);
-    path.add(safe);
-    return safe;
-  }
-
-  bool _isInsideShopBounds(Offset point) {
-    return point.dx >= _shopLeft &&
-        point.dx <= _shopRight &&
-        point.dy >= _shopTop &&
-        point.dy <= _shopBottom;
-  }
-
-  Offset _pushOutOfShopBounds(Offset point) {
-    if (!_isInsideShopBounds(point)) {
-      return point;
-    }
-
-    const padding = 10.0;
-    final leftDistance = (point.dx - _shopLeft).abs();
-    final rightDistance = (_shopRight - point.dx).abs();
-    final topDistance = (point.dy - _shopTop).abs();
-    final bottomDistance = (_shopBottom - point.dy).abs();
-    final nearest = math.min(
-      math.min(leftDistance, rightDistance),
-      math.min(topDistance, bottomDistance),
-    );
-
-    if (nearest == bottomDistance) {
-      return Offset(point.dx, _shopBottom + padding);
-    }
-    if (nearest == rightDistance) {
-      return Offset(_shopRight + padding, point.dy);
-    }
-    if (nearest == leftDistance) {
-      return Offset(_shopLeft - padding, point.dy);
-    }
-    return Offset(point.dx, _shopTop - padding);
   }
 
   void _followWaypoints(List<Offset> path, int index, VoidCallback onArrival) {
@@ -971,11 +942,9 @@ class MultiplayerClient extends ChangeNotifier {
           aiAgent!.flipLeft = dx < 0;
         }
 
-        final nextPosition = _pushOutOfShopBounds(
-          Offset(
-            aiAgent!.x + (dx / distance) * speed,
-            aiAgent!.y + (dy / distance) * speed,
-          ),
+        final nextPosition = Offset(
+          aiAgent!.x + (dx / distance) * speed,
+          aiAgent!.y + (dy / distance) * speed,
         );
         if ((nextPosition - lastPosition).distance < 1.0) {
           stuckTicks++;
@@ -995,10 +964,9 @@ class MultiplayerClient extends ChangeNotifier {
           ..y = nextPosition.dy;
         notifyListeners();
       } else {
-        final safeTarget = _pushOutOfShopBounds(target);
         aiAgent!
-          ..x = safeTarget.dx
-          ..y = safeTarget.dy;
+          ..x = target.dx
+          ..y = target.dy;
         notifyListeners();
         timer.cancel();
 
