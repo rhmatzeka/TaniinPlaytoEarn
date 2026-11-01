@@ -2,6 +2,8 @@
 
 Taniin is a pixel farming game for the browser and Android, built with Flutter and Flame. Players buy seeds, plant, harvest, and sell crops, play alongside other farmers and the Pak Tani AI assistant, and can record their farm on Ethereum Sepolia after signing in with Privy.
 
+![Taniin gameplay: the village with the seed shop, market stall, Pak Tani AI and other farmers](docs/images/taniin-gameplay.png)
+
 - **Play:** https://taniin.rahmateka.my.id
 - **Android APK:** https://taniin.rahmateka.my.id/unduh/Taniin.apk (Android 8.0+)
 
