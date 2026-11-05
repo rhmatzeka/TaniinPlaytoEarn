@@ -30,7 +30,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap">
-  <link rel="stylesheet" href="/landing.css">
+  <link rel="stylesheet" href="/landing-v2.css">
 
   <script type="application/ld+json">
   {
@@ -92,29 +92,42 @@
     </figure>
   </header>
 
+  <div class="ticker" aria-hidden="true">
+    <div class="ticker-jalur"><ul><li><img class="pixel" src="/img/sprite/benih.png" alt="">Main gratis di browser</li><li><img class="pixel" src="/img/sprite/petani.png" alt="">Pak Tani AI siap bantu</li><li><img class="pixel" src="/img/sprite/ayam.png" alt="">Desa ramai tiap hari</li><li><img class="pixel" src="/img/sprite/stroberi.png" alt="">Panen tercatat di Sepolia</li><li><img class="pixel" src="/img/sprite/peti.png" alt="">APK untuk Android</li></ul><ul><li><img class="pixel" src="/img/sprite/benih.png" alt="">Main gratis di browser</li><li><img class="pixel" src="/img/sprite/petani.png" alt="">Pak Tani AI siap bantu</li><li><img class="pixel" src="/img/sprite/ayam.png" alt="">Desa ramai tiap hari</li><li><img class="pixel" src="/img/sprite/stroberi.png" alt="">Panen tercatat di Sepolia</li><li><img class="pixel" src="/img/sprite/peti.png" alt="">APK untuk Android</li></ul></div>
+  </div>
+  <div class="dither" aria-hidden="true"></div>
+
   <main id="isi">
-    <section class="musim" id="cara-main" aria-labelledby="judul-musim">
+    <section class="langit-band musim" id="cara-main" aria-labelledby="judul-musim">
       <div class="wrap">
-        <h2 id="judul-musim">Sehari di kebun</h2>
-        <p class="intro">Satu putaran bertani cuma beberapa menit. Ulangi, kumpulkan koin, lalu beli lahan baru sampai lima petak.</p>
+        <div class="musim-atas">
+          <div>
+            <h2 id="judul-musim">Sehari di kebun</h2>
+            <p class="intro">Satu putaran bertani cuma beberapa menit. Ulangi, kumpulkan koin, lalu beli lahan baru sampai lima petak.</p>
+          </div>
+          <div class="maskot" aria-hidden="true">
+            <img class="pixel" src="/img/sprite/petani.png" width="12" height="20" alt="">
+            <img class="pixel" src="/img/sprite/ayam.png" width="14" height="16" alt="">
+          </div>
+        </div>
         <ol class="siklus">
           <li>
-            <span class="sprite"><img src="/img/sprite/benih.png" width="12" height="14" alt=""></span>
+            <span class="sprite"><img class="pixel" src="/img/sprite/benih.png" width="12" height="14" alt=""></span>
             <h3>Beli benih</h3>
             <p>Kentang, bawang, stroberi, atau bit dari toko desa.</p>
           </li>
           <li>
-            <span class="sprite"><img src="/img/sprite/tanam.png" width="9" height="8" alt=""></span>
+            <span class="sprite"><img class="pixel" src="/img/sprite/tanam.png" width="9" height="8" alt=""></span>
             <h3>Tanam</h3>
             <p>Dekati lahanmu, pilih benih, dan tanam.</p>
           </li>
           <li>
-            <span class="sprite"><img src="/img/sprite/panen.png" width="12" height="10" alt=""></span>
+            <span class="sprite"><img class="pixel" src="/img/sprite/panen.png" width="12" height="10" alt=""></span>
             <h3>Panen</h3>
             <p>Begitu matang, petik hasilnya ke tas.</p>
           </li>
           <li>
-            <span class="sprite"><img src="/img/sprite/jual.png" width="12" height="15" alt=""></span>
+            <span class="sprite"><img class="pixel" src="/img/sprite/jual.png" width="12" height="15" alt=""></span>
             <h3>Jual</h3>
             <p>Bawa ke pengepul dan tukar jadi Game Coin.</p>
           </li>
@@ -122,71 +135,91 @@
       </div>
     </section>
 
-    <section class="desa" aria-labelledby="judul-desa">
-      <div class="wrap desa-grid">
-        <div class="desa-teks">
-          <h2 id="judul-desa">Kamu tidak bertani sendirian</h2>
-          <ul class="fitur">
-            <li>
-              <img src="/img/sprite/petani.png" width="12" height="20" alt="">
-              <div>
-                <h3>Main bareng</h3>
-                <p>Petani lain terlihat jalan di peta yang sama, dan kalian bisa ngobrol lewat chat.</p>
-              </div>
-            </li>
-            <li>
-              <img src="/img/logo.webp" width="40" height="40" alt="" class="foto">
-              <div>
-                <h3>Pak Tani AI</h3>
-                <p>Ketik "tolong tanam kentang di lahan 2" dan dia akan jalan ke sana lalu menanamnya.</p>
-              </div>
-            </li>
-            <li>
-              <img src="/img/sprite/stroberi.png" width="13" height="13" alt="">
-              <div>
-                <h3>Quest harian</h3>
-                <p>Selesaikan target tanam, panen, dan jual untuk XP, lalu buka baju petani baru.</p>
-              </div>
-            </li>
-          </ul>
-        </div>
-        <div class="bingkai-tumpuk">
-          <figure class="bingkai miring-kiri"><img src="/img/shot-shop.webp" width="1280" height="720" loading="lazy" decoding="async" alt="Panel toko benih dengan empat jenis benih dan jumlah paket"></figure>
-          <figure class="bingkai miring-kanan"><img src="/img/shot-profile.webp" width="1280" height="720" loading="lazy" decoding="async" alt="Panel profil petani dengan quest harian, pencapaian, dan wardrobe"></figure>
-        </div>
+    <div class="ladang" aria-hidden="true"></div>
+
+    <section class="malam-band desa" aria-labelledby="judul-desa">
+      <div class="wrap">
+        <h2 id="judul-desa">Kamu tidak bertani sendirian</h2>
+
+        <article class="baris">
+          <figure class="tumpuk">
+            <span class="badge" aria-hidden="true"><img class="pixel" src="/img/sprite/petani.png" width="12" height="20" alt=""></span>
+            <img class="foto foto-depan" src="/img/v2/desa.webp" srcset="/img/v2/desa-640.webp 640w, /img/v2/desa.webp 1280w" sizes="(max-width: 900px) 92vw, 600px" width="1280" height="720" loading="lazy" decoding="async" alt="Dua petani di jalan desa dekat toko dan kios pasar, dengan warga, sapi, dan ayam di sekitarnya">
+            <span class="foto foto-belakang" aria-hidden="true"><img src="/img/v2/malam-640.webp" width="640" height="360" loading="lazy" decoding="async" alt=""></span>
+          </figure>
+          <div>
+            <h3>Main bareng</h3>
+            <p>Petani lain terlihat jalan di peta yang sama, dan kalian bisa ngobrol lewat chat. Warga desa lalu-lalang dan menyapa. Begitu malam di tempatmu, lampu desa ikut menyala.</p>
+          </div>
+        </article>
+
+        <article class="baris">
+          <figure class="tumpuk">
+            <span class="badge" aria-hidden="true"><img class="bulat" src="/img/logo.webp" width="40" height="40" alt=""></span>
+            <img class="foto foto-depan" src="/img/v2/pak-tani.webp" srcset="/img/v2/pak-tani-640.webp 640w, /img/v2/pak-tani.webp 1280w" sizes="(max-width: 900px) 92vw, 600px" width="1280" height="720" loading="lazy" decoding="async" alt="Panel chat Pak Tani AI yang melaporkan kentang sudah ditanam di lahan 1">
+            <span class="foto foto-belakang" aria-hidden="true"><img src="/img/v2/desa-640.webp" width="640" height="360" loading="lazy" decoding="async" alt=""></span>
+          </figure>
+          <div>
+            <h3>Suruh Pak Tani AI</h3>
+            <p>Tulis perintah biasa di chat. Pak Tani jalan ke lahanmu, menanam, lalu melapor kalau sudah beres.</p>
+            <p class="kutip">"tolong tanam kentang di lahan 1"</p>
+          </div>
+        </article>
+
+        <article class="baris">
+          <figure class="tumpuk">
+            <span class="badge" aria-hidden="true"><img class="pixel" src="/img/sprite/stroberi.png" width="13" height="13" alt=""></span>
+            <img class="foto foto-depan" src="/img/v2/toko.webp" srcset="/img/v2/toko-640.webp 640w, /img/v2/toko.webp 1280w" sizes="(max-width: 900px) 92vw, 600px" width="1280" height="720" loading="lazy" decoding="async" alt="Toko benih berisi kentang, bawang, stroberi, dan bit dengan harga dalam Game Coin">
+            <span class="foto foto-belakang" aria-hidden="true"><img src="/img/v2/profil-640.webp" width="640" height="360" loading="lazy" decoding="async" alt=""></span>
+          </figure>
+          <div>
+            <h3>Belanja, quest, ganti baju</h3>
+            <p>Beli benih pakai Game Coin, selesaikan quest harian untuk XP, dan buka baju petani baru setiap naik level.</p>
+          </div>
+        </article>
       </div>
     </section>
 
-    <section class="rantai" id="web3" aria-labelledby="judul-web3">
-      <div class="wrap rantai-grid">
-        <div>
-          <h2 id="judul-web3">Web3 tanpa harus paham Web3</h2>
-          <ol class="langkah">
-            <li><strong>Main sebagai tamu.</strong> Progres tersimpan di perangkatmu, tanpa daftar apa pun.</li>
-            <li><strong>Masuk dengan Privy.</strong> Email atau Google sudah cukup. Wallet Sepolia dibuat otomatis, dan progres tamu ikut pindah.</li>
-            <li><strong>Server memeriksa setiap aksi.</strong> Harga, waktu tumbuh, dan stok dicek sebelum transaksi dikirim, jadi koin tidak bisa dicetak dari aplikasi.</li>
-            <li><strong>Lihat sendiri di Etherscan.</strong> Setiap transaksi di riwayat game bisa dibuka.</li>
-          </ol>
+    <div class="dither dither-malam-langit" aria-hidden="true"></div>
+
+    <section class="langit-band rantai" id="web3" aria-labelledby="judul-web3">
+      <div class="wrap">
+        <div class="rantai-atas">
+          <div class="koin-besar" aria-hidden="true">$TANI</div>
+          <div>
+            <h2 id="judul-web3">Web3 tanpa harus paham Web3</h2>
+            <p>Tukar Game Coin jadi token TANI di rumah tukar desa, atau tarik jadi Sepolia ETH. Lahan, benih, dan panenmu tercatat di Ethereum Sepolia.</p>
+          </div>
         </div>
-        <div class="papan">
-          <img class="papan-peti" src="/img/sprite/peti.png" width="15" height="13" alt="">
-          <h3>Tercatat di Sepolia</h3>
-          <dl class="kontrak">
-            <div><dt>Lahan</dt><dd><span class="tipe">NFT ERC-721</span><a href="https://sepolia.etherscan.io/address/0x55D768D736b66B842EE72Ff7fa143f03245F81cc" rel="noopener">0x55D7…81cc</a></dd></div>
-            <div><dt>Benih &amp; panen</dt><dd><span class="tipe">ERC-1155</span><a href="https://sepolia.etherscan.io/address/0x9414eD4F6d9beF484484D72da3d8361989348AEf" rel="noopener">0x9414…8AEf</a></dd></div>
-            <div><dt>Token TANI</dt><dd><span class="tipe">ERC-20</span><a href="https://sepolia.etherscan.io/address/0x8E1584fF95842C888F1FAaB29ed1e55d886A81F8" rel="noopener">0x8E15…81F8</a></dd></div>
-          </dl>
-          <p class="catatan">Testnet: token dan ETH di sini tidak punya nilai uang sungguhan.</p>
-        </div>
+        <ol class="langkah">
+          <li><strong>Main sebagai tamu</strong>Progres tersimpan di perangkatmu, tanpa daftar apa pun.</li>
+          <li><strong>Masuk dengan Privy</strong>Email atau Google sudah cukup. Wallet Sepolia dibuat otomatis, dan progres tamu ikut pindah.</li>
+          <li><strong>Server memeriksa setiap aksi</strong>Harga, waktu tumbuh, dan stok dicek sebelum transaksi dikirim, jadi koin tidak bisa dicetak dari aplikasi.</li>
+          <li><strong>Lihat sendiri di Etherscan</strong>Setiap transaksi di riwayat game bisa dibuka.</li>
+        </ol>
+        <dl class="kontrak">
+          <div><dt>Lahan</dt><dd><span class="tipe">NFT ERC-721</span><a href="https://sepolia.etherscan.io/address/0x55D768D736b66B842EE72Ff7fa143f03245F81cc" rel="noopener">0x55D7…81cc</a></dd></div>
+          <div><dt>Benih &amp; panen</dt><dd><span class="tipe">ERC-1155</span><a href="https://sepolia.etherscan.io/address/0x9414eD4F6d9beF484484D72da3d8361989348AEf" rel="noopener">0x9414…8AEf</a></dd></div>
+          <div><dt>Token TANI</dt><dd><span class="tipe">ERC-20</span><a href="https://sepolia.etherscan.io/address/0x8E1584fF95842C888F1FAaB29ed1e55d886A81F8" rel="noopener">0x8E15…81F8</a></dd></div>
+        </dl>
+        <p class="catatan">Testnet: token dan ETH di sini tidak punya nilai uang sungguhan.</p>
       </div>
     </section>
+
+  <div class="ticker ticker-arah-balik" aria-hidden="true">
+    <div class="ticker-jalur"><ul><li><img class="pixel" src="/img/sprite/benih.png" alt="">Main gratis di browser</li><li><img class="pixel" src="/img/sprite/petani.png" alt="">Pak Tani AI siap bantu</li><li><img class="pixel" src="/img/sprite/ayam.png" alt="">Desa ramai tiap hari</li><li><img class="pixel" src="/img/sprite/stroberi.png" alt="">Panen tercatat di Sepolia</li><li><img class="pixel" src="/img/sprite/peti.png" alt="">APK untuk Android</li></ul><ul><li><img class="pixel" src="/img/sprite/benih.png" alt="">Main gratis di browser</li><li><img class="pixel" src="/img/sprite/petani.png" alt="">Pak Tani AI siap bantu</li><li><img class="pixel" src="/img/sprite/ayam.png" alt="">Desa ramai tiap hari</li><li><img class="pixel" src="/img/sprite/stroberi.png" alt="">Panen tercatat di Sepolia</li><li><img class="pixel" src="/img/sprite/peti.png" alt="">APK untuk Android</li></ul></div>
+  </div>
+    <div class="dither dither-emas-rumput" aria-hidden="true"></div>
 
     <section class="ajak" aria-labelledby="judul-ajak">
       <div class="wrap ajak-isi">
-        <img src="/img/sprite/sapi.png" width="22" height="19" alt="" class="ajak-sapi">
+        <div class="ajak-hewan" aria-hidden="true">
+          <img class="pixel" src="/img/sprite/sapi.png" width="22" height="19" alt="">
+          <img class="pixel" src="/img/sprite/ayam.png" width="14" height="16" alt="">
+        </div>
         <h2 id="judul-ajak">Lahan pertamamu sudah siap</h2>
         <div class="cta">
-          <a class="btn btn-kayu" href="/main/">Main di browser</a>
+          <a class="btn btn-emas" href="/main/">Main di browser</a>
           <a class="btn btn-krem" href="/unduh/Taniin.apk" download>Unduh APK Android</a>
         </div>
       </div>
