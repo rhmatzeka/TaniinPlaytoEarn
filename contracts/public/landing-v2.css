@@ -1,0 +1,400 @@
+/* Taniin landing: colors and frames come straight from the game's HUD
+   (wood panels with an orange rim, soil, grass, sky from the loading art). */
+:root {
+  --langit: #2b6be3;
+  --langit-tua: #1d4fb0;
+  --kayu: #a34a1c;
+  --kayu-tua: #7a2d0e;
+  --kayu-gelap: #4a1d08;
+  --rim: #e07b20;
+  --emas: #ffde19;
+  --rumput: #74ab4c;
+  --rumput-tua: #4f8a34;
+  --tanah: #5b3923;
+  --krem: #fff3d4;
+  --malam: #1b2f7a;
+  --malam-tua: #0f1d55;
+  --tinta: #24301e;
+  --pixel: "Pixelify Sans", ui-monospace, monospace;
+  --teks: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --lebar: 1120px;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--rumput);
+  color: var(--tinta);
+  font: 400 17px/1.65 var(--teks);
+  overflow-x: hidden;
+}
+img { max-width: 100%; height: auto; display: block; }
+a { color: inherit; }
+:focus-visible { outline: 3px dashed var(--emas); outline-offset: 3px; }
+h1, h2, h3 { font-family: var(--pixel); font-weight: 700; line-height: 1.1; margin: 0; }
+.wrap { width: min(var(--lebar), 100% - 32px); margin-inline: auto; }
+.skip { position: absolute; left: 16px; top: -60px; z-index: 10; padding: 8px 12px; background: var(--krem); }
+.skip:focus { top: 12px; }
+
+/* Pixel sprites are tiny on purpose; scale them crisp. */
+.sprite img, .fitur > li > img:not(.foto), .papan-peti, .ajak-sapi {
+  image-rendering: pixelated;
+}
+
+/* ---------- Buttons: game HUD buttons ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 10px 22px;
+  border: 3px solid var(--kayu-gelap);
+  border-radius: 10px;
+  font: 700 20px/1 var(--pixel);
+  text-decoration: none;
+  box-shadow: inset 0 -5px 0 rgb(0 0 0 / 0.22), 0 4px 0 var(--kayu-gelap);
+  transition: transform 80ms ease, box-shadow 80ms ease;
+}
+.btn:active { transform: translateY(3px); box-shadow: inset 0 -3px 0 rgb(0 0 0 / 0.22), 0 1px 0 var(--kayu-gelap); }
+.btn-kayu { background: var(--kayu); color: var(--emas); outline-color: var(--emas); }
+.btn-kayu { box-shadow: inset 0 0 0 3px var(--rim), inset 0 -6px 0 rgb(0 0 0 / 0.25), 0 4px 0 var(--kayu-gelap); }
+.btn-krem { background: var(--krem); color: var(--kayu-tua); }
+.cta { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; }
+
+/* ---------- Hero: a game title screen ---------- */
+.hero {
+  position: relative;
+  padding-bottom: clamp(48px, 9vw, 120px);
+  background:
+    linear-gradient(to bottom, rgb(18 46 120 / 0.35), transparent 38%),
+    url("/img/hero.webp") center 70% / cover no-repeat,
+    var(--langit);
+  image-rendering: pixelated;
+  isolation: isolate;
+}
+.hero::after {
+  /* grass lip where the sky meets the first section */
+  content: "";
+  position: absolute;
+  inset: auto 0 -1px 0;
+  height: 28px;
+  background:
+    conic-gradient(from 135deg at 50% 0, var(--emas) 25%, transparent 0) 0 0 / 28px 14px repeat-x,
+    linear-gradient(var(--emas), var(--emas)) 0 14px / 100% 14px no-repeat;
+  z-index: -1;
+}
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  width: min(var(--lebar), 100% - 32px);
+  margin: 0 auto;
+  padding: 18px 0;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #fff;
+  text-decoration: none;
+  font: 700 26px var(--pixel);
+  text-shadow: 0 3px 0 var(--langit-tua);
+}
+.brand img { border-radius: 9px; border: 2px solid var(--kayu-gelap); }
+.nav-links { display: flex; gap: 22px; list-style: none; margin: 0 0 0 auto; padding: 0; }
+.nav-links a {
+  color: #fff;
+  font: 700 18px var(--pixel);
+  text-decoration: none;
+  text-shadow: 0 2px 0 var(--langit-tua);
+}
+.nav-links a:hover { text-decoration: underline; text-underline-offset: 5px; }
+.nav-play {
+  padding: 8px 16px;
+  border: 3px solid var(--kayu-gelap);
+  border-radius: 8px;
+  background: var(--kayu);
+  box-shadow: inset 0 0 0 2px var(--rim);
+  color: var(--emas);
+  font: 700 18px var(--pixel);
+  text-decoration: none;
+}
+
+.hero-copy {
+  width: min(760px, 100% - 32px);
+  margin: clamp(24px, 6vw, 72px) auto 0;
+  text-align: center;
+  color: #fff;
+}
+.wordmark {
+  font-size: clamp(72px, 15vw, 168px);
+  letter-spacing: 0.02em;
+  line-height: 0.95;
+  color: var(--emas);
+  -webkit-text-stroke: clamp(4px, 0.8vw, 9px) var(--kayu-gelap);
+  paint-order: stroke fill;
+  text-shadow: 0 clamp(6px, 1.2vw, 12px) 0 var(--kayu-gelap);
+}
+.tagline {
+  max-width: 36ch;
+  margin: 22px auto 24px;
+  padding: 12px 18px;
+  background: var(--kayu-tua);
+  border: 3px solid var(--kayu-gelap);
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 2px var(--rim), 0 5px 0 var(--kayu-gelap);
+  color: var(--krem);
+  font: 600 clamp(17px, 2.2vw, 21px)/1.45 var(--teks);
+}
+.fine {
+  display: inline-block;
+  margin: 16px auto 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgb(17 44 112 / 0.72);
+  font-size: 14px;
+}
+
+.layar {
+  width: min(980px, 100% - 32px);
+  margin: clamp(36px, 6vw, 64px) auto 0;
+  padding: clamp(6px, 1vw, 12px);
+  background: var(--kayu);
+  border: 4px solid var(--kayu-gelap);
+  border-radius: 18px;
+  box-shadow: inset 0 0 0 3px var(--rim), 0 12px 0 var(--kayu-gelap), 0 30px 60px rgb(10 30 80 / 0.35);
+}
+.layar img { border-radius: 10px; border: 3px solid var(--kayu-gelap); }
+
+/* ---------- Below the hero: flat saturated bands joined by pixel dithers,
+   tilted screenshots with character badges, a ticker. ---------- */
+.pixel { image-rendering: pixelated; }
+.btn-emas {
+  background: var(--emas);
+  color: var(--kayu-gelap);
+  border-color: var(--kayu-gelap);
+  box-shadow: inset 0 -5px 0 rgb(0 0 0 / 0.14), 5px 5px 0 var(--kayu-gelap);
+}
+.btn-emas:active { transform: translate(3px, 3px); box-shadow: inset 0 -3px 0 rgb(0 0 0 / 0.14), 2px 2px 0 var(--kayu-gelap); }
+
+/* Ticker */
+.ticker {
+  overflow: hidden;
+  background: var(--emas);
+  border-block: 4px solid var(--kayu-gelap);
+  color: var(--kayu-gelap);
+}
+.ticker-jalur {
+  display: flex;
+  width: max-content;
+  animation: jalan 38s linear infinite;
+}
+.ticker-arah-balik .ticker-jalur { animation-direction: reverse; }
+.ticker ul { display: flex; align-items: center; gap: 28px; margin: 0; padding: 12px 14px; list-style: none; }
+.ticker li { display: flex; align-items: center; gap: 28px; font: 700 clamp(18px, 2vw, 22px)/1 var(--pixel); white-space: nowrap; }
+.ticker li img { width: auto; height: 30px; }
+@keyframes jalan { to { transform: translateX(-50%); } }
+
+/* Dither and soil bands between colours */
+.dither { height: 72px; background: url("/img/v2/dither-emas-langit.svg") 0 0 / 48px 72px repeat-x; }
+.dither-langit-malam { background-image: url("/img/v2/dither-langit-malam.svg"); }
+.dither-malam-langit { background-image: url("/img/v2/dither-malam-langit.svg"); }
+.dither-emas-rumput { background-image: url("/img/v2/dither-emas-rumput.svg"); }
+.ladang {
+  height: 72px;
+  background:
+    url("/img/sprite/tumbuh.png") 12px 8px / 44px 48px repeat-x,
+    repeating-linear-gradient(to bottom, #6b4429 0 12px, #5b3923 12px 24px);
+  border-block: 4px solid #2e1b0f;
+  image-rendering: pixelated;
+}
+
+.langit-band { background: var(--langit); color: #eaf1ff; }
+.malam-band { background: var(--malam); color: #dfe6ff; }
+.langit-band h2, .malam-band h2, .malam-band h3, .rantai h3 {
+  color: var(--emas);
+  text-shadow: 4px 4px 0 var(--kayu-gelap);
+}
+.langit-band h2, .malam-band h2 { font-size: clamp(34px, 5.4vw, 56px); }
+
+/* Day on the farm: a real sequence, so it is numbered */
+.musim { padding: clamp(56px, 8vw, 100px) 0 clamp(64px, 9vw, 112px); }
+.musim-atas { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 32px; }
+.intro { max-width: 46ch; margin: 16px 0 0; font-size: 18px; color: #fff; }
+.maskot { display: flex; align-items: flex-end; gap: 6px; }
+.maskot img:first-child { width: 120px; }
+.maskot img:last-child { width: 70px; }
+.siklus {
+  counter-reset: langkah;
+  list-style: none;
+  margin: 44px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+.siklus li {
+  counter-increment: langkah;
+  position: relative;
+  padding: 22px 18px 20px;
+  background: var(--malam);
+  border: 4px solid var(--malam-tua);
+  box-shadow: 6px 6px 0 var(--malam-tua);
+}
+.siklus li::before {
+  content: counter(langkah);
+  position: absolute;
+  top: -18px;
+  left: 14px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--kayu-gelap);
+  background: var(--emas);
+  color: var(--kayu-gelap);
+  font: 700 20px/1 var(--pixel);
+}
+.sprite { display: grid; place-items: end center; height: 92px; margin-bottom: 12px; }
+.sprite img { width: auto; height: 76px; }
+.siklus h3 { font-size: 24px; color: #fff; }
+.siklus p { margin: 6px 0 0; font-size: 15.5px; line-height: 1.5; color: #c9d4ff; }
+
+/* Village: zig-zag rows of tilted screenshots */
+.desa { padding: clamp(64px, 9vw, 120px) 0; }
+.desa > .wrap > h2 { max-width: 16ch; }
+.baris {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  align-items: center;
+  gap: clamp(36px, 6vw, 88px);
+  margin-top: clamp(56px, 8vw, 104px);
+}
+.baris:nth-of-type(even) { grid-template-columns: 1fr 1.15fr; }
+.baris:nth-of-type(even) .tumpuk { order: 2; }
+.tumpuk { position: relative; margin: 0; padding: 0 4% 6% 0; }
+.foto {
+  display: block;
+  border: 8px solid var(--krem);
+  outline: 3px solid var(--kayu-gelap);
+  box-shadow: 10px 10px 0 var(--malam-tua);
+  background: var(--malam-tua);
+}
+.foto-depan { position: relative; z-index: 1; transform: rotate(-3deg); }
+.foto-belakang { position: absolute; inset: 6% 0 0 4%; transform: rotate(3.5deg); }
+.foto-belakang img { width: 100%; height: 100%; object-fit: cover; }
+.baris:nth-of-type(even) .foto-depan { transform: rotate(3deg); }
+.baris:nth-of-type(even) .foto-belakang { transform: rotate(-3.5deg); }
+.badge {
+  position: absolute;
+  z-index: 2;
+  top: -34px;
+  right: 2%;
+  display: grid;
+  place-items: center;
+  width: clamp(84px, 9vw, 112px);
+  aspect-ratio: 1;
+  border: 4px solid var(--kayu-gelap);
+  border-radius: 50%;
+  background: var(--emas);
+  box-shadow: 4px 4px 0 var(--kayu-gelap);
+}
+.baris:nth-of-type(even) .badge { right: auto; left: 2%; }
+.badge img { width: 52%; height: auto; }
+.badge img.bulat { width: 78%; border-radius: 50%; image-rendering: auto; }
+.baris h3 { font-size: clamp(28px, 3.4vw, 38px); }
+.baris p { max-width: 40ch; margin: 14px 0 0; font-size: 18px; }
+.kutip {
+  display: inline-block;
+  margin-top: 18px;
+  padding: 8px 14px;
+  border: 3px solid var(--kayu-gelap);
+  background: var(--krem);
+  color: var(--kayu-tua);
+  font: 700 18px/1.3 var(--pixel);
+  box-shadow: 4px 4px 0 var(--kayu-gelap);
+}
+
+/* Chain */
+.rantai { padding: clamp(64px, 9vw, 120px) 0; }
+.rantai-atas { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: clamp(32px, 6vw, 80px); }
+.koin-besar {
+  margin: 0;
+  font: 700 clamp(88px, 15vw, 196px)/0.9 var(--pixel);
+  letter-spacing: 0.02em;
+  color: var(--emas);
+  -webkit-text-stroke: clamp(4px, 0.7vw, 8px) var(--kayu-gelap);
+  paint-order: stroke fill;
+  text-shadow: clamp(6px, 1vw, 12px) clamp(6px, 1vw, 12px) 0 var(--kayu-gelap);
+}
+.rantai-atas div p { max-width: 44ch; margin: 14px 0 0; font-size: 18px; color: #fff; }
+.langkah {
+  list-style: none;
+  counter-reset: l;
+  margin: clamp(48px, 7vw, 80px) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+.langkah li { counter-increment: l; padding-top: 14px; border-top: 4px solid var(--emas); font-size: 16px; }
+.langkah li::before { content: counter(l); display: block; margin-bottom: 6px; font: 700 28px/1 var(--pixel); color: var(--emas); }
+.langkah strong { display: block; margin-bottom: 4px; color: #fff; font: 700 20px/1.2 var(--pixel); }
+.kontrak { margin: clamp(44px, 6vw, 64px) 0 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.kontrak div {
+  padding: 16px 18px;
+  background: var(--malam);
+  border: 4px solid var(--malam-tua);
+  box-shadow: 6px 6px 0 var(--malam-tua);
+}
+.kontrak dt { font: 700 22px var(--pixel); color: #fff; }
+.kontrak dd { margin: 4px 0 0; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 15px; }
+.kontrak .tipe { color: #b9c7ff; }
+.kontrak a { color: var(--emas); font-variant-numeric: tabular-nums; }
+.catatan { margin: 18px 0 0; font-size: 14px; color: #cfdaff; }
+
+/* Closing call */
+.ajak { padding: clamp(56px, 8vw, 96px) 0 clamp(64px, 9vw, 110px); background: var(--rumput); text-align: center; }
+.ajak-isi { display: grid; justify-items: center; gap: 22px; }
+.ajak-hewan { display: flex; align-items: flex-end; gap: 10px; }
+.ajak-hewan img:first-child { width: 120px; }
+.ajak-hewan img:last-child { width: 56px; }
+.ajak h2 { font-size: clamp(34px, 5.4vw, 56px); color: #fff; text-shadow: 4px 4px 0 var(--rumput-tua); }
+
+.footer { background: var(--tanah); color: var(--krem); font-size: 15px; }
+.footer-isi { padding: 26px 0; display: grid; gap: 4px; }
+.footer p { margin: 0; }
+.footer a { color: var(--emas); }
+
+/* ---------- Narrower screens ---------- */
+@media (max-width: 900px) {
+  .siklus, .langkah { grid-template-columns: repeat(2, 1fr); row-gap: 34px; }
+  .baris, .baris:nth-of-type(even) { grid-template-columns: 1fr; }
+  .baris:nth-of-type(even) .tumpuk { order: 0; }
+  .rantai-atas { grid-template-columns: 1fr; gap: 20px; }
+  .kontrak { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  body { font-size: 16px; }
+  .nav { gap: 12px; }
+  .nav-links { display: none; }
+  .nav-play { margin-left: auto; }
+  .hero-copy { margin-top: 28px; }
+  .cta { flex-direction: column; align-items: stretch; }
+  .btn { width: 100%; }
+  .musim-atas { grid-template-columns: 1fr; }
+  .maskot { display: none; }
+  .siklus, .langkah { grid-template-columns: 1fr; }
+  .siklus li { display: grid; grid-template-columns: 72px 1fr; column-gap: 14px; align-items: center; }
+  .sprite { grid-row: span 2; height: 64px; margin: 0; }
+  .sprite img { height: 56px; }
+  .siklus p { margin-top: 2px; }
+  .foto { border-width: 5px; box-shadow: 6px 6px 0 var(--malam-tua); }
+  .badge { top: -26px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .btn { transition: none; }
+  .ticker-jalur { animation: none; }
+}
